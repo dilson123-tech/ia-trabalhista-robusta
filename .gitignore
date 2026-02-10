@@ -26,3 +26,6 @@ htmlcov/
 
 # Outros
 *.pyc
+
+# Backups gerados por scripts
+*.bak_d02_*
