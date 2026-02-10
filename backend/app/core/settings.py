@@ -1,4 +1,5 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import Field
 from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parents[3]
@@ -12,7 +13,7 @@ class Settings(BaseSettings):
     AUDIT_EXCLUDE_PATHS: str = "/api/v1/health,/docs,/openapi.json"
     LOG_HTTP: bool = True
     AUTH_ENABLED: bool = True
-    JWT_SECRET: str = "CHANGE_ME_DEV_ONLY"
+    JWT_SECRET: str = Field(..., min_length=32)
     JWT_ALG: str = "HS256"
     JWT_EXPIRES_MIN: int = 60
     ADMIN_SEED_TOKEN: str = "CHANGE_ME_SEED_TOKEN"
