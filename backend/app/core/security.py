@@ -1,19 +1,26 @@
 import time
+from typing import Literal
+
 import jwt
 from passlib.context import CryptContext
 from fastapi import HTTPException, status, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+
 from app.core.settings import settings
+
+# Conjunto de papéis suportados no sistema
+UserRole = Literal["admin", "advogado", "estagiario", "leitura"]
 
 pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 bearer = HTTPBearer(auto_error=False)
 
 # "DB" in-memory por enquanto (robusto depois com Postgres)
-_USERS = {}  # username -> {password_hash, role}
+_USERS: dict[str, dict[str, str]] = {}  # username -> {password_hash, role}
 
-ROLES = {"admin", "advogado", "estagiario", "leitura"}
+ROLES: set[UserRole] = {"admin", "advogado", "estagiario", "leitura"}
 
-def create_user(username: str, password: str, role: str):
+
+def create_user(username: str, password: str, role: UserRole) -> None:
     if role not in ROLES:
         raise ValueError("invalid role")
     _USERS[username] = {
@@ -21,13 +28,15 @@ def create_user(username: str, password: str, role: str):
         "role": role,
     }
 
+
 def verify_user(username: str, password: str) -> bool:
     u = _USERS.get(username)
     if not u:
         return False
     return pwd_context.verify(password, u["password_hash"])
 
-def issue_token(username: str, role: str) -> str:
+
+def issue_token(username: str, role: UserRole) -> str:
     now = int(time.time())
     payload = {
         "sub": username,
@@ -37,24 +46,29 @@ def issue_token(username: str, role: str) -> str:
     }
     return jwt.encode(payload, settings.JWT_SECRET, algorithm=settings.JWT_ALG)
 
+
 def decode_token(token: str):
     try:
         return jwt.decode(token, settings.JWT_SECRET, algorithms=[settings.JWT_ALG])
     except Exception:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid token")
 
+
 def require_auth(creds: HTTPAuthorizationCredentials = Depends(bearer)):
     if not settings.AUTH_ENABLED:
+        # modo dev: sempre devolve admin para facilitar testes locais
         return {"sub": "dev", "role": "admin"}
     if not creds or not creds.credentials:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="missing token")
     return decode_token(creds.credentials)
 
-def require_role(*allowed):
+
+def require_role(*allowed: UserRole):
     def dep(claims=Depends(require_auth)):
         if not allowed:
             return claims
         if claims.get("role") not in allowed:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
         return claims
+
     return dep
