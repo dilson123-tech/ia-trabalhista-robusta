@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  smoke-backend:
+    runs-on: ubuntu-latest
+
+    env:
+      DATABASE_URL: postgresql+psycopg2://ia_trab_user:ia_trab_pass@localhost:5432/ia_trab
+      JWT_SECRET: dummy_jwt_secret_for_ci_which_is_long_enough_1234567890
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: ia_trab
+          POSTGRES_USER: ia_trab_user
+          POSTGRES_PASSWORD: ia_trab_pass
+        ports:
+          - "5432:5432"
+        options: >-
+          --health-cmd="pg_isready -U ia_trab_user -d ia_trab"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        working-directory: backend
+        run: |
+          python -m venv ../.venv
+          source ../.venv/bin/activate
+          pip install -r requirements.txt
+
+      - name: Run DB migrations (alembic upgrade head)
+        working-directory: backend
+        run: |
+          source ../.venv/bin/activate
+          alembic upgrade head
+
+      - name: Run backend smoke (start server + auth script)
+        run: |
+          cd backend
+          source ../.venv/bin/activate
+
+          uvicorn app.main:app --host 127.0.0.1 --port 8099 &
+          PID=$!
+          echo "Backend PID=$PID"
+
+          for i in {1..30}; do
+            echo "Waiting for backend (try $i)..."
+            if curl -fsS "http://127.0.0.1:8099/api/v1/health" >/dev/null 2>&1; then
+              echo "Backend is up."
+              break
+            fi
+            sleep 1
+          done
+
+          cd ..
+          chmod +x scripts/smoke_auth.sh
+          ./scripts/smoke_auth.sh
+
+          kill "$PID" || true
