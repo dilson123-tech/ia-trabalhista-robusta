@@ -1,0 +1,31 @@
+from fastapi import APIRouter, Depends, Header, HTTPException, status
+from app.core.settings import settings
+from app.core.security import create_user, verify_user, issue_token, require_auth, require_role, _USERS
+from app.schemas.auth import LoginIn, TokenOut, UserOut, SeedAdminIn
+
+router = APIRouter(prefix="/auth", tags=["auth"])
+
+@router.post("/seed-admin")
+def seed_admin(payload: SeedAdminIn, x_seed_token: str = Header(default="")):
+    if x_seed_token != settings.ADMIN_SEED_TOKEN:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid seed token")
+    if payload.username in _USERS:
+        return {"ok": True, "seeded": False, "reason": "already exists"}
+    create_user(payload.username, payload.password, payload.role)
+    return {"ok": True, "seeded": True, "username": payload.username, "role": payload.role}
+
+@router.post("/login", response_model=TokenOut)
+def login(payload: LoginIn):
+    if not verify_user(payload.username, payload.password):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="bad credentials")
+    role = _USERS[payload.username]["role"]
+    token = issue_token(payload.username, role)
+    return TokenOut(access_token=token)
+
+@router.get("/whoami", response_model=UserOut)
+def whoami(claims=Depends(require_auth)):
+    return UserOut(username=claims.get("sub","?"), role=claims.get("role","?"))
+
+@router.get("/admin-only")
+def admin_only(_=Depends(require_role("admin"))):
+    return {"ok": True, "admin": True}

@@ -1,0 +1,28 @@
+# Python / FastAPI
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.log
+
+# Ambiente virtual
+.venv/
+venv/
+
+# Config local / segredos
+.env
+.env.*
+*.db
+*.sqlite3
+
+# Editor / IDE
+.vscode/
+.idea/
+
+# Testes / cobertura
+pytest_cache/
+.coverage
+htmlcov/
+
+# Outros
+*.pyc
