@@ -45,6 +45,12 @@ jobs:
           source ../.venv/bin/activate
           pip install -r requirements.txt
 
+      - name: Run DB migrations (alembic upgrade head)
+        working-directory: backend
+        run: |
+          source ../.venv/bin/activate
+          alembic upgrade head
+
       - name: Run backend smoke (start server + auth script)
         run: |
           cd backend
