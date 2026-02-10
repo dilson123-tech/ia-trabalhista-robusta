@@ -1,18 +1,23 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr  # EmailStr mantido para uso futuro
+from app.core.security import UserRole
+
 
 class LoginIn(BaseModel):
     username: str
     password: str
 
+
 class TokenOut(BaseModel):
     access_token: str
     token_type: str = "bearer"
 
+
 class UserOut(BaseModel):
     username: str
-    role: str
+    role: UserRole
+
 
 class SeedAdminIn(BaseModel):
     username: str
     password: str
-    role: str = "admin"
+    role: UserRole = "admin"
