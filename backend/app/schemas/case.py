@@ -20,3 +20,13 @@ class CaseOut(CaseBase):
 
     class Config:
         from_attributes = True
+
+class CaseAnalysisOut(BaseModel):
+    """Saída pública de uma análise de caso (histórico)."""
+
+    id: int
+    case_id: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True

@@ -2,6 +2,7 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.core.settings import settings
+import uuid
 
 client = TestClient(app)
 
@@ -42,7 +43,7 @@ def test_create_and_get_case_flow():
 
     # cria um case
     create_payload = {
-        "case_number": "0001234-56.2025.5.12.0001",
+        "case_number": f"TEST-{uuid.uuid4().hex[:8]}",
         "title": "Reclamação trabalhista por verbas rescisórias",
         "description": "Reclamante alega não recebimento de férias, 13º e FGTS.",
         "status": "draft",

@@ -2,10 +2,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.models import Case
+from app.models import Case, CaseAnalysis
 from app.schemas import CaseCreate, CaseOut
 from app.core.security import require_role
 from app.services import analyze_case
+from app.services.case_analysis import list_case_analyses
+from app.schemas.case import CaseAnalysisOut
 
 
 router = APIRouter(
@@ -29,11 +31,6 @@ def list_cases(db: Session = Depends(get_db)):
     dependencies=[Depends(require_role("admin", "advogado"))],
 )
 def create_case(payload: CaseCreate, db: Session = Depends(get_db)):
-    # Idempotente por case_number: se já existir, só devolve
-    existing = db.query(Case).filter(Case.case_number == payload.case_number).first()
-    if existing:
-        return existing
-
     # Pydantic v2: usar model_dump() em vez de dict()
     case = Case(**payload.model_dump())
     db.add(case)
@@ -59,6 +56,13 @@ def get_case(case_id: int, db: Session = Depends(get_db)):
     dependencies=[Depends(require_role("admin", "advogado"))],
 )
 def analyze_case_endpoint(case_id: int, db: Session = Depends(get_db)):
+    """
+    Endpoint D07:
+    - Busca o caso
+    - Roda análise baseada em regras
+    - Persiste histórico em case_analyses
+    - Retorna a análise + metadados básicos
+    """
     case = db.query(Case).filter(Case.id == case_id).first()
     if not case:
         raise HTTPException(status_code=404, detail="Case not found")
@@ -69,7 +73,34 @@ def analyze_case_endpoint(case_id: int, db: Session = Depends(get_db)):
         description=case.description,
     )
 
+    record = CaseAnalysis(
+        case_id=case.id,
+        risk_level=analysis["risk_level"],
+        summary=analysis["summary"],
+        issues=analysis["issues"],
+        next_steps=analysis["next_steps"],
+    )
+    db.add(record)
+    db.commit()
+    db.refresh(record)
+
     return {
         "case_id": case.id,
+        "analysis_id": record.id,
+        "created_at": record.created_at,
         "analysis": analysis,
     }
+
+@router.get(
+    "/{case_id}/analysis/history",
+    response_model=list[CaseAnalysisOut],
+    dependencies=[Depends(require_role("admin", "advogado"))],
+)
+def get_case_analysis_history(
+    case_id: int,
+    db: Session = Depends(get_db),
+    limit: int = 20,
+):
+    """Retorna o histórico de análises já realizadas para um caso."""
+    return list_case_analyses(db=db, case_id=case_id, limit=limit)
+
