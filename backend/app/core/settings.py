@@ -1,6 +1,7 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field
 from pathlib import Path
+import os
 
 ROOT_DIR = Path(__file__).resolve().parents[3]
 
@@ -16,8 +17,14 @@ class Settings(BaseSettings):
     JWT_SECRET: str = Field(..., min_length=32)
     JWT_ALG: str = "HS256"
     JWT_EXPIRES_MIN: int = 60
-    ADMIN_SEED_TOKEN: str = "CHANGE_ME_SEED_TOKEN"
+    ADMIN_SEED_TOKEN: str = os.getenv("ADMIN_SEED_TOKEN", "CHANGE_ME_SEED_TOKEN")
     API_V1_PREFIX: str = "/api/v1"
     DATABASE_URL: str = "postgresql+psycopg2://ia_user:ia_pass@127.0.0.1:55432/ia_trabalhista"
 
-settings = Settings()
+from functools import lru_cache
+
+@lru_cache
+def get_settings():
+    return Settings()
+
+settings = get_settings()

@@ -1,74 +1,106 @@
-import time
-from typing import Literal
+from __future__ import annotations
 
-import jwt
-from passlib.context import CryptContext
-from fastapi import HTTPException, status, Depends
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+import bcrypt
+from datetime import datetime, timedelta, timezone
+from typing import Callable, Literal, Optional, Set, Dict, Any
+
+from fastapi import Depends, HTTPException
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from jose import JWTError, jwt
 
 from app.core.settings import settings
 
-# Conjunto de papéis suportados no sistema
+# -----------------------------------------------------------------------------
+# Hardening: bcrypt direto (sem passlib/crypt), compatível com Python 3.13+
+# Mantém a API antiga do projeto (issue_token/require_auth/require_role/pwd_context)
+# para não quebrar rotas e testes.
+# -----------------------------------------------------------------------------
+
 UserRole = Literal["admin", "advogado", "estagiario", "leitura"]
+ROLES: Set[UserRole] = {"admin", "advogado", "estagiario", "leitura"}
 
-pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
-bearer = HTTPBearer(auto_error=False)
+BCRYPT_ROUNDS = 12  # 10-14 comum; 12 é um bom default.
+_bearer = HTTPBearer(auto_error=False)
 
-# "DB" in-memory por enquanto (robusto depois com Postgres)
-_USERS: dict[str, dict[str, str]] = {}  # username -> {password_hash, role}
+def hash_password(password: str) -> str:
+    if not isinstance(password, str) or not password:
+        raise ValueError("password must be a non-empty string")
+    pw = password.encode("utf-8")
+    h = bcrypt.hashpw(pw, bcrypt.gensalt(rounds=BCRYPT_ROUNDS))
+    return h.decode("utf-8")
 
-ROLES: set[UserRole] = {"admin", "advogado", "estagiario", "leitura"}
-
-
-def create_user(username: str, password: str, role: UserRole) -> None:
-    if role not in ROLES:
-        raise ValueError("invalid role")
-    _USERS[username] = {
-        "password_hash": pwd_context.hash(password),
-        "role": role,
-    }
-
-
-def verify_user(username: str, password: str) -> bool:
-    u = _USERS.get(username)
-    if not u:
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    if not plain_password or not hashed_password:
         return False
-    return pwd_context.verify(password, u["password_hash"])
+    try:
+        return bcrypt.checkpw(
+            plain_password.encode("utf-8"),
+            hashed_password.encode("utf-8"),
+        )
+    except Exception:
+        return False
 
+class _PwdContextCompat:
+    # drop-in compat para código que fazia pwd_context.hash/verify
+    def hash(self, password: str) -> str:
+        return hash_password(password)
+
+    def verify(self, plain_password: str, hashed_password: str) -> bool:
+        return verify_password(plain_password, hashed_password)
+
+pwd_context = _PwdContextCompat()
 
 def issue_token(username: str, role: UserRole) -> str:
-    now = int(time.time())
-    payload = {
+    if role not in ROLES:
+        raise HTTPException(status_code=400, detail="invalid role")
+
+    now = datetime.now(timezone.utc)
+    exp = now + timedelta(minutes=int(getattr(settings, "JWT_EXPIRES_MIN", 60) or 60))
+
+    claims = {
         "sub": username,
         "role": role,
-        "iat": now,
-        "exp": now + settings.JWT_EXPIRES_MIN * 60,
+        "iat": int(now.timestamp()),
+        "exp": int(exp.timestamp()),
     }
-    return jwt.encode(payload, settings.JWT_SECRET, algorithm=settings.JWT_ALG)
 
+    secret = getattr(settings, "JWT_SECRET", None) or getattr(settings, "AUTH_JWT_SECRET", None)
+    alg = getattr(settings, "JWT_ALG", None) or getattr(settings, "AUTH_JWT_ALG", None) or "HS256"
 
-def decode_token(token: str):
+    if not secret:
+        raise HTTPException(status_code=500, detail="JWT secret not configured")
+
+    return jwt.encode(claims, secret, algorithm=alg)
+
+def require_auth(
+    creds: Optional[HTTPAuthorizationCredentials] = Depends(_bearer),
+) -> Dict[str, Any]:
+    if creds is None or not creds.credentials:
+        raise HTTPException(status_code=401, detail="missing token")
+
+    token = creds.credentials
+    secret = getattr(settings, "JWT_SECRET", None) or getattr(settings, "AUTH_JWT_SECRET", None)
+    alg = getattr(settings, "JWT_ALG", None) or getattr(settings, "AUTH_JWT_ALG", None) or "HS256"
+
+    if not secret:
+        raise HTTPException(status_code=500, detail="JWT secret not configured")
+
     try:
-        return jwt.decode(token, settings.JWT_SECRET, algorithms=[settings.JWT_ALG])
-    except Exception:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid token")
+        claims = jwt.decode(token, secret, algorithms=[alg])
+        # sanity mínima
+        if "sub" not in claims or "role" not in claims:
+            raise HTTPException(status_code=401, detail="invalid token")
+        return claims
+    except JWTError:
+        raise HTTPException(status_code=401, detail="invalid token")
 
+def require_role(*allowed_roles: UserRole) -> Callable[..., Dict[str, Any]]:
+    allowed: Set[UserRole] = set(allowed_roles)
 
-def require_auth(creds: HTTPAuthorizationCredentials = Depends(bearer)):
-    if not settings.AUTH_ENABLED:
-        # modo dev: sempre devolve admin para facilitar testes locais
-        return {"sub": "dev", "role": "admin"}
-    if not creds or not creds.credentials:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="missing token")
-    return decode_token(creds.credentials)
-
-
-def require_role(*allowed: UserRole):
-    def dep(claims=Depends(require_auth)):
-        if not allowed:
-            return claims
-        if claims.get("role") not in allowed:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
+    def _dep(claims: Dict[str, Any] = Depends(require_auth)) -> Dict[str, Any]:
+        role = claims.get("role")
+        if allowed and role not in allowed:
+            raise HTTPException(status_code=403, detail="forbidden")
         return claims
 
-    return dep
+    return _dep

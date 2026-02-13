@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
-from app.core.settings import settings
+from app.core.settings import get_settings
 from app.core.security import issue_token, require_auth, require_role, pwd_context
 from app.db.session import get_db
 from app.models.user import User
@@ -18,12 +18,16 @@ def seed_admin(
     x_seed_token: str = Header(default=""),
     db: Session = Depends(get_db),
 ):
-    if x_seed_token != settings.ADMIN_SEED_TOKEN:
+    if x_seed_token != get_settings().ADMIN_SEED_TOKEN:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid seed token")
 
     existing = db.execute(select(User).where(User.username == payload.username)).scalar_one_or_none()
     if existing:
-        return {"ok": True, "seeded": False, "reason": "already exists"}
+        existing.password_hash = pwd_context.hash(payload.password)
+        existing.role = payload.role
+        db.add(existing)
+        db.commit()
+        return {"ok": True, "seeded": True, "updated": True, "username": payload.username, "role": payload.role}
 
     u = User(
         username=payload.username,

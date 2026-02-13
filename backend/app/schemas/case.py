@@ -1,5 +1,5 @@
 from datetime import datetime
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class CaseBase(BaseModel):
@@ -18,15 +18,4 @@ class CaseOut(CaseBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
-
-class CaseAnalysisOut(BaseModel):
-    """Saída pública de uma análise de caso (histórico)."""
-
-    id: int
-    case_id: int
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

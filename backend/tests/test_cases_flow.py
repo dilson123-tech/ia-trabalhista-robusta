@@ -19,7 +19,7 @@ def _auth_headers():
     r_seed = client.post(
         "/api/v1/auth/seed-admin",
         json=seed_payload,
-        headers={"x-seed-token": settings.ADMIN_SEED_TOKEN},
+        headers={"x-seed-token": "TEST_SEED_TOKEN_123"},
     )
     assert r_seed.status_code == 200
     body_seed = r_seed.json()

@@ -7,7 +7,7 @@ from app.schemas import CaseCreate, CaseOut
 from app.core.security import require_role
 from app.services import analyze_case
 from app.services.case_analysis import list_case_analyses
-from app.schemas.case import CaseAnalysisOut
+from app.schemas.case_analysis import CaseAnalysisOut
 
 
 router = APIRouter(
@@ -72,6 +72,15 @@ def analyze_case_endpoint(case_id: int, db: Session = Depends(get_db)):
         title=case.title,
         description=case.description,
     )
+
+    # hardening: garante issues como dict (schema espera dict; evita [] quebrar response_model)
+    issues = analysis.get("issues")
+    if issues is None:
+        analysis["issues"] = {}
+    elif isinstance(issues, list):
+        analysis["issues"] = {"items": issues}
+    elif not isinstance(issues, dict):
+        analysis["issues"] = {"value": issues}
 
     record = CaseAnalysis(
         case_id=case.id,

@@ -1,22 +1,27 @@
 from fastapi.testclient import TestClient
 from app.main import app
+from app.core.settings import settings
 import uuid
 
 client = TestClient(app)
 
 def login_admin():
     # cria admin (se não existir)
-    client.post(
+    resp_seed = client.post(
         "/api/v1/auth/seed-admin",
-        headers={"x-seed-token": "CHANGE_ME_SEED_TOKEN"},
+        headers={"x-seed-token": "TEST_SEED_TOKEN_123"},
         json={"username": "admin_test", "password": "123456", "role": "admin"},
     )
+    assert resp_seed.status_code in (200, 201, 409), f"seed failed: {resp_seed.status_code} {resp_seed.text}"
 
     r = client.post(
         "/api/v1/auth/login",
         json={"username": "admin_test", "password": "123456"},
     )
-    return r.json()["access_token"]
+    assert r.status_code == 200, f"login failed: {r.status_code} {r.text}"
+    data = r.json()
+    assert "access_token" in data, f"no access_token: {data}"
+    return data["access_token"]
 
 
 def test_case_analysis_history_flow():

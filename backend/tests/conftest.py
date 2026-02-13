@@ -1,8 +1,13 @@
-import sys
-from pathlib import Path
+import os
+import pytest
 
-# BASE_DIR = raiz do backend (onde fica app/)
-BASE_DIR = Path(__file__).resolve().parents[1]
+@pytest.fixture(autouse=True, scope="session")
+def _test_env_defaults():
+    os.environ["ADMIN_SEED_TOKEN"] = "TEST_SEED_TOKEN_123"
+    os.environ.setdefault("JWT_SECRET", "x" * 64)
 
-if str(BASE_DIR) not in sys.path:
-    sys.path.insert(0, str(BASE_DIR))
+    # limpar cache do settings (import tardio para evitar ciclo)
+    from app.core.settings import get_settings
+    get_settings.cache_clear()
+
+    yield
