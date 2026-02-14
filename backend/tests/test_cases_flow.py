@@ -1,4 +1,5 @@
 from fastapi.testclient import TestClient
+import uuid
 
 from app.main import app
 from app.core.settings import settings
@@ -9,8 +10,8 @@ client = TestClient(app)
 def _auth_headers():
     # garante que existe um admin seedado e faz login
     seed_payload = {
-        "username": "admin_d07@example.com",
-        "password": "admin_d07_pass",
+        "username": f"admin_d07_{uuid.uuid4().hex[:8]}@example.com",
+        "password": f"admin_d07_pass_{uuid.uuid4().hex[:8]}",
         "role": "admin",
     }
 

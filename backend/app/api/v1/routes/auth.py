@@ -40,6 +40,32 @@ def seed_admin(
     return {"ok": True, "seeded": True, "username": payload.username, "role": payload.role}
 
 
+
+@router.post("/users", response_model=UserOut, dependencies=[Depends(require_role("admin"))])
+def create_user(payload: SeedAdminIn, db: Session = Depends(get_db)):
+    """
+    Cria usuário (admin-only).
+    Reaproveita SeedAdminIn: {username,password,role}.
+    """
+    existing = db.execute(select(User).where(User.username == payload.username)).scalar_one_or_none()
+    if existing:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="username already exists")
+
+    u = User(
+        username=payload.username,
+        password_hash=pwd_context.hash(payload.password),
+        role=payload.role,
+    )
+    db.add(u)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="username already exists")
+    db.refresh(u)
+    return UserOut(username=u.username, role=u.role)
+
+
 @router.post("/login", response_model=TokenOut)
 def login(payload: LoginIn, db: Session = Depends(get_db)):
     u = db.execute(select(User).where(User.username == payload.username)).scalar_one_or_none()
