@@ -11,7 +11,7 @@ from app.core.settings import settings
 # Conjunto de papéis suportados no sistema
 UserRole = Literal["admin", "advogado", "estagiario", "leitura"]
 
-pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
+pwd_context = CryptContext(schemes=["pbkdf2_sha256","bcrypt"], deprecated="auto")
 bearer = HTTPBearer(auto_error=False)
 
 # "DB" in-memory por enquanto (robusto depois com Postgres)
@@ -36,11 +36,12 @@ def verify_user(username: str, password: str) -> bool:
     return pwd_context.verify(password, u["password_hash"])
 
 
-def issue_token(username: str, role: UserRole) -> str:
+def issue_token(username: str, role: UserRole, tenant_id: int) -> str:
     now = int(time.time())
     payload = {
         "sub": username,
         "role": role,
+        "tenant_id": tenant_id,
         "iat": now,
         "exp": now + settings.JWT_EXPIRES_MIN * 60,
     }
@@ -57,7 +58,7 @@ def decode_token(token: str):
 def require_auth(creds: HTTPAuthorizationCredentials = Depends(bearer)):
     if not settings.AUTH_ENABLED:
         # modo dev: sempre devolve admin para facilitar testes locais
-        return {"sub": "dev", "role": "admin"}
+        return {"sub": "dev", "role": "admin", "tenant_id": 1}
     if not creds or not creds.credentials:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="missing token")
     return decode_token(creds.credentials)
