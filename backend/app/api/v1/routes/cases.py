@@ -1,10 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException
+from app.services.viability_engine import calculate_viability
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.models import Case, CaseAnalysis
 from app.schemas import CaseCreate, CaseOut
 from app.core.security import require_role, require_auth
+from app.services.report_engine import generate_report_html
+from app.services.viability_engine import calculate_viability
+from app.services.strategic_diagnosis import strategic_diagnosis
 from app.services import analyze_case
 from app.core.tenant import scoped_query
 
@@ -106,6 +110,19 @@ def analyze_case_endpoint(
         description=case.description,
     )
 
+    strategic = strategic_diagnosis(analysis)
+
+    full_analysis = {
+
+
+        "technical": analysis,
+        "strategic": strategic,
+        "viability": viability,
+    }
+
+    viability = calculate_viability(analysis)
+
+
     record = CaseAnalysis(
         tenant_id=current_user["tenant_id"],
         case_id=case.id,
@@ -113,7 +130,7 @@ def analyze_case_endpoint(
         summary=analysis.get("summary", ""),
         issues=analysis.get("issues", []),
         next_steps=analysis.get("next_steps", []),
-        analysis=analysis,
+          analysis=full_analysis,
     )
 
     db.add(record)
@@ -123,6 +140,50 @@ def analyze_case_endpoint(
     return {
         "case_id": case.id,
         "analysis_id": record.id,
-        "analysis": analysis,
+          "analysis": full_analysis,
+        "viability": viability,
     }
 
+    viability = calculate_viability(analysis)
+
+
+
+
+@router.get(
+    "/{case_id}/report",
+    dependencies=[Depends(require_role("admin", "advogado"))],
+)
+def generate_case_report(
+    case_id: int,
+    db: Session = Depends(get_db),
+    current_user = Depends(require_auth),
+):
+    # Busca case respeitando tenant
+    case = scoped_query(db, Case, current_user).filter(Case.id == case_id).first()
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
+
+    # Busca análise salva
+    analysis_record = (
+        db.query(CaseAnalysis)
+        .filter(
+            CaseAnalysis.case_id == case.id,
+            CaseAnalysis.tenant_id == current_user["tenant_id"],
+        )
+        .first()
+    )
+
+    if not analysis_record:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+
+    html = generate_report_html(
+        case={
+            "case_number": case.case_number,
+            "title": case.title,
+            "description": case.description,
+        },
+        analysis=analysis_record.analysis,
+        viability=calculate_viability(analysis_record.analysis),
+    )
+
+    return {"report_html": html}
