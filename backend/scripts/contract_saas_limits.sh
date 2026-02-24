@@ -23,7 +23,7 @@ reset_usage_counters() {
   fi
 
   echo "[contract] resetting usage_counters for tenant 1 (current month)..."
-  if command -v docker >/dev/null 2>&1 && docker ps --format '{{.Names}}' | rg -q '^ia_trabalhista_db$'; then
+  if command -v docker >/dev/null 2>&1 && docker ps --format '{{.Names}}' | grep -Eq '^ia_trabalhista_db$'; then
     docker exec -i ia_trabalhista_db psql -U ia_app_runtime -d ia_trabalhista -v ON_ERROR_STOP=1 -c "SELECT set_config('app.tenant_id','1',false); DELETE FROM usage_counters WHERE tenant_id=1 AND month = date_trunc('month', now())::date;" >/dev/null
     return 0
   fi
@@ -49,18 +49,16 @@ echo "[contract] port=${PORT}"
 echo "[contract] log=${LOG}"
 
 # Ensure DB container is running (best-effort)
+# Local dev may use docker container ia_trabalhista_db; CI uses postgres service.
 if command -v docker >/dev/null 2>&1; then
-  if ! docker ps --format '{{.Names}}' | rg -q '^ia_trabalhista_db$'; then
-    echo "[contract] starting docker container ia_trabalhista_db..."
-    docker start ia_trabalhista_db >/dev/null
-    sleep 1
-    echo "[contract] resetting usage_counters for tenant 1 (current month)..."
-    docker exec -i ia_trabalhista_db psql -U ia_app_runtime -d ia_trabalhista -v ON_ERROR_STOP=1 -c "SELECT set_config('app.tenant_id','1',false); DELETE FROM usage_counters WHERE tenant_id=1 AND month = date_trunc('month', now())::date;" >/dev/null
+  if docker ps -a --format '{{.Names}}' | grep -Eq '^ia_trabalhista_db$'; then
+    if ! docker ps --format '{{.Names}}' | grep -Eq '^ia_trabalhista_db$'; then
+      echo "[contract] starting docker container ia_trabalhista_db..."
+      docker start ia_trabalhista_db >/dev/null || true
+      sleep 1
+    fi
   fi
 fi
-
-
-reset_usage_counters
 
 # Start API
 echo "[contract] starting uvicorn..."
