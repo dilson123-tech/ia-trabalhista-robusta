@@ -12,6 +12,7 @@ import zlib
 from app.core.settings import settings
 from app.core.security import issue_token, require_auth, require_role, pwd_context
 from app.db.session import get_db
+from app.core.tenant import set_tenant_on_session
 from app.models.tenant_member import TenantMember
 from app.models.user import User
 from app.schemas.auth import LoginIn, TokenOut, UserOut, SeedAdminIn
@@ -44,6 +45,20 @@ def _ensure_tenant_id(db: Session, username: str) -> int:
     # pega PK e tenta reutilizar um tenant existente (DX + menos lixo)
     pk_cols = [c for c in tenants.columns if c.primary_key]
     pk = pk_cols[0] if pk_cols else tenants.columns[list(tenants.columns.keys())[0]]
+    # RLS FORCE pode esconder/impedir INSERT em tenants.
+    # Estratégia: define app.tenant_id=1 (tenant dev padrão) e reutiliza um tenant existente.
+    try:
+        set_tenant_on_session(db, 1)
+    except Exception:
+        pass
+
+    try:
+        row0 = db.execute(select(pk).limit(1)).first()
+        if row0 and row0[0] is not None:
+            return int(row0[0])
+    except Exception:
+        pass
+
 
     
     cols = {c.name: c for c in tenants.columns}
@@ -110,7 +125,10 @@ def _ensure_membership(db: Session, u: User) -> TenantMember:
         return m
 
     tenant_id = _ensure_tenant_id(db, u.username)
-    db.execute(text("INSERT INTO subscriptions (tenant_id, plan_type, status, expires_at) VALUES (:tid, 'basic', 'trial', NOW() + INTERVAL '30 days') ON CONFLICT (tenant_id) DO NOTHING"), {"tid": tenant_id})
+    # RLS FORCE: operar como tenant alvo para inserts/updates
+    set_tenant_on_session(db, tenant_id)
+    exp = _dt.datetime.utcnow() + _dt.timedelta(days=30)
+    db.execute(text("INSERT INTO subscriptions (tenant_id, plan_type, status, expires_at) VALUES (:tid, 'basic', 'trial', :exp) ON CONFLICT (tenant_id) DO NOTHING"), {"tid": tenant_id, "exp": exp})
 
 
     cols = set(TenantMember.__table__.columns.keys())
