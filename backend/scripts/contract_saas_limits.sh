@@ -103,10 +103,32 @@ JSON
 }
 
 echo "[contract] create 2 cases (expect 200)..."
-R1="$(curl -fsS -X POST "${API}/cases" -H "Content-Type: application/json" -d "$(mk_payload 1)")"
-ID1="$(jq -r '.id' <<<"${R1}")"
-R2="$(curl -fsS -X POST "${API}/cases" -H "Content-Type: application/json" -d "$(mk_payload 2)")"
-ID2="$(jq -r '.id' <<<"${R2}")"
+
+case1_out="/tmp/contract_case1_${RUN_ID}.json"
+case2_out="/tmp/contract_case2_${RUN_ID}.json"
+
+CODE1="$(curl -sS -o "${case1_out}" -w "%{http_code}" \
+  -X POST "${API}/cases" -H "Content-Type: application/json" -d "$(mk_payload 1)")"
+if [ "${CODE1}" != "200" ]; then
+  echo "[contract] FAIL: expected 200 on case1, got ${CODE1}"
+  cat "${case1_out}" || true
+  echo "[contract] tail log:"
+  tail -n 120 "${LOG}" || true
+  exit 1
+fi
+ID1="$(jq -r '.id' < "${case1_out}")"
+
+CODE2="$(curl -sS -o "${case2_out}" -w "%{http_code}" \
+  -X POST "${API}/cases" -H "Content-Type: application/json" -d "$(mk_payload 2)")"
+if [ "${CODE2}" != "200" ]; then
+  echo "[contract] FAIL: expected 200 on case2, got ${CODE2}"
+  cat "${case2_out}" || true
+  echo "[contract] tail log:"
+  tail -n 120 "${LOG}" || true
+  exit 1
+fi
+ID2="$(jq -r '.id' < "${case2_out}")"
+
 echo "[contract] ids: ${ID1}, ${ID2}"
 
 echo "[contract] create 3rd case (expect 402)..."
