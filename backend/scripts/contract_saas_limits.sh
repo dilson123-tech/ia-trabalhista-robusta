@@ -23,7 +23,84 @@ reset_usage_counters() {
   fi
 
   echo "[contract] resetting usage_counters for tenant 1 (current month)..."
+
+SQL_ENSURE_TENANT_1=$(cat <<'SQL'
+DO $$
+DECLARE
+  cols text := '';
+  vals text := '';
+  r record;
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM tenants WHERE id=1) THEN
+    -- Sempre tenta setar campos comuns se existirem
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tenants' AND column_name='id') THEN
+      cols := cols || 'id,';
+      vals := vals || '1,';
+    END IF;
+
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tenants' AND column_name='name') THEN
+      cols := cols || 'name,';
+      vals := vals || quote_literal('Tenant CI') || ',';
+    END IF;
+
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tenants' AND column_name='slug') THEN
+      cols := cols || 'slug,';
+      vals := vals || quote_literal('tenant-ci') || ',';
+    END IF;
+
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tenants' AND column_name='created_at') THEN
+      cols := cols || 'created_at,';
+      vals := vals || 'now(),';
+    END IF;
+
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tenants' AND column_name IN ('is_active','active','enabled')) THEN
+      -- pega o primeiro que existir
+      IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tenants' AND column_name='is_active') THEN
+        cols := cols || 'is_active,';
+      ELSIF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tenants' AND column_name='active') THEN
+        cols := cols || 'active,';
+      ELSE
+        cols := cols || 'enabled,';
+      END IF;
+      vals := vals || 'true,';
+    END IF;
+
+    -- Completa qualquer NOT NULL sem default (best-effort)
+    FOR r IN
+      SELECT column_name, data_type
+      FROM information_schema.columns
+      WHERE table_name='tenants'
+        AND is_nullable='NO'
+        AND column_default IS NULL
+        AND column_name NOT IN ('id')
+    LOOP
+      IF position(r.column_name in cols) = 0 THEN
+        cols := cols || quote_ident(r.column_name) || ',';
+        IF r.data_type IN ('character varying','text','character') THEN
+          vals := vals || quote_literal('') || ',';
+        ELSIF r.data_type IN ('integer','bigint','smallint','numeric','double precision','real') THEN
+          vals := vals || '0,';
+        ELSIF r.data_type = 'boolean' THEN
+          vals := vals || 'true,';
+        ELSIF r.data_type LIKE '%timestamp%' THEN
+          vals := vals || 'now(),';
+        ELSE
+          vals := vals || 'NULL,';
+        END IF;
+      END IF;
+    END LOOP;
+
+    cols := left(cols, length(cols)-1);
+    vals := left(vals, length(vals)-1);
+
+    EXECUTE format('INSERT INTO tenants (%s) VALUES (%s)', cols, vals);
+  END IF;
+END $$;
+SQL
+)
+
   if command -v docker >/dev/null 2>&1 && docker ps --format '{{.Names}}' | grep -Eq '^ia_trabalhista_db$'; then
+    docker exec -i ia_trabalhista_db psql -U ia_app_runtime -d ia_trabalhista -v ON_ERROR_STOP=1 -c "$SQL_ENSURE_TENANT_1" >/dev/null
     docker exec -i ia_trabalhista_db psql -U ia_app_runtime -d ia_trabalhista -v ON_ERROR_STOP=1 -c "SELECT set_config('app.tenant_id','1',false); DELETE FROM usage_counters WHERE tenant_id=1 AND month = date_trunc('month', now())::date;" >/dev/null
     return 0
   fi
@@ -33,8 +110,10 @@ reset_usage_counters() {
     if [ -n "${DATABASE_URL:-}" ]; then
       # SQLAlchemy URL -> psql precisa de libpq URL. Se já for postgres://, ok. Se for postgresql+psycopg2://, converte.
       PSQL_URL="${DATABASE_URL/postgresql+psycopg2:\/\//postgresql:\/\/}"
+      psql "${PSQL_URL}" -v ON_ERROR_STOP=1 -c "$SQL_ENSURE_TENANT_1" >/dev/null
       psql "${PSQL_URL}" -v ON_ERROR_STOP=1 -c "SELECT set_config('app.tenant_id','1',false); DELETE FROM usage_counters WHERE tenant_id=1 AND month = date_trunc('month', now())::date;" >/dev/null
     else
+      psql "postgresql://ia_trab_user:ia_trab_pass@localhost:5432/ia_trab" -v ON_ERROR_STOP=1 -c "$SQL_ENSURE_TENANT_1" >/dev/null
       psql "postgresql://ia_trab_user:ia_trab_pass@localhost:5432/ia_trab" -v ON_ERROR_STOP=1 -c "SELECT set_config('app.tenant_id','1',false); DELETE FROM usage_counters WHERE tenant_id=1 AND month = date_trunc('month', now())::date;" >/dev/null
     fi
     return 0
