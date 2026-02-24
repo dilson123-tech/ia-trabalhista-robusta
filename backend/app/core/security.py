@@ -6,6 +6,7 @@ from passlib.context import CryptContext
 from fastapi import HTTPException, status, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy import text
+from sqlalchemy import select, inspect, Table, MetaData
 from sqlalchemy.orm import Session
 
 from app.core.settings import settings
@@ -42,12 +43,71 @@ def decode_token(token: str):
         )
 
 
+
+def _ensure_dev_tenant(db: "Session", tenant_id: int = 1) -> None:
+    """
+    DEV/CI bootstrap:
+    garante que exista tenants.id=tenant_id para não quebrar FK do usage_counters
+    quando AUTH_ENABLED=false (tenant fixo).
+    Respeita RLS porque o caller já setou app.tenant_id.
+    """
+    bind = db.get_bind()
+    insp = inspect(bind)
+    tables = set(insp.get_table_names() or [])
+    if "tenants" not in tables:
+        return
+
+    md = MetaData()
+    tenants = Table("tenants", md, autoload_with=bind)
+
+    # já existe?
+    row = db.execute(select(tenants.c.id).where(tenants.c.id == tenant_id)).first()
+    if row:
+        return
+
+    cols = {c.name: c for c in tenants.columns}
+    payload: dict = {}
+
+    if "id" in cols:
+        payload["id"] = tenant_id
+    if "name" in cols:
+        payload["name"] = f"Tenant {tenant_id}"
+    if "slug" in cols:
+        payload["slug"] = f"tenant-{tenant_id}"
+    elif "code" in cols:
+        payload["code"] = f"tenant-{tenant_id}"
+
+    # completa NOT NULL sem default (best-effort)
+    for c in tenants.columns:
+        if c.primary_key or c.name in payload:
+            continue
+        if c.nullable or c.default is not None or c.server_default is not None:
+            continue
+
+        if c.name in ("created_at", "created"):
+            payload[c.name] = datetime.now(timezone.utc)
+        elif c.name in ("is_active", "active", "enabled"):
+            payload[c.name] = True
+        else:
+            py = getattr(c.type, "python_type", None)
+            if py is str:
+                payload[c.name] = ""
+            elif py is int:
+                payload[c.name] = 0
+            elif py is bool:
+                payload[c.name] = True
+            else:
+                payload[c.name] = None
+
+    db.execute(tenants.insert().values(**payload))
+
 def require_auth(
     creds: HTTPAuthorizationCredentials = Depends(bearer),
     db: Session = Depends(get_db),
 ):
     if not settings.AUTH_ENABLED:
         set_tenant_on_session(db, 1)
+        _ensure_dev_tenant(db, 1)
         return {"sub": "dev", "role": "admin", "tenant_id": 1}
 
     if not creds or not creds.credentials:
