@@ -14,6 +14,7 @@ class CaseCreate(CaseBase):
 
 
 class CaseOut(CaseBase):
+    tenant_id: int
     id: int
     created_at: datetime
     updated_at: datetime

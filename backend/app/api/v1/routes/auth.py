@@ -1,5 +1,7 @@
 from fastapi import APIRouter, Depends, Header, HTTPException, status
+from sqlalchemy import text
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from sqlalchemy import select, inspect, Table, MetaData
 from sqlalchemy.exc import IntegrityError
 
@@ -108,6 +110,8 @@ def _ensure_membership(db: Session, u: User) -> TenantMember:
         return m
 
     tenant_id = _ensure_tenant_id(db, u.username)
+    db.execute(text("INSERT INTO subscriptions (tenant_id, plan_type, status, expires_at) VALUES (:tid, 'basic', 'trial', NOW() + INTERVAL '30 days') ON CONFLICT (tenant_id) DO NOTHING"), {"tid": tenant_id})
+
 
     cols = set(TenantMember.__table__.columns.keys())
     data: dict = {}
@@ -204,6 +208,8 @@ def create_user(payload: SeedAdminIn, db: Session = Depends(get_db)):
     return UserOut(username=u.username, role=u.role)
 
 
+
+
 @router.post("/login", response_model=TokenOut)
 def login(payload: LoginIn, db: Session = Depends(get_db)):
     u = db.execute(select(User).where(User.username == payload.username)).scalar_one_or_none()
@@ -214,12 +220,15 @@ def login(payload: LoginIn, db: Session = Depends(get_db)):
             detail="bad credentials",
         )
 
-    # vínculo com tenant (auto-provision em DEV/CI)
-    membership = _ensure_membership(db, u)
+    membership = db.execute(
+        select(TenantMember).where(TenantMember.user_id == u.id)
+    ).scalar_one_or_none()
+
+    if not membership:
+        raise HTTPException(status_code=403, detail="no tenant membership")
 
     token = issue_token(u.username, u.role, membership.tenant_id)
     return TokenOut(access_token=token)
-
 
 @router.get("/whoami", response_model=UserOut)
 def whoami(claims=Depends(require_auth)):

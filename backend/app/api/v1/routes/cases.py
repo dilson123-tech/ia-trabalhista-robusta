@@ -7,14 +7,14 @@ from app.db.session import get_db
 from app.models import Case, CaseAnalysis
 from app.schemas import CaseCreate, CaseOut
 from app.core.security import require_role, require_auth
+from app.core.tenant import scoped_query
 from app.services.report_engine import generate_report_html
 from app.services.strategic_diagnosis import strategic_diagnosis
 from app.services.decision_engine import generate_decision
 from app.services.pdf_executive import generate_executive_pdf
 from app.services import analyze_case
-from app.core.tenant import scoped_query
-
-
+from app.services.usage import register_usage
+from app.services.plan_enforcement import enforce_plan_limits, PlanAction
 router = APIRouter(
     prefix="/cases",
     tags=["cases"],
@@ -50,15 +50,31 @@ def create_case(
     if existing:
         return existing
 
+    enforce_plan_limits(db, current_user["tenant_id"], PlanAction.CASE_CREATE)
+
     # Pydantic v2: usar model_dump() em vez de dict()
     case = Case(
         tenant_id=current_user["tenant_id"],
         **payload.model_dump(),
     )
     db.add(case)
+    db.flush()
+
+    register_usage(db, current_user["tenant_id"], "case_created", case.id)
+
     db.commit()
-    db.refresh(case)
-    return case
+    response_data = {
+        "id": case.id,
+        "case_number": case.case_number,
+        "title": case.title,
+        "description": case.description,
+        "status": case.status,
+        "created_at": case.created_at,
+        "updated_at": case.updated_at,
+        "tenant_id": case.tenant_id,
+    }
+
+    return response_data
 
 
 @router.get(
@@ -88,7 +104,7 @@ def analyze_case_endpoint(
     if not case:
         raise HTTPException(status_code=404, detail="Case not found")
 
-    
+
     # Verifica se já existe análise para esse case + tenant (idempotência)
     existing_analysis = (
         db.query(CaseAnalysis)
@@ -183,7 +199,6 @@ def analyze_case_endpoint(
 
     db.add(record)
 
-    db.commit()
 
     db.refresh(record)
 
@@ -394,44 +409,44 @@ def generate_executive_pdf_route(
         .first()
     )
 
-    
-    if not analysis:
-            analysis_data = analyze_case(
-                case_number=case.case_number,
-                title=case.title,
-                description=case.description,
-            )
-    
-            strategic = strategic_diagnosis(analysis_data)
-            viability = calculate_viability(analysis_data)
-            decision = generate_decision(analysis_data, viability)
-    
-            record = CaseAnalysis(
-                tenant_id=current_user["tenant_id"],
-                case_id=case.id,
-                risk_level=analysis_data.get("risk_level", "medium"),
-                summary=analysis_data.get("summary", ""),
-                issues=analysis_data.get("issues", []),
-                next_steps=analysis_data.get("next_steps", []),
-                analysis={
-                    "technical": analysis_data,
-                    "strategic": strategic,
-                    "viability": viability,
-                    "decision": decision,
-                },
-                executive_data={
-                    "viability": viability,
-                    "decision": decision,
-                    "strategic": strategic,
-                },
-            )
-    
-            db.add(record)
-            db.commit()
-            db.refresh(record)
-    
-            analysis = record
 
+    if not analysis:
+        enforce_plan_limits(db, current_user["tenant_id"], PlanAction.AI_ANALYSIS_CREATE)
+
+        analysis_data = analyze_case(
+            case_number=case.case_number,
+            title=case.title,
+            description=case.description,
+        )
+
+        strategic = strategic_diagnosis(analysis_data)
+        viability = calculate_viability(analysis_data)
+        decision = generate_decision(analysis_data, viability)
+
+        record = CaseAnalysis(
+            tenant_id=current_user["tenant_id"],
+            case_id=case.id,
+            risk_level=analysis_data.get("risk_level", "medium"),
+            summary=analysis_data.get("summary", ""),
+            issues=analysis_data.get("issues", []),
+            next_steps=analysis_data.get("next_steps", []),
+            analysis={
+                "technical": analysis_data,
+                "strategic": strategic,
+                "viability": viability,
+                "decision": decision,
+            },
+            executive_data={
+                "viability": viability,
+                "decision": decision,
+                "strategic": strategic,
+            },
+        )
+
+        db.add(record)
+        db.commit()
+        db.refresh(record)
+        analysis = record
 
     pdf_bytes = generate_executive_pdf(
         case_data={
@@ -444,8 +459,5 @@ def generate_executive_pdf_route(
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
-        headers={
-            "Content-Disposition": f"inline; filename=executive_case_{case.id}.pdf"
-        },
+        headers={"Content-Disposition": f"inline; filename=executive_case_{case.id}.pdf"},
     )
-

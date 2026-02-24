@@ -19,6 +19,12 @@ class Tenant(Base):
         index=True,
     )
 
+    plan: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+        server_default="free",
+    )
+
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
