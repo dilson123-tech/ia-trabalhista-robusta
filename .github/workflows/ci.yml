@@ -74,3 +74,63 @@ jobs:
           ./scripts/smoke_auth.sh
 
           kill "$PID" || true
+
+
+  contract-saas-limits:
+    runs-on: ubuntu-latest
+
+    env:
+      DATABASE_URL: postgresql+psycopg2://ia_trab_user:ia_trab_pass@localhost:5432/ia_trab
+      JWT_SECRET: dummy_jwt_secret_for_ci_which_is_long_enough_1234567890
+      AUTH_ENABLED: "false"
+      PLAN_BASIC_CASES_PER_MONTH: "2"
+      PLAN_BASIC_AI_ANALYSES_PER_MONTH: "1"
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: ia_trab
+          POSTGRES_USER: ia_trab_user
+          POSTGRES_PASSWORD: ia_trab_pass
+        ports:
+          - "5432:5432"
+        options: >-
+          --health-cmd="pg_isready -U ia_trab_user -d ia_trab"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install OS deps (psql client)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Install dependencies
+        working-directory: backend
+        run: |
+          python -m venv ../.venv
+          source ../.venv/bin/activate
+          pip install -r requirements.txt
+
+      - name: Run DB migrations (alembic upgrade head)
+        working-directory: backend
+        run: |
+          source ../.venv/bin/activate
+          alembic upgrade head
+
+      - name: Run SaaS contract (limits + summary)
+        working-directory: backend
+        run: |
+          source ../.venv/bin/activate
+          chmod +x scripts/contract_saas_limits.sh
+          PORT=18099 ./scripts/contract_saas_limits.sh

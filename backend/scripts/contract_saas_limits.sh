@@ -13,6 +13,36 @@ BACKEND_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 REPO_DIR="$(cd "${BACKEND_DIR}/.." && pwd)"
 LOG="/tmp/ia_trabalhista_contract_${RUN_ID}.log"
 
+reset_usage_counters() {
+  # Determinismo: limpa usage_counters do tenant 1 no mês atual.
+  # - Local dev: tenta docker exec no container ia_trabalhista_db
+  # - CI: usa psql se disponível
+  if [ "${SKIP_DB_RESET:-0}" = "1" ]; then
+    echo "[contract] SKIP_DB_RESET=1 -> skipping reset"
+    return 0
+  fi
+
+  echo "[contract] resetting usage_counters for tenant 1 (current month)..."
+  if command -v docker >/dev/null 2>&1 && docker ps --format '{{.Names}}' | rg -q '^ia_trabalhista_db$'; then
+    docker exec -i ia_trabalhista_db psql -U ia_app_runtime -d ia_trabalhista -v ON_ERROR_STOP=1 -c "SELECT set_config('app.tenant_id','1',false); DELETE FROM usage_counters WHERE tenant_id=1 AND month = date_trunc('month', now())::date;" >/dev/null
+    return 0
+  fi
+
+  if command -v psql >/dev/null 2>&1; then
+    # Usa DATABASE_URL do env se existir, senão tenta localhost padrão
+    if [ -n "${DATABASE_URL:-}" ]; then
+      # SQLAlchemy URL -> psql precisa de libpq URL. Se já for postgres://, ok. Se for postgresql+psycopg2://, converte.
+      PSQL_URL="${DATABASE_URL/postgresql+psycopg2:\/\//postgresql:\/\/}"
+      psql "${PSQL_URL}" -v ON_ERROR_STOP=1 -c "SELECT set_config('app.tenant_id','1',false); DELETE FROM usage_counters WHERE tenant_id=1 AND month = date_trunc('month', now())::date;" >/dev/null
+    else
+      psql "postgresql://ia_trab_user:ia_trab_pass@localhost:5432/ia_trab" -v ON_ERROR_STOP=1 -c "SELECT set_config('app.tenant_id','1',false); DELETE FROM usage_counters WHERE tenant_id=1 AND month = date_trunc('month', now())::date;" >/dev/null
+    fi
+    return 0
+  fi
+
+  echo "[contract] WARN: could not reset usage_counters (no docker/psql)."
+}
+
 echo "[contract] repo=${REPO_DIR}"
 echo "[contract] backend=${BACKEND_DIR}"
 echo "[contract] port=${PORT}"
@@ -30,9 +60,7 @@ if command -v docker >/dev/null 2>&1; then
 fi
 
 
-# Reset usage_counters for deterministic runs (tenant 1 / current month)
-echo "[contract] resetting usage_counters for tenant 1 (current month)..."
-docker exec -i ia_trabalhista_db psql -U ia_app_runtime -d ia_trabalhista -v ON_ERROR_STOP=1 -c "SELECT set_config('app.tenant_id','1',false); DELETE FROM usage_counters WHERE tenant_id=1 AND month = date_trunc('month', now())::date;" >/dev/null
+reset_usage_counters
 
 # Start API
 echo "[contract] starting uvicorn..."
