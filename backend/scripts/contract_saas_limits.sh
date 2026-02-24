@@ -31,6 +31,7 @@ DECLARE
   vals text := '';
   r record;
 BEGIN
+  PERFORM set_config('app.tenant_id','1',false);
   IF NOT EXISTS (SELECT 1 FROM tenants WHERE id=1) THEN
     -- Sempre tenta setar campos comuns se existirem
     IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tenants' AND column_name='id') THEN
