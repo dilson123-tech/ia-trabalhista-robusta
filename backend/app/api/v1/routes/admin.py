@@ -17,6 +17,7 @@ from app.core.plans import PlanType, limits_for
 from app.core.tenant import set_tenant_on_session
 from app.db.session import get_db
 from app.models.subscription import Subscription
+from app.models.tenant import Tenant
 from app.models.usage_counter import UsageCounter
 from app.services.plan_enforcement import get_effective_plan
 
@@ -286,3 +287,40 @@ def admin_usage_export(
         raise HTTPException(status_code=500, detail=f"admin usage export failed: {type(e).__name__}: {e}")
     finally:
         _reset_tenant_context(db)
+
+@router.get("/tenants/{tenant_id}", dependencies=[Depends(require_admin_key)])
+def admin_get_tenant(
+    tenant_id: int,
+    db: Session = Depends(get_db),
+):
+    """
+    Confirmação por ID (suporte): NÃO lista tenants.
+    RLS-safe: opera como o tenant alvo.
+    """
+    try:
+        set_tenant_on_session(db, tenant_id)
+
+        tenant = db.query(Tenant).filter(Tenant.id == tenant_id).one_or_none()
+        if tenant is None:
+            raise HTTPException(status_code=404, detail="Tenant não encontrado.")
+
+        eff = get_effective_plan(db, tenant_id)
+
+        return {
+            "tenant_id": tenant.id,
+            "name": tenant.name,
+            "created_at": tenant.created_at.isoformat() if getattr(tenant, "created_at", None) else None,
+            "plan": {
+                "type": getattr(eff.plan_type, "value", str(eff.plan_type)),
+                "status": str(eff.status),
+            },
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("admin get tenant failed (unexpected)")
+        raise HTTPException(status_code=500, detail=f"admin get tenant failed: {type(e).__name__}: {e}")
+    finally:
+        _reset_tenant_context(db)
+
