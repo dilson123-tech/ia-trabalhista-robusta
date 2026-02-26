@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import os
 import logging
+import csv
+import io
 from datetime import datetime, timezone, date
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
@@ -180,5 +182,107 @@ def admin_usage_summary(
     except Exception as e:
         logger.exception("admin usage summary failed (unexpected)")
         raise HTTPException(status_code=500, detail=f"admin usage summary failed: {type(e).__name__}: {e}")
+    finally:
+        _reset_tenant_context(db)
+
+
+@router.get("/tenants/{tenant_id}/usage/export", dependencies=[Depends(require_admin_key)])
+def admin_usage_export(
+    tenant_id: int,
+    month: Optional[date] = Query(default=None, description="Primeiro dia do mês, ex: 2026-02-01"),
+    format: str = Query(default="json", description="json|csv"),
+    db: Session = Depends(get_db),
+):
+    m = month or date.today().replace(day=1)
+    if m.day != 1:
+        raise HTTPException(status_code=422, detail="month deve ser o primeiro dia do mês (YYYY-MM-01).")
+
+    fmt = (format or "json").strip().lower()
+    if fmt not in ("json", "csv"):
+        raise HTTPException(status_code=422, detail="format inválido (use json|csv).")
+
+    try:
+        set_tenant_on_session(db, tenant_id)
+
+        eff = get_effective_plan(db, tenant_id)
+        lim = limits_for(eff.plan_type)
+
+        row = (
+            db.query(UsageCounter)
+            .filter(UsageCounter.tenant_id == tenant_id, UsageCounter.month == m)
+            .one_or_none()
+        )
+
+        used_cases = int(getattr(row, "cases_created", 0) or 0)
+        used_ai = int(getattr(row, "ai_analyses_generated", 0) or 0)
+
+        remaining_cases = max(lim.cases_per_month - used_cases, 0)
+        remaining_ai = max(lim.ai_analyses_per_month - used_ai, 0)
+
+        payload = {
+            "tenant_id": tenant_id,
+            "month": m.isoformat(),
+            "exported_at": datetime.now(timezone.utc).isoformat(),
+            "plan": {"type": getattr(eff.plan_type, "value", str(eff.plan_type)), "status": str(eff.status)},
+            "limits": {
+                "cases_per_month": lim.cases_per_month,
+                "ai_analyses_per_month": lim.ai_analyses_per_month,
+            },
+            "used": {"cases_created": used_cases, "ai_analyses_generated": used_ai},
+            "remaining": {"cases": remaining_cases, "ai_analyses": remaining_ai},
+        }
+
+        if fmt == "json":
+            return payload
+
+        # CSV
+        buf = io.StringIO()
+        w = csv.writer(buf)
+
+        header = [
+            "tenant_id",
+            "month",
+            "exported_at",
+            "plan_type",
+            "plan_status",
+            "limits_cases_per_month",
+            "limits_ai_analyses_per_month",
+            "used_cases_created",
+            "used_ai_analyses_generated",
+            "remaining_cases",
+            "remaining_ai_analyses",
+        ]
+        w.writerow(header)
+        w.writerow(
+            [
+                tenant_id,
+                m.isoformat(),
+                payload["exported_at"],
+                payload["plan"]["type"],
+                payload["plan"]["status"],
+                payload["limits"]["cases_per_month"],
+                payload["limits"]["ai_analyses_per_month"],
+                payload["used"]["cases_created"],
+                payload["used"]["ai_analyses_generated"],
+                payload["remaining"]["cases"],
+                payload["remaining"]["ai_analyses"],
+            ]
+        )
+
+        filename = f"tenant-{tenant_id}-usage-{m.isoformat()}.csv"
+        return Response(
+            content=buf.getvalue(),
+            media_type="text/csv",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+
+    except HTTPException:
+        raise
+    except SQLAlchemyError as e:
+        logger.exception("admin usage export failed (SQLAlchemyError)")
+        raise HTTPException(status_code=500, detail=f"admin usage export failed: SQLAlchemyError: {e}")
+    except Exception as e:
+        logger.exception("admin usage export failed (unexpected)")
+        raise HTTPException(status_code=500, detail=f"admin usage export failed: {type(e).__name__}: {e}")
     finally:
         _reset_tenant_context(db)
