@@ -2,18 +2,21 @@ from __future__ import annotations
 
 import os
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field
+from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from app.core.plans import PlanType
+from app.core.plans import PlanType, limits_for
 from app.core.tenant import set_tenant_on_session
 from app.db.session import get_db
 from app.models.subscription import Subscription
+from app.models.usage_counter import UsageCounter
+from app.services.plan_enforcement import get_effective_plan
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 logger = logging.getLogger(__name__)
@@ -25,6 +28,28 @@ def require_admin_key(x_admin_key: str | None = Header(default=None, alias="X-Ad
         raise HTTPException(status_code=500, detail="ADMIN_API_KEY não configurada no ambiente.")
     if not x_admin_key or x_admin_key.strip() != expected:
         raise HTTPException(status_code=403, detail="Admin key inválida.")
+
+
+def _reset_tenant_context(db: Session) -> None:
+    """
+    Best-effort: garante que app.tenant_id não vaze pra próxima request no pool.
+    Em SQLite/dev, isso vira no-op.
+    """
+    try:
+        bind = db.get_bind()
+        dialect = getattr(getattr(bind, "dialect", None), "name", "") or ""
+        if str(dialect).startswith("postgres"):
+            db.execute(text("RESET app.tenant_id"))
+        # garante sessão limpinha
+        try:
+            db.rollback()
+        except Exception:
+            pass
+    except Exception:
+        try:
+            db.rollback()
+        except Exception:
+            pass
 
 
 class SubscriptionUpsertIn(BaseModel):
@@ -90,7 +115,6 @@ def upsert_subscription(
         }
 
     except HTTPException:
-        # já é erro “esperado”
         raise
     except SQLAlchemyError as e:
         try:
@@ -106,3 +130,55 @@ def upsert_subscription(
             pass
         logger.exception("admin upsert failed (unexpected)")
         raise HTTPException(status_code=500, detail=f"admin upsert failed: {type(e).__name__}: {e}")
+    finally:
+        _reset_tenant_context(db)
+
+
+@router.get("/tenants/{tenant_id}/usage/summary", dependencies=[Depends(require_admin_key)])
+def admin_usage_summary(
+    tenant_id: int,
+    db: Session = Depends(get_db),
+):
+    month = date.today().replace(day=1)
+
+    try:
+        # RLS: opera “como” o tenant alvo
+        set_tenant_on_session(db, tenant_id)
+
+        eff = get_effective_plan(db, tenant_id)
+        lim = limits_for(eff.plan_type)
+
+        row = (
+            db.query(UsageCounter)
+            .filter(UsageCounter.tenant_id == tenant_id, UsageCounter.month == month)
+            .one_or_none()
+        )
+
+        used_cases = int(getattr(row, "cases_created", 0) or 0)
+        used_ai = int(getattr(row, "ai_analyses_generated", 0) or 0)
+
+        remaining_cases = max(lim.cases_per_month - used_cases, 0)
+        remaining_ai = max(lim.ai_analyses_per_month - used_ai, 0)
+
+        return {
+            "tenant_id": tenant_id,
+            "month": month.isoformat(),
+            "plan": {"type": getattr(eff.plan_type, "value", str(eff.plan_type)), "status": str(eff.status)},
+            "limits": {
+                "cases_per_month": lim.cases_per_month,
+                "ai_analyses_per_month": lim.ai_analyses_per_month,
+            },
+            "used": {"cases_created": used_cases, "ai_analyses_generated": used_ai},
+            "remaining": {"cases": remaining_cases, "ai_analyses": remaining_ai},
+        }
+
+    except HTTPException:
+        raise
+    except SQLAlchemyError as e:
+        logger.exception("admin usage summary failed (SQLAlchemyError)")
+        raise HTTPException(status_code=500, detail=f"admin usage summary failed: SQLAlchemyError: {e}")
+    except Exception as e:
+        logger.exception("admin usage summary failed (unexpected)")
+        raise HTTPException(status_code=500, detail=f"admin usage summary failed: {type(e).__name__}: {e}")
+    finally:
+        _reset_tenant_context(db)
