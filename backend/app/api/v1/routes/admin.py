@@ -4,7 +4,7 @@ import os
 import logging
 import csv
 import io
-from datetime import datetime, timezone, date
+from datetime import datetime, timezone, date, time, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response
@@ -19,6 +19,7 @@ from app.db.session import get_db
 from app.models.subscription import Subscription
 from app.models.tenant import Tenant
 from app.models.usage_counter import UsageCounter
+from app.models.tenant_usage_event import TenantUsageEvent
 from app.services.plan_enforcement import get_effective_plan
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -321,6 +322,77 @@ def admin_get_tenant(
     except Exception as e:
         logger.exception("admin get tenant failed (unexpected)")
         raise HTTPException(status_code=500, detail=f"admin get tenant failed: {type(e).__name__}: {e}")
+    finally:
+        _reset_tenant_context(db)
+
+@router.get("/tenants/{tenant_id}/usage/events", dependencies=[Depends(require_admin_key)])
+def admin_usage_events(
+    tenant_id: int,
+    from_date: Optional[date] = Query(default=None, alias="from", description="YYYY-MM-DD (início)"),
+    to_date: Optional[date] = Query(default=None, alias="to", description="YYYY-MM-DD (fim)"),
+    limit: int = Query(default=200, ge=1, le=500, description="1..500"),
+    db: Session = Depends(get_db),
+):
+    """
+    Auditoria detalhada por tenant (suporte).
+    NÃO lista tenants. Escopo 100% por tenant_id. RLS-safe.
+    """
+    today = date.today()
+    fd = from_date or (today - timedelta(days=30))
+    td = to_date or today
+
+    if fd > td:
+        raise HTTPException(status_code=422, detail="from deve ser <= to.")
+
+    start_dt = datetime.combine(fd, time.min, tzinfo=timezone.utc)
+    end_dt = datetime.combine(td + timedelta(days=1), time.min, tzinfo=timezone.utc)  # exclusivo
+
+    try:
+        set_tenant_on_session(db, tenant_id)
+
+        # Confirma tenant existe (evita retorno vazio por ID errado)
+        t = db.query(Tenant).filter(Tenant.id == tenant_id).one_or_none()
+        if t is None:
+            raise HTTPException(status_code=404, detail="Tenant não encontrado.")
+
+        q = (
+            db.query(TenantUsageEvent)
+            .filter(
+                TenantUsageEvent.tenant_id == tenant_id,
+                TenantUsageEvent.created_at >= start_dt,
+                TenantUsageEvent.created_at < end_dt,
+            )
+            .order_by(TenantUsageEvent.created_at.desc(), TenantUsageEvent.id.desc())
+            .limit(limit)
+        )
+
+        events = [
+            {
+                "id": e.id,
+                "event_type": e.event_type,
+                "resource_id": e.resource_id,
+                "created_at": e.created_at.isoformat() if e.created_at else None,
+            }
+            for e in q.all()
+        ]
+
+        return {
+            "tenant_id": tenant_id,
+            "from": fd.isoformat(),
+            "to": td.isoformat(),
+            "limit": limit,
+            "count": len(events),
+            "events": events,
+        }
+
+    except HTTPException:
+        raise
+    except SQLAlchemyError as e:
+        logger.exception("admin usage events failed (SQLAlchemyError)")
+        raise HTTPException(status_code=500, detail=f"admin usage events failed: SQLAlchemyError: {e}")
+    except Exception as e:
+        logger.exception("admin usage events failed (unexpected)")
+        raise HTTPException(status_code=500, detail=f"admin usage events failed: {type(e).__name__}: {e}")
     finally:
         _reset_tenant_context(db)
 
