@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import hmac
 import logging
 import csv
 import io
@@ -27,12 +28,24 @@ logger = logging.getLogger(__name__)
 
 
 def require_admin_key(x_admin_key: str | None = Header(default=None, alias="X-Admin-Key")) -> None:
-    expected = os.getenv("ADMIN_API_KEY", "").strip()
-    if not expected:
-        raise HTTPException(status_code=500, detail="ADMIN_API_KEY não configurada no ambiente.")
-    if not x_admin_key or x_admin_key.strip() != expected:
+    # Suporta rotação: ADMIN_API_KEYS="k1,k2" e legado ADMIN_API_KEY
+    raw_multi = (os.getenv("ADMIN_API_KEYS", "") or "").strip()
+    keys = {k.strip() for k in raw_multi.split(",") if k.strip()}
+
+    legacy = (os.getenv("ADMIN_API_KEY", "") or "").strip()
+    if legacy:
+        keys.add(legacy)
+
+    if not keys:
+        raise HTTPException(status_code=500, detail="ADMIN_API_KEY(S) não configurada(s) no ambiente.")
+
+    if not x_admin_key:
         raise HTTPException(status_code=403, detail="Admin key inválida.")
 
+    provided = x_admin_key.strip()
+    ok = any(hmac.compare_digest(provided, k) for k in keys)
+    if not ok:
+        raise HTTPException(status_code=403, detail="Admin key inválida.")
 
 def _reset_tenant_context(db: Session) -> None:
     """
