@@ -1,4 +1,8 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+
+import logging
+import re
+import time
 from app.core.middleware import install_middleware
 from app.core.settings import settings
 from app.core.logging import setup_logging
@@ -16,6 +20,52 @@ app = FastAPI(
 
 # Middleware padrão (request_id, tempo, audit no Postgres)
 install_middleware(app)
+
+admin_audit_logger = logging.getLogger("admin_audit")
+
+# Audit trail de suporte (somente /api/v1/admin/*)
+@app.middleware("http")
+async def admin_audit_middleware(request: Request, call_next):
+    path = request.url.path
+    admin_prefix = f"{settings.API_V1_PREFIX}/admin"
+    if not path.startswith(admin_prefix):
+        return await call_next(request)
+
+    t0 = time.perf_counter()
+
+    # NÃO logar X-Admin-Key (segredo). Só actor opcional.
+    actor = request.headers.get("X-Admin-Actor") or request.headers.get("x-admin-actor")
+
+    # tenta extrair tenant_id do path: /api/v1/admin/tenants/{id}/...
+    m = re.search(r"/admin/tenants/(\d+)", path)
+    tenant_id = int(m.group(1)) if m else None
+
+    # request_id (se já existir no contexto/header)
+    rid = (
+        request.headers.get("X-Request-Id")
+        or request.headers.get("X-Request-ID")
+        or getattr(getattr(request, "state", None), "request_id", None)
+        or getattr(getattr(request, "state", None), "requestId", None)
+    )
+
+    status_code = None
+    try:
+        resp = await call_next(request)
+        status_code = resp.status_code
+        return resp
+    finally:
+        dt_ms = int((time.perf_counter() - t0) * 1000)
+        # log enxuto e auditável
+        admin_audit_logger.info(
+            "admin_audit actor=%s tenant_id=%s method=%s path=%s status=%s duration_ms=%s request_id=%s",
+            actor,
+            tenant_id,
+            request.method,
+            path,
+            status_code,
+            dt_ms,
+            rid,
+        )
 
 app.add_middleware(RequestContextMiddleware)
 
