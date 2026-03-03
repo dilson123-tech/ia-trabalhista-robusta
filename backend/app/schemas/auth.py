@@ -21,3 +21,8 @@ class SeedAdminIn(BaseModel):
     username: str
     password: str
     role: UserRole = "admin"
+
+class ChangePasswordIn(BaseModel):
+    old_password: str
+    new_password: str
+
