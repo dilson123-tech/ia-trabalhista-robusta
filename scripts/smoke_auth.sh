@@ -1,6 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Token de seed (CI/DEV): preferir ADMIN_SEED_TOKEN, fallback para SEED_TOKEN/X_SEED_TOKEN
+SEED_HEADER_TOKEN="${ADMIN_SEED_TOKEN:-${SEED_TOKEN:-${X_SEED_TOKEN:-}}}"
+if [ -z "${SEED_HEADER_TOKEN}" ]; then
+  echo "missing seed token env (ADMIN_SEED_TOKEN/SEED_TOKEN/X_SEED_TOKEN)" >&2
+  exit 1
+fi
+echo "seed token len=${#SEED_HEADER_TOKEN}"
+
+
 BASE_URL="${BASE_URL:-http://127.0.0.1:8099}"
 SEED_TOKEN="${SEED_TOKEN:-CHANGE_ME_SEED_TOKEN}"
 ADMIN_USER="${ADMIN_USER:-admin}"
@@ -43,7 +52,7 @@ PY
 echo "== SMOKE AUTH: seed-admin =="
 req POST "$BASE_URL/api/v1/auth/seed-admin" \
   -H 'Content-Type: application/json' \
-  -H "X-Seed-Token: $SEED_TOKEN" \
+  -H "X-Seed-Token: $SEED_HEADER_TOKEN" \
   -d "$seed_payload"
 
 echo "== SMOKE AUTH: login =="
