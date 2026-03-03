@@ -13,6 +13,8 @@ jobs:
     env:
       DATABASE_URL: postgresql+psycopg2://ia_trab_user:ia_trab_pass@localhost:5432/ia_trab
       JWT_SECRET: dummy_jwt_secret_for_ci_which_is_long_enough_1234567890
+        ADMIN_SEED_TOKEN: "dev-seed-123"
+        ALLOW_SEED_ADMIN: "true"
 
     services:
       postgres:
