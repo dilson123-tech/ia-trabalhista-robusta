@@ -174,6 +174,12 @@ def seed_admin(
     x_seed_token: str = Header(default=""),
     db: Session = Depends(get_db),
 ):
+        # HARDENING: seed-admin é break-glass (desativado por padrão)
+    if not settings.ALLOW_SEED_ADMIN:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="not found")
+    if not settings.ADMIN_SEED_TOKEN or settings.ADMIN_SEED_TOKEN == "CHANGE_ME_SEED_TOKEN":
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="seed token not configured")
+
     if x_seed_token != settings.ADMIN_SEED_TOKEN:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid seed token")
 
