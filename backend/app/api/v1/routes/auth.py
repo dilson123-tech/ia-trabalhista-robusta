@@ -15,7 +15,7 @@ from app.db.session import get_db
 from app.core.tenant import set_tenant_on_session
 from app.models.tenant_member import TenantMember
 from app.models.user import User
-from app.schemas.auth import LoginIn, TokenOut, UserOut, SeedAdminIn
+from app.schemas.auth import LoginIn, TokenOut, UserOut, SeedAdminIn, ChangePasswordIn
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -253,6 +253,33 @@ def login(payload: LoginIn, db: Session = Depends(get_db)):
 
     token = issue_token(u.username, u.role, membership.tenant_id)
     return TokenOut(access_token=token)
+
+
+@router.post("/me/password")
+def change_my_password(
+    payload: ChangePasswordIn,
+    claims=Depends(require_auth),
+    db: Session = Depends(get_db),
+):
+    username = (claims or {}).get("sub")
+    if not username:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="unauthorized")
+
+    u = db.execute(select(User).where(User.username == username)).scalar_one_or_none()
+    if (u is None) or (not pwd_context.verify(payload.old_password, u.password_hash)):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="bad credentials")
+
+    if payload.old_password == payload.new_password:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="new password must differ")
+
+    if len(payload.new_password or "") < 8:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="password too short (min 8)")
+
+    u.password_hash = pwd_context.hash(payload.new_password)
+    db.add(u)
+    db.commit()
+    return {"ok": True}
+
 
 @router.get("/whoami", response_model=UserOut)
 def whoami(claims=Depends(require_auth)):
