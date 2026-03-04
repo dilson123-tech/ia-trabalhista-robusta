@@ -234,14 +234,56 @@ def create_user(payload: SeedAdminIn, db: Session = Depends(get_db)):
 
 
 
+
+
+
+@router.patch("/users/{user_id}/activate", dependencies=[Depends(require_role("admin"))])
+def activate_user(user_id: int, db: Session = Depends(get_db)):
+    """
+    Admin do tenant ativa um usuário (is_active=True).
+    """
+    u = db.execute(select(User).where(User.id == user_id)).scalar_one_or_none()
+    if not u:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="user not found")
+
+    u.is_active = True
+    db.add(u)
+    db.commit()
+    db.refresh(u)
+    return {"username": u.username, "role": u.role, "is_active": u.is_active}
+
+
+@router.patch("/users/{user_id}/deactivate", dependencies=[Depends(require_role("admin"))])
+def deactivate_user(user_id: int, db: Session = Depends(get_db)):
+    """
+    Admin do tenant desativa um usuário (is_active=False).
+    """
+    u = db.execute(select(User).where(User.id == user_id)).scalar_one_or_none()
+    if not u:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="user not found")
+
+    u.is_active = False
+    db.add(u)
+    db.commit()
+    db.refresh(u)
+    return {"username": u.username, "role": u.role, "is_active": u.is_active}
+
 @router.post("/login", response_model=TokenOut)
 def login(payload: LoginIn, db: Session = Depends(get_db)):
-    u = db.execute(select(User).where(User.username == payload.username)).scalar_one_or_none()
+    u = db.execute(
+        select(User).where(User.username == payload.username)
+    ).scalar_one_or_none()
 
     if (u is None) or (not pwd_context.verify(payload.password, u.password_hash)):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="bad credentials",
+        )
+
+    if not u.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="user is inactive",
         )
 
     membership = db.execute(
@@ -253,7 +295,6 @@ def login(payload: LoginIn, db: Session = Depends(get_db)):
 
     token = issue_token(u.username, u.role, membership.tenant_id)
     return TokenOut(access_token=token)
-
 
 @router.post("/me/password")
 def change_my_password(
