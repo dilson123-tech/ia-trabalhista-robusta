@@ -3,6 +3,11 @@ from sqlalchemy.orm import Session
 
 
 def set_tenant_on_session(db: Session, tenant_id: int) -> None:
+    # SQLite (tests): não existe set_config / RLS vars. No-op.
+    dialect_name = db.get_bind().dialect.name
+    if dialect_name == "sqlite":
+        return
+
     """
     Define tenant_id na conexão ativa para RLS funcionar.
     """

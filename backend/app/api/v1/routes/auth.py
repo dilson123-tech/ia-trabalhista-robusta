@@ -268,6 +268,27 @@ def deactivate_user(user_id: int, db: Session = Depends(get_db)):
     db.refresh(u)
     return {"username": u.username, "role": u.role, "is_active": u.is_active}
 
+
+@router.get("/users", dependencies=[Depends(require_role("admin"))])
+def list_users(claims=Depends(require_auth), db: Session = Depends(get_db)):
+    """
+    Lista usuários do tenant atual (admin-only).
+    Retorna somente usuários com membership no tenant do token.
+    """
+    tenant_id = claims.get("tenant_id")
+    rows = db.execute(
+        select(User.id, User.username, User.role, User.is_active)
+        .join(TenantMember, TenantMember.user_id == User.id)
+        .where(TenantMember.tenant_id == tenant_id)
+        .order_by(User.id)
+    ).all()
+
+    return [
+        {"id": r.id, "username": r.username, "role": r.role, "is_active": r.is_active}
+        for r in rows
+    ]
+
+
 @router.post("/login", response_model=TokenOut)
 def login(payload: LoginIn, db: Session = Depends(get_db)):
     u = db.execute(
