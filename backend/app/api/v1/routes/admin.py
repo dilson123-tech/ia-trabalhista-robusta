@@ -106,17 +106,23 @@ def upsert_subscription(
             .one_or_none()
         )
 
+        lim = limits_for(pt)
+
         if sub is None:
             sub = Subscription(
                 tenant_id=tenant_id,
                 plan_type=getattr(pt, "value", str(pt)),
                 status=payload.status,
+                case_limit=lim.cases_per_month,
+                active=payload.status in ("trial", "active"),
                 expires_at=exp,
             )
             db.add(sub)
         else:
             sub.plan_type = getattr(pt, "value", str(pt))
             sub.status = payload.status
+            sub.case_limit = lim.cases_per_month
+            sub.active = payload.status in ("trial", "active")
             sub.expires_at = exp
 
         db.commit()
