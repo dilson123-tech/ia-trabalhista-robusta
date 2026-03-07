@@ -128,7 +128,14 @@ def _ensure_membership(db: Session, u: User) -> TenantMember:
     # RLS FORCE: operar como tenant alvo para inserts/updates
     set_tenant_on_session(db, tenant_id)
     exp = _dt.datetime.utcnow() + _dt.timedelta(days=30)
-    db.execute(text("INSERT INTO subscriptions (tenant_id, plan_type, status, expires_at) VALUES (:tid, 'basic', 'trial', :exp) ON CONFLICT (tenant_id) DO NOTHING"), {"tid": tenant_id, "exp": exp})
+    db.execute(
+        text(
+            "INSERT INTO subscriptions (tenant_id, plan_type, status, case_limit, active, expires_at) "
+            "VALUES (:tid, 'basic', 'trial', :case_limit, :active, :exp) "
+            "ON CONFLICT (tenant_id) DO NOTHING"
+        ),
+        {"tid": tenant_id, "case_limit": 10, "active": True, "exp": exp},
+    )
 
 
     cols = set(TenantMember.__table__.columns.keys())
