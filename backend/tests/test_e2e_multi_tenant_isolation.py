@@ -7,6 +7,7 @@ from app.models.tenant import Tenant
 from app.models.user import User
 from app.models.tenant_member import TenantMember
 from app.core.security import pwd_context
+from app.core.tenant import set_tenant_on_session
 
 client = TestClient(app)
 
@@ -52,8 +53,11 @@ def test_e2e_multi_tenant_isolation():
     # Criar tenants
     tenant_a = create_tenant(db, f"TenantA_{uuid.uuid4()}")
     tenant_b = create_tenant(db, f"TenantB_{uuid.uuid4()}")
-    db.execute(text("INSERT INTO subscriptions (tenant_id, plan_type, case_limit, active, expires_at) VALUES (:tid, 'basic', 10, TRUE, NOW() + INTERVAL '1 year')"), {"tid": tenant_a.id})
-    db.execute(text("INSERT INTO subscriptions (tenant_id, plan_type, case_limit, active, expires_at) VALUES (:tid, 'basic', 10, TRUE, NOW() + INTERVAL '1 year')"), {"tid": tenant_b.id})
+    set_tenant_on_session(db, tenant_a.id)
+    db.execute(text("INSERT INTO subscriptions (tenant_id, plan_type, status, case_limit, active, expires_at) VALUES (:tid, 'basic', 'active', 10, TRUE, NOW() + INTERVAL '1 year')"), {"tid": tenant_a.id})
+
+    set_tenant_on_session(db, tenant_b.id)
+    db.execute(text("INSERT INTO subscriptions (tenant_id, plan_type, status, case_limit, active, expires_at) VALUES (:tid, 'basic', 'active', 10, TRUE, NOW() + INTERVAL '1 year')"), {"tid": tenant_b.id})
     db.commit()
 
 
