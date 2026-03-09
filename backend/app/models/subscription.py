@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import CheckConstraint, Column, DateTime, ForeignKey, Integer, String, UniqueConstraint, func
+from sqlalchemy import Boolean, CheckConstraint, Column, DateTime, ForeignKey, Integer, String, UniqueConstraint, func
 
 from app.db.base import Base
 
@@ -15,6 +15,9 @@ class Subscription(Base):
     # string + CHECK (evita dor com Postgres ENUM em migração; mantém “enum no banco” na prática)
     status = Column(String(20), nullable=False, default="trial")
     plan_type = Column(String(20), nullable=False, default="basic")
+
+    case_limit = Column(Integer, nullable=False, default=10)
+    active = Column(Boolean, nullable=False, default=True)
 
     expires_at = Column(DateTime(timezone=True), nullable=True)
 

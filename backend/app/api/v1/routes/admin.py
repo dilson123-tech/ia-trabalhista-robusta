@@ -75,6 +75,76 @@ class SubscriptionUpsertIn(BaseModel):
     expires_at: Optional[datetime] = Field(default=None, description="ISO datetime (UTC recomendado)")
 
 
+
+@router.get("/tenants", dependencies=[Depends(require_admin_key)])
+def admin_list_tenants(
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    plan_type: Optional[str] = Query(default=None, description="basic|pro|office"),
+    status: Optional[str] = Query(default=None, description="trial|active|canceled"),
+    name: Optional[str] = Query(default=None, description="Busca por nome do tenant"),
+    db: Session = Depends(get_db),
+):
+    """
+    Lista global de tenants para operação/admin.
+    Não usa set_tenant_on_session: visão global de backoffice.
+    """
+    try:
+        q = (
+            db.query(Tenant, Subscription)
+            .outerjoin(Subscription, Subscription.tenant_id == Tenant.id)
+        )
+
+        if plan_type:
+            q = q.filter(Subscription.plan_type == plan_type)
+
+        if status:
+            q = q.filter(Subscription.status == status)
+
+        if name:
+            q = q.filter(Tenant.name.ilike(f"%{name.strip()}%"))
+
+        total = q.count()
+
+        rows = (
+            q.order_by(Tenant.id.desc())
+            .offset(offset)
+            .limit(limit)
+            .all()
+        )
+
+        items = []
+        for tenant, sub in rows:
+            items.append(
+                {
+                    "tenant_id": tenant.id,
+                    "name": tenant.name,
+                    "created_at": tenant.created_at.isoformat() if getattr(tenant, "created_at", None) else None,
+                    "subscription": {
+                        "plan_type": getattr(sub, "plan_type", None),
+                        "status": getattr(sub, "status", None),
+                        "expires_at": sub.expires_at.isoformat() if getattr(sub, "expires_at", None) else None,
+                        "case_limit": getattr(sub, "case_limit", None),
+                        "active": getattr(sub, "active", None),
+                    },
+                }
+            )
+
+        return {
+            "total": total,
+            "limit": limit,
+            "offset": offset,
+            "items": items,
+        }
+
+    except SQLAlchemyError as e:
+        logger.exception("admin list tenants failed (SQLAlchemyError)")
+        raise HTTPException(status_code=500, detail=f"admin list tenants failed: SQLAlchemyError: {e}")
+    except Exception as e:
+        logger.exception("admin list tenants failed (unexpected)")
+        raise HTTPException(status_code=500, detail=f"admin list tenants failed: {type(e).__name__}: {e}")
+
+
 @router.post("/tenants/{tenant_id}/subscription", dependencies=[Depends(require_admin_key)])
 def upsert_subscription(
     tenant_id: int,
