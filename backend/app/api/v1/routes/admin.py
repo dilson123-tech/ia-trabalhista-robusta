@@ -19,8 +19,10 @@ from app.core.tenant import set_tenant_on_session
 from app.db.session import get_db
 from app.models.subscription import Subscription
 from app.models.tenant import Tenant
+from app.models.tenant_member import TenantMember
 from app.models.usage_counter import UsageCounter
 from app.models.tenant_usage_event import TenantUsageEvent
+from app.models.user import User
 from app.services.plan_enforcement import get_effective_plan
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -377,6 +379,59 @@ def admin_usage_export(
         raise HTTPException(status_code=500, detail=f"admin usage export failed: {type(e).__name__}: {e}")
     finally:
         _reset_tenant_context(db)
+
+
+
+@router.get("/tenants/{tenant_id}/users", dependencies=[Depends(require_admin_key)])
+def admin_list_tenant_users(
+    tenant_id: int,
+    db: Session = Depends(get_db),
+):
+    """
+    Lista usuários vinculados a um tenant específico.
+    Visão global de backoffice/admin.
+    """
+    try:
+        tenant = db.query(Tenant).filter(Tenant.id == tenant_id).one_or_none()
+        if tenant is None:
+            raise HTTPException(status_code=404, detail="Tenant não encontrado.")
+
+        rows = (
+            db.query(User, TenantMember)
+            .join(TenantMember, TenantMember.user_id == User.id)
+            .filter(TenantMember.tenant_id == tenant_id)
+            .order_by(User.id.asc())
+            .all()
+        )
+
+        items = [
+            {
+                "user_id": user.id,
+                "username": user.username,
+                "role": user.role,
+                "tenant_role": member.role,
+                "is_active": bool(user.is_active),
+                "created_at": user.created_at.isoformat() if getattr(user, "created_at", None) else None,
+            }
+            for user, member in rows
+        ]
+
+        return {
+            "tenant_id": tenant_id,
+            "count": len(items),
+            "items": items,
+        }
+
+    except HTTPException:
+        raise
+    except SQLAlchemyError as e:
+        logger.exception("admin list tenant users failed (SQLAlchemyError)")
+        raise HTTPException(status_code=500, detail=f"admin list tenant users failed: SQLAlchemyError: {e}")
+    except Exception as e:
+        logger.exception("admin list tenant users failed (unexpected)")
+        raise HTTPException(status_code=500, detail=f"admin list tenant users failed: {type(e).__name__}: {e}")
+
+
 
 @router.get("/tenants/{tenant_id}", dependencies=[Depends(require_admin_key)])
 def admin_get_tenant(
