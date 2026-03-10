@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 from app.core.plans import PlanType, limits_for
 from app.core.tenant import set_tenant_on_session
 from app.db.session import get_db
+from app.models.audit_log import AuditLog
 from app.models.subscription import Subscription
 from app.models.tenant import Tenant
 from app.models.tenant_member import TenantMember
@@ -80,6 +81,64 @@ class SubscriptionUpsertIn(BaseModel):
     status: str = Field(..., description="trial|active|canceled")
     expires_at: Optional[datetime] = Field(default=None, description="ISO datetime (UTC recomendado)")
 
+
+
+@router.get("/audit/logs", dependencies=[Depends(require_admin_key)])
+def admin_audit_logs(
+    tenant_id: Optional[int] = Query(default=None),
+    status_code: Optional[int] = Query(default=None),
+    path: Optional[str] = Query(default=None),
+    limit: int = Query(default=100, ge=1, le=500),
+    db: Session = Depends(get_db),
+):
+    try:
+        q = db.query(AuditLog)
+
+        if tenant_id is not None:
+            q = q.filter(AuditLog.tenant_id == tenant_id)
+
+        if status_code is not None:
+            q = q.filter(AuditLog.status_code == status_code)
+
+        if path:
+            q = q.filter(AuditLog.path == path)
+
+        rows = (
+            q.order_by(AuditLog.created_at.desc(), AuditLog.id.desc())
+            .limit(limit)
+            .all()
+        )
+
+        items = [
+            {
+                "id": row.id,
+                "tenant_id": row.tenant_id,
+                "request_id": row.request_id,
+                "method": row.method,
+                "path": row.path,
+                "status_code": row.status_code,
+                "process_time_ms": row.process_time_ms,
+                "username": row.username,
+                "role": row.role,
+                "client_ip": row.client_ip,
+                "user_agent": row.user_agent,
+                "created_at": row.created_at.isoformat() if getattr(row, "created_at", None) else None,
+            }
+            for row in rows
+        ]
+
+        return {
+            "count": len(items),
+            "limit": limit,
+            "items": items,
+        }
+
+    except SQLAlchemyError as e:
+        logger.exception("admin audit logs failed (SQLAlchemyError)")
+        raise HTTPException(status_code=500, detail=f"admin audit logs failed: SQLAlchemyError: {e}")
+    except Exception as e:
+        logger.exception("admin audit logs failed (unexpected)")
+        raise HTTPException(status_code=500, detail=f"admin audit logs failed: {type(e).__name__}: {e}")
 
 
 @router.get("/dashboard/summary", dependencies=[Depends(require_admin_key)])
