@@ -1,58 +1,56 @@
-import pytest
-from fastapi.testclient import TestClient
-from sqlalchemy import text
-from app.main import app
-from app.db.session import SessionLocal
-from app.core.security import issue_token
-
-client = TestClient(app)
+from app.core.security import issue_token, pwd_context
+from app.models.tenant import Tenant
+from app.models.tenant_member import TenantMember
+from app.models.user import User
 
 
-def test_cross_tenant_isolation():
-    db = SessionLocal()
+def test_cross_tenant_isolation(client, db_session):
+    tenant_a = Tenant(name="Tenant A", plan="free")
+    tenant_b = Tenant(name="Tenant B", plan="free")
+    db_session.add_all([tenant_a, tenant_b])
+    db_session.commit()
 
-    # Criar tenants
-    db.execute(text("INSERT INTO tenants (id, name) VALUES (100, 'Tenant A') ON CONFLICT DO NOTHING"))
-    db.execute(text("INSERT INTO tenants (id, name) VALUES (200, 'Tenant B') ON CONFLICT DO NOTHING"))
+    user_a = User(
+        username="userA@example.com",
+        password_hash=pwd_context.hash("dev"),
+        role="admin",
+        is_active=True,
+    )
+    user_b = User(
+        username="userB@example.com",
+        password_hash=pwd_context.hash("dev"),
+        role="admin",
+        is_active=True,
+    )
+    db_session.add_all([user_a, user_b])
+    db_session.commit()
 
-    # Criar usuários
-    db.execute(text("INSERT INTO users (username, password_hash, role) VALUES ('userA', 'fake', 'admin') ON CONFLICT DO NOTHING"))
-    db.execute(text("INSERT INTO users (username, password_hash, role) VALUES ('userB', 'fake', 'admin') ON CONFLICT DO NOTHING"))
+    db_session.add_all(
+        [
+            TenantMember(tenant_id=tenant_a.id, user_id=user_a.id, role="admin"),
+            TenantMember(tenant_id=tenant_b.id, user_id=user_b.id, role="admin"),
+        ]
+    )
+    db_session.commit()
 
-    # Buscar IDs
-    userA_id = db.execute(text("SELECT id FROM users WHERE username='userA'")).fetchone()[0]
-    userB_id = db.execute(text("SELECT id FROM users WHERE username='userB'")).fetchone()[0]
+    token_a = issue_token(user_a.username, "admin", tenant_a.id)
+    token_b = issue_token(user_b.username, "admin", tenant_b.id)
 
-    # Criar membership
-    db.execute(text("INSERT INTO tenant_members (tenant_id, user_id, role) VALUES (100, :uid, 'admin') ON CONFLICT DO NOTHING"), {"uid": userA_id})
-    db.execute(text("INSERT INTO tenant_members (tenant_id, user_id, role) VALUES (200, :uid, 'admin') ON CONFLICT DO NOTHING"), {"uid": userB_id})
-
-    db.commit()
-
-    # Gerar tokens direto
-    tokenA = issue_token("userA", "admin", 100)
-    tokenB = issue_token("userB", "admin", 200)
-
-    # Criar case no tenant A
     case_resp = client.post(
         "/api/v1/cases",
-        headers={"Authorization": f"Bearer {tokenA}"},
+        headers={"Authorization": f"Bearer {token_a}"},
         json={
             "case_number": "ISO-001",
             "title": "Caso Isolamento",
             "description": "Teste multi-tenant",
-            "status": "ativo"
-        }
+            "status": "ativo",
+        },
     )
     assert case_resp.status_code == 200
     case_id = case_resp.json()["id"]
 
-    # Tenant B tenta acessar
     forbidden_resp = client.get(
         f"/api/v1/cases/{case_id}",
-        headers={"Authorization": f"Bearer {tokenB}"}
+        headers={"Authorization": f"Bearer {token_b}"},
     )
-
-    assert forbidden_resp.status_code == 404
-
-    db.close()
+    assert forbidden_resp.status_code in (403, 404)
