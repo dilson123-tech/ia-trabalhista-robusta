@@ -71,6 +71,10 @@ def _reset_tenant_context(db: Session) -> None:
             pass
 
 
+class SubscriptionActiveToggleIn(BaseModel):
+    active: bool = Field(..., description="true para ativar, false para desativar")
+
+
 class SubscriptionUpsertIn(BaseModel):
     plan_type: str = Field(..., description="basic|pro|office")
     status: str = Field(..., description="trial|active|canceled")
@@ -227,6 +231,55 @@ def upsert_subscription(
         raise HTTPException(status_code=500, detail=f"admin upsert failed: {type(e).__name__}: {e}")
     finally:
         _reset_tenant_context(db)
+
+
+@router.patch("/tenants/{tenant_id}/subscription/active", dependencies=[Depends(require_admin_key)])
+def toggle_subscription_active(
+    tenant_id: int,
+    payload: SubscriptionActiveToggleIn,
+    db: Session = Depends(get_db),
+):
+    try:
+        sub = (
+            db.query(Subscription)
+            .filter(Subscription.tenant_id == tenant_id)
+            .one_or_none()
+        )
+        if sub is None:
+            raise HTTPException(status_code=404, detail="Subscription não encontrada.")
+
+        sub.active = payload.active
+        sub.status = "active" if payload.active else "canceled"
+
+        db.commit()
+        db.refresh(sub)
+
+        return {
+            "tenant_id": tenant_id,
+            "subscription": {
+                "plan_type": sub.plan_type,
+                "status": sub.status,
+                "active": bool(sub.active),
+                "expires_at": sub.expires_at.isoformat() if sub.expires_at else None,
+            },
+        }
+
+    except HTTPException:
+        raise
+    except SQLAlchemyError as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        logger.exception("admin toggle subscription failed (SQLAlchemyError)")
+        raise HTTPException(status_code=500, detail=f"admin toggle subscription failed: SQLAlchemyError: {e}")
+    except Exception as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        logger.exception("admin toggle subscription failed (unexpected)")
+        raise HTTPException(status_code=500, detail=f"admin toggle subscription failed: {type(e).__name__}: {e}")
 
 
 @router.get("/tenants/{tenant_id}/usage/summary", dependencies=[Depends(require_admin_key)])
