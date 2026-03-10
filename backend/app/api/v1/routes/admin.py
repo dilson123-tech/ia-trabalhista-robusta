@@ -233,6 +233,42 @@ def upsert_subscription(
         _reset_tenant_context(db)
 
 
+@router.get("/tenants/{tenant_id}/subscription", dependencies=[Depends(require_admin_key)])
+def admin_get_subscription(
+    tenant_id: int,
+    db: Session = Depends(get_db),
+):
+    try:
+        sub = (
+            db.query(Subscription)
+            .filter(Subscription.tenant_id == tenant_id)
+            .one_or_none()
+        )
+        if sub is None:
+            raise HTTPException(status_code=404, detail="Subscription não encontrada.")
+
+        return {
+            "tenant_id": tenant_id,
+            "subscription": {
+                "plan_type": sub.plan_type,
+                "status": sub.status,
+                "active": bool(sub.active),
+                "case_limit": sub.case_limit,
+                "expires_at": sub.expires_at.isoformat() if sub.expires_at else None,
+                "created_at": sub.created_at.isoformat() if getattr(sub, "created_at", None) else None,
+            },
+        }
+
+    except HTTPException:
+        raise
+    except SQLAlchemyError as e:
+        logger.exception("admin get subscription failed (SQLAlchemyError)")
+        raise HTTPException(status_code=500, detail=f"admin get subscription failed: SQLAlchemyError: {e}")
+    except Exception as e:
+        logger.exception("admin get subscription failed (unexpected)")
+        raise HTTPException(status_code=500, detail=f"admin get subscription failed: {type(e).__name__}: {e}")
+
+
 @router.patch("/tenants/{tenant_id}/subscription/active", dependencies=[Depends(require_admin_key)])
 def toggle_subscription_active(
     tenant_id: int,
