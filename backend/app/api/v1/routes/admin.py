@@ -603,6 +603,112 @@ def admin_get_tenant(
     finally:
         _reset_tenant_context(db)
 
+@router.get("/tenants/{tenant_id}/usage/full", dependencies=[Depends(require_admin_key)])
+def admin_tenant_usage_full(
+    tenant_id: int,
+    db: Session = Depends(get_db),
+):
+    """
+    Visão consolidada do tenant para backoffice/admin.
+    Junta tenant, subscription, users e usage summary atual.
+    """
+    month = date.today().replace(day=1)
+
+    try:
+        tenant = db.query(Tenant).filter(Tenant.id == tenant_id).one_or_none()
+        if tenant is None:
+            raise HTTPException(status_code=404, detail="Tenant não encontrado.")
+
+        sub = (
+            db.query(Subscription)
+            .filter(Subscription.tenant_id == tenant_id)
+            .one_or_none()
+        )
+
+        user_rows = (
+            db.query(User, TenantMember)
+            .join(TenantMember, TenantMember.user_id == User.id)
+            .filter(TenantMember.tenant_id == tenant_id)
+            .order_by(User.id.asc())
+            .all()
+        )
+
+        users_items = [
+            {
+                "user_id": user.id,
+                "username": user.username,
+                "role": user.role,
+                "tenant_role": member.role,
+                "is_active": bool(user.is_active),
+                "created_at": user.created_at.isoformat() if getattr(user, "created_at", None) else None,
+            }
+            for user, member in user_rows
+        ]
+
+        eff = get_effective_plan(db, tenant_id)
+        lim = limits_for(eff.plan_type)
+
+        row = (
+            db.query(UsageCounter)
+            .filter(UsageCounter.tenant_id == tenant_id, UsageCounter.month == month)
+            .one_or_none()
+        )
+
+        used_cases = int(getattr(row, "cases_created", 0) or 0)
+        used_ai = int(getattr(row, "ai_analyses_generated", 0) or 0)
+
+        remaining_cases = max(lim.cases_per_month - used_cases, 0)
+        remaining_ai = max(lim.ai_analyses_per_month - used_ai, 0)
+
+        return {
+            "tenant": {
+                "tenant_id": tenant.id,
+                "name": tenant.name,
+                "created_at": tenant.created_at.isoformat() if getattr(tenant, "created_at", None) else None,
+            },
+            "subscription": {
+                "plan_type": getattr(sub, "plan_type", None),
+                "status": getattr(sub, "status", None),
+                "active": getattr(sub, "active", None),
+                "case_limit": getattr(sub, "case_limit", None),
+                "expires_at": sub.expires_at.isoformat() if getattr(sub, "expires_at", None) else None,
+                "created_at": sub.created_at.isoformat() if getattr(sub, "created_at", None) else None,
+            } if sub else None,
+            "users": {
+                "count": len(users_items),
+                "items": users_items,
+            },
+            "usage_summary": {
+                "month": month.isoformat(),
+                "plan": {
+                    "type": getattr(eff.plan_type, "value", str(eff.plan_type)),
+                    "status": str(eff.status),
+                },
+                "limits": {
+                    "cases_per_month": lim.cases_per_month,
+                    "ai_analyses_per_month": lim.ai_analyses_per_month,
+                },
+                "used": {
+                    "cases_created": used_cases,
+                    "ai_analyses_generated": used_ai,
+                },
+                "remaining": {
+                    "cases": remaining_cases,
+                    "ai_analyses": remaining_ai,
+                },
+            },
+        }
+
+    except HTTPException:
+        raise
+    except SQLAlchemyError as e:
+        logger.exception("admin tenant usage full failed (SQLAlchemyError)")
+        raise HTTPException(status_code=500, detail=f"admin tenant usage full failed: SQLAlchemyError: {e}")
+    except Exception as e:
+        logger.exception("admin tenant usage full failed (unexpected)")
+        raise HTTPException(status_code=500, detail=f"admin tenant usage full failed: {type(e).__name__}: {e}")
+
+
 @router.get("/tenants/{tenant_id}/usage/events", dependencies=[Depends(require_admin_key)])
 def admin_usage_events(
     tenant_id: int,
