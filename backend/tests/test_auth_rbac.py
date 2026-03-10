@@ -1,13 +1,12 @@
-from fastapi.testclient import TestClient
 import uuid
 
-from app.main import app
 from app.core.settings import settings
 
-client = TestClient(app)
 
+def _seed_and_login(client, monkeypatch, role: str):
+    monkeypatch.setattr(settings, "ALLOW_SEED_ADMIN", True)
+    monkeypatch.setattr(settings, "ADMIN_SEED_TOKEN", "test-seed-token")
 
-def _seed_and_login(role: str):
     username = f"{role}_{uuid.uuid4().hex[:8]}@example.com"
     password = "dev"
 
@@ -17,11 +16,10 @@ def _seed_and_login(role: str):
         "role": role,
     }
 
-    # seed admin endpoint é protegido por token
     r_seed = client.post(
         "/api/v1/auth/seed-admin",
         json=seed_payload,
-        headers={"x-seed-token": settings.ADMIN_SEED_TOKEN},
+        headers={"x-seed-token": "test-seed-token"},
     )
     assert r_seed.status_code == 200
     assert r_seed.json()["ok"] is True
@@ -34,8 +32,8 @@ def _seed_and_login(role: str):
     return r_login.json()["access_token"]
 
 
-def test_admin_only_admin_ok():
-    token = _seed_and_login("admin")
+def test_admin_only_admin_ok(client, monkeypatch):
+    token = _seed_and_login(client, monkeypatch, "admin")
 
     r = client.get(
         "/api/v1/auth/admin-only",
@@ -44,8 +42,8 @@ def test_admin_only_admin_ok():
     assert r.status_code == 200
 
 
-def test_admin_only_adv_forbidden():
-    token = _seed_and_login("advogado")
+def test_admin_only_adv_forbidden(client, monkeypatch):
+    token = _seed_and_login(client, monkeypatch, "advogado")
 
     r = client.get(
         "/api/v1/auth/admin-only",

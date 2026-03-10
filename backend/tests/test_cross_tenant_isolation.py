@@ -1,16 +1,11 @@
 import uuid
-from fastapi.testclient import TestClient
-from sqlalchemy import text
+from datetime import datetime, timezone
 
-from app.main import app
-from app.db.session import SessionLocal
+from app.models.subscription import Subscription
 from app.models.tenant import Tenant
-from app.models.user import User
 from app.models.tenant_member import TenantMember
+from app.models.user import User
 from app.core.security import pwd_context
-from app.core.tenant import set_tenant_on_session
-
-client = TestClient(app)
 
 
 def create_tenant(db, name):
@@ -34,23 +29,23 @@ def create_user(db, username, password):
 
 
 def link_user_to_tenant(db, user_id, tenant_id):
-    member = TenantMember(user_id=user_id, tenant_id=tenant_id)
+    member = TenantMember(user_id=user_id, tenant_id=tenant_id, role="admin")
     db.add(member)
 
 
 def create_subscription(db, tenant_id):
-    set_tenant_on_session(db, tenant_id)
-    db.execute(
-        text(
-            "INSERT INTO subscriptions "
-            "(tenant_id, plan_type, status, case_limit, active, expires_at) "
-            "VALUES (:tid, 'basic', 'active', 10, TRUE, NOW() + INTERVAL '1 year')"
-        ),
-        {"tid": tenant_id},
+    sub = Subscription(
+        tenant_id=tenant_id,
+        plan_type="basic",
+        status="active",
+        case_limit=10,
+        active=True,
+        expires_at=datetime.now(timezone.utc),
     )
+    db.add(sub)
 
 
-def login(username, password):
+def login(client, username, password):
     r = client.post(
         "/api/v1/auth/login",
         json={"username": username, "password": password},
@@ -59,30 +54,24 @@ def login(username, password):
     return r.json()["access_token"]
 
 
-def test_cross_tenant_isolation():
-    db = SessionLocal()
+def test_cross_tenant_isolation(client, db_session):
+    tenant_a = create_tenant(db_session, f"TenantA_{uuid.uuid4()}")
+    tenant_b = create_tenant(db_session, f"TenantB_{uuid.uuid4()}")
 
-    tenant_a = create_tenant(db, f"TenantA_{uuid.uuid4()}")
-    tenant_b = create_tenant(db, f"TenantB_{uuid.uuid4()}")
-
-    create_subscription(db, tenant_a.id)
-    create_subscription(db, tenant_b.id)
-    db.commit()
+    create_subscription(db_session, tenant_a.id)
+    create_subscription(db_session, tenant_b.id)
+    db_session.commit()
 
     password = "123456"
-    user_a = create_user(db, f"userA_{uuid.uuid4()}", password)
-    user_b = create_user(db, f"userB_{uuid.uuid4()}", password)
+    user_a = create_user(db_session, f"userA_{uuid.uuid4()}@example.com", password)
+    user_b = create_user(db_session, f"userB_{uuid.uuid4()}@example.com", password)
 
-    link_user_to_tenant(db, user_a.id, tenant_a.id)
-    link_user_to_tenant(db, user_b.id, tenant_b.id)
-    db.commit()
+    link_user_to_tenant(db_session, user_a.id, tenant_a.id)
+    link_user_to_tenant(db_session, user_b.id, tenant_b.id)
+    db_session.commit()
 
-    username_a = user_a.username
-    username_b = user_b.username
-    db.close()
-
-    token_a = login(username_a, password)
-    token_b = login(username_b, password)
+    token_a = login(client, user_a.username, password)
+    token_b = login(client, user_b.username, password)
 
     headers_a = {"Authorization": f"Bearer {token_a}"}
     headers_b = {"Authorization": f"Bearer {token_b}"}
