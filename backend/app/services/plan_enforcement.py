@@ -40,7 +40,11 @@ def get_effective_plan(db: Session, tenant_id: int) -> EffectivePlan:
         return EffectivePlan(plan_type=PlanType.basic, status="trial")
 
     # Expirou? cai no basic (e segue vida)
-    if sub.expires_at is not None and sub.expires_at <= now:
+    exp = sub.expires_at
+    if exp is not None and exp.tzinfo is None:
+        exp = exp.replace(tzinfo=timezone.utc)
+
+    if exp is not None and exp <= now:
         return EffectivePlan(plan_type=PlanType.basic, status=sub.status)
 
     try:
