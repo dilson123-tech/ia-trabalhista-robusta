@@ -10,7 +10,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response
 from pydantic import BaseModel, Field
-from sqlalchemy import text
+from sqlalchemy import func, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -80,6 +80,51 @@ class SubscriptionUpsertIn(BaseModel):
     status: str = Field(..., description="trial|active|canceled")
     expires_at: Optional[datetime] = Field(default=None, description="ISO datetime (UTC recomendado)")
 
+
+
+@router.get("/dashboard/summary", dependencies=[Depends(require_admin_key)])
+def admin_dashboard_summary(
+    db: Session = Depends(get_db),
+):
+    try:
+        tenants_total = db.query(Tenant).count()
+        users_total = db.query(User).count()
+        subscriptions_total = db.query(Subscription).count()
+
+        subscriptions_active = db.query(Subscription).filter(Subscription.status == "active").count()
+        subscriptions_trial = db.query(Subscription).filter(Subscription.status == "trial").count()
+        subscriptions_canceled = db.query(Subscription).filter(Subscription.status == "canceled").count()
+
+        subscriptions_active_flag_true = db.query(Subscription).filter(Subscription.active.is_(True)).count()
+        subscriptions_active_flag_false = db.query(Subscription).filter(Subscription.active.is_(False)).count()
+
+        plan_rows = (
+            db.query(Subscription.plan_type, func.count(Subscription.id))
+            .group_by(Subscription.plan_type)
+            .all()
+        )
+        subscriptions_by_plan = {"basic": 0, "pro": 0, "office": 0}
+        for plan_type, total in plan_rows:
+            subscriptions_by_plan[str(plan_type)] = int(total)
+
+        return {
+            "tenants_total": tenants_total,
+            "users_total": users_total,
+            "subscriptions_total": subscriptions_total,
+            "subscriptions_active": subscriptions_active,
+            "subscriptions_trial": subscriptions_trial,
+            "subscriptions_canceled": subscriptions_canceled,
+            "subscriptions_active_flag_true": subscriptions_active_flag_true,
+            "subscriptions_active_flag_false": subscriptions_active_flag_false,
+            "subscriptions_by_plan": subscriptions_by_plan,
+        }
+
+    except SQLAlchemyError as e:
+        logger.exception("admin dashboard summary failed (SQLAlchemyError)")
+        raise HTTPException(status_code=500, detail=f"admin dashboard summary failed: SQLAlchemyError: {e}")
+    except Exception as e:
+        logger.exception("admin dashboard summary failed (unexpected)")
+        raise HTTPException(status_code=500, detail=f"admin dashboard summary failed: {type(e).__name__}: {e}")
 
 
 @router.get("/tenants", dependencies=[Depends(require_admin_key)])
