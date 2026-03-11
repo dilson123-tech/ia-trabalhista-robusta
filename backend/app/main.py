@@ -1,4 +1,6 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
+from sqlalchemy import text as sql_text
+from app.db.session import SessionLocal
 
 import logging
 import re
@@ -72,7 +74,39 @@ app.add_middleware(RequestContextMiddleware)
 # health “raiz” (ops rápido)
 @app.get("/health", tags=["ops"])
 def health():
-    return {"ok": True, "service": "ia_trabalhista_robusta", "version": "0.1.0"}
+    return {
+        "ok": True,
+        "service": "ia_trabalhista_robusta",
+        "env": settings.APP_ENV,
+        "version": "0.1.0",
+    }
+
+@app.get("/ready", tags=["ops"])
+def ready():
+    db = SessionLocal()
+    try:
+        db.execute(sql_text("SELECT 1"))
+        return {
+            "ok": True,
+            "service": "ia_trabalhista_robusta",
+            "env": settings.APP_ENV,
+            "version": "0.1.0",
+            "database": "ok",
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "ok": False,
+                "service": "ia_trabalhista_robusta",
+                "env": settings.APP_ENV,
+                "version": "0.1.0",
+                "database": "error",
+                "reason": str(e),
+            },
+        )
+    finally:
+        db.close()
 
 # API versionada
 app.include_router(api_router, prefix=settings.API_V1_PREFIX)

@@ -41,6 +41,8 @@ print("OK ✅", d)
 
 assert_json "root health" "$BASE_URL/health"
 echo
+assert_json "root ready" "$BASE_URL/ready"
+echo
 assert_json "v1 health" "$BASE_URL/api/v1/health"
 echo
 echo "✅ SMOKE PASS"
