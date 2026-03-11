@@ -11,7 +11,6 @@ echo "seed token len=${#SEED_HEADER_TOKEN}"
 
 
 BASE_URL="${BASE_URL:-http://127.0.0.1:8099}"
-SEED_TOKEN="${SEED_TOKEN:-CHANGE_ME_SEED_TOKEN}"
 ADMIN_USER="${ADMIN_USER:-admin}"
 ADMIN_PASS="${ADMIN_PASS:-admin123}"
 

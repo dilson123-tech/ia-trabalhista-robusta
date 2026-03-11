@@ -215,11 +215,17 @@ def seed_admin(
 
 
 @router.post("/users", response_model=UserOut, dependencies=[Depends(require_role("admin"))])
-def create_user(payload: SeedAdminIn, db: Session = Depends(get_db)):
+def create_user(
+    payload: SeedAdminIn,
+    claims=Depends(require_auth),
+    db: Session = Depends(get_db),
+):
     """
-    Cria usuário (admin-only).
+    Cria usuário (admin-only) já vinculado ao tenant atual do admin.
     Reaproveita SeedAdminIn: {username,password,role}.
     """
+    tenant_id = claims.get("tenant_id")
+
     existing = db.execute(select(User).where(User.username == payload.username)).scalar_one_or_none()
     if existing:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="username already exists")
@@ -230,11 +236,39 @@ def create_user(payload: SeedAdminIn, db: Session = Depends(get_db)):
         role=payload.role,
     )
     db.add(u)
+    db.flush()
+
+    cols = set(TenantMember.__table__.columns.keys())
+    data = {}
+
+    if "tenant_id" in cols:
+        data["tenant_id"] = tenant_id
+    elif "tid" in cols:
+        data["tid"] = tenant_id
+    else:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="tenant member missing tenant_id column")
+
+    if "user_id" in cols:
+        data["user_id"] = u.id
+    else:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="tenant member missing user_id column")
+
+    if "role" in cols:
+        data["role"] = payload.role
+    elif "member_role" in cols:
+        data["member_role"] = payload.role
+
+    if "is_owner" in cols:
+        data["is_owner"] = False
+
+    db.add(TenantMember(**data))
+
     try:
         db.commit()
     except IntegrityError:
         db.rollback()
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="username already exists")
+
     db.refresh(u)
     return UserOut(username=u.username, role=u.role)
 
@@ -245,11 +279,20 @@ def create_user(payload: SeedAdminIn, db: Session = Depends(get_db)):
 
 
 @router.patch("/users/{user_id}/activate", dependencies=[Depends(require_role("admin"))])
-def activate_user(user_id: int, db: Session = Depends(get_db)):
+def activate_user(
+    user_id: int,
+    claims=Depends(require_auth),
+    db: Session = Depends(get_db),
+):
     """
     Admin do tenant ativa um usuário (is_active=True).
     """
-    u = db.execute(select(User).where(User.id == user_id)).scalar_one_or_none()
+    tenant_id = claims.get("tenant_id")
+    u = db.execute(
+        select(User)
+        .join(TenantMember, TenantMember.user_id == User.id)
+        .where(User.id == user_id, TenantMember.tenant_id == tenant_id)
+    ).scalar_one_or_none()
     if not u:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="user not found")
 
@@ -261,11 +304,20 @@ def activate_user(user_id: int, db: Session = Depends(get_db)):
 
 
 @router.patch("/users/{user_id}/deactivate", dependencies=[Depends(require_role("admin"))])
-def deactivate_user(user_id: int, db: Session = Depends(get_db)):
+def deactivate_user(
+    user_id: int,
+    claims=Depends(require_auth),
+    db: Session = Depends(get_db),
+):
     """
     Admin do tenant desativa um usuário (is_active=False).
     """
-    u = db.execute(select(User).where(User.id == user_id)).scalar_one_or_none()
+    tenant_id = claims.get("tenant_id")
+    u = db.execute(
+        select(User)
+        .join(TenantMember, TenantMember.user_id == User.id)
+        .where(User.id == user_id, TenantMember.tenant_id == tenant_id)
+    ).scalar_one_or_none()
     if not u:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="user not found")
 

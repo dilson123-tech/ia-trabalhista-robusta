@@ -12,6 +12,7 @@ from app.services.report_engine import generate_report_html
 from app.services.strategic_diagnosis import strategic_diagnosis
 from app.services.decision_engine import generate_decision
 from app.services.pdf_executive import generate_executive_pdf
+from app.services.executive_summary_engine import generate_executive_summary
 from app.services import analyze_case
 from app.services.usage import register_usage
 from app.services.plan_enforcement import enforce_plan_limits, PlanAction
@@ -145,32 +146,20 @@ def analyze_case_endpoint(
 
     viability = calculate_viability(analysis)
 
-    decision = generate_decision(viability, strategic)
-
-
+    decision = generate_decision(analysis, viability)
+    decision = generate_executive_summary(analysis, viability, decision)
 
     executive_data = {
-
         "viability": viability,
-
         "decision": decision,
-
         "strategic": strategic,
-
     }
 
-
-
     full_analysis = {
-
         "technical": analysis,
-
         "strategic": strategic,
-
         "viability": viability,
-
         "decision": decision,
-
     }
 
 
@@ -198,22 +187,14 @@ def analyze_case_endpoint(
 
 
     db.add(record)
-
-
+    db.commit()
     db.refresh(record)
 
-
-
     return {
-
         "case_id": case.id,
-
         "analysis_id": record.id,
-
-        "analysis": full_analysis,
-
+        "analysis": record.analysis,
         "viability": viability,
-
     }
 
 
@@ -261,66 +242,13 @@ def generate_case_report(
     return {"report_html": html}
 
 
-@router.get(
-    "/{case_id}/executive-report",
-    dependencies=[Depends(require_role("admin", "advogado"))],
-)
-def get_executive_report(
-    case_id: int,
-    db: Session = Depends(get_db),
-    current_user=Depends(require_auth),
-):
-    """
-    Gera relatório executivo completo do caso.
-    """
-
-    case = (
-        scoped_query(db, Case, current_user["tenant_id"])
-        .filter(Case.id == case_id)
-        .first()
-    )
-
-    if not case:
-        raise HTTPException(status_code=404, detail="Caso não encontrado")
-
-    analysis = analyze_case(
-        case_number=case.case_number,
-        title=case.title,
-        description=case.description,
-    )
-
-    strategic = strategic_diagnosis(analysis)
-    viability = calculate_viability(analysis)
-    decision = generate_decision(analysis, viability)
-
-    html = generate_report_html(
-        case={
-            "case_number": case.case_number,
-            "title": case.title,
-            "description": case.description,
-        },
-        analysis=analysis,
-        viability=viability,
-    )
-
-    return {
-        "case_id": case.id,
-        "analysis": analysis,
-        "strategic": strategic,
-        "viability": viability,
-        "decision": decision,
-        "html_report": html,
-    }
-
-
-
 @router.get("/{case_id}/executive-summary")
 def get_executive_summary(
     case_id: int,
     db: Session = Depends(get_db),
     current_user=Depends(require_auth),
 ):
-    case = scoped_query(db, Case, current_user["tenant_id"]).filter(
+    case = scoped_query(db, Case, current_user).filter(
         Case.id == case_id
     ).first()
 
@@ -336,6 +264,7 @@ def get_executive_summary(
     strategic = strategic_diagnosis(analysis)
     viability = calculate_viability(analysis)
     decision = generate_decision(analysis, viability)
+    decision = generate_executive_summary(analysis, viability, decision)
 
     return {
         "case": {
@@ -355,7 +284,7 @@ def get_executive_report(
     db: Session = Depends(get_db),
     current_user=Depends(require_auth),
 ):
-    case = scoped_query(db, Case, current_user["tenant_id"]).filter(
+    case = scoped_query(db, Case, current_user).filter(
         Case.id == case_id
     ).first()
 
@@ -371,6 +300,7 @@ def get_executive_report(
     strategic = strategic_diagnosis(analysis)
     viability = calculate_viability(analysis)
     decision = generate_decision(analysis, viability)
+    decision = generate_executive_summary(analysis, viability, decision)
 
     html = generate_report_html(
         case={
@@ -380,6 +310,7 @@ def get_executive_report(
         },
         analysis=analysis,
         viability=viability,
+        executive_decision=decision,
     )
 
     return {
@@ -422,6 +353,7 @@ def generate_executive_pdf_route(
         strategic = strategic_diagnosis(analysis_data)
         viability = calculate_viability(analysis_data)
         decision = generate_decision(analysis_data, viability)
+        decision = generate_executive_summary(analysis_data, viability, decision)
 
         record = CaseAnalysis(
             tenant_id=current_user["tenant_id"],
