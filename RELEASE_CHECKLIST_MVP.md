@@ -42,7 +42,7 @@ Legenda de status:
 - [x] gerar executive PDF
 - [x] registrar uso
 - [~] cobertura funcional formal ponta a ponta
-- [ ] validação formal dos cenários de erro principais
+- [~] validação formal dos cenários de erro principais
 
 ## 4) Relatórios e entrega executiva
 - [x] resumo executivo integrado ao fluxo real
