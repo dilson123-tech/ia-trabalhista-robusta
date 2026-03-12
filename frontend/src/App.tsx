@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { getCases, getCaseAnalysis, type CaseItem, type CaseAnalysisResponse } from './services/api'
+import { getCases, getCaseAnalysis, getExecutiveSummary, type CaseItem, type CaseAnalysisResponse, type ExecutiveSummaryResponse } from './services/api'
 
 function App() {
   const [token, setToken] = useState('')
@@ -11,6 +11,9 @@ function App() {
   const [analysisData, setAnalysisData] = useState<CaseAnalysisResponse | null>(null)
   const [analysisLoading, setAnalysisLoading] = useState(false)
   const [analysisError, setAnalysisError] = useState('')
+  const [executiveSummaryData, setExecutiveSummaryData] = useState<ExecutiveSummaryResponse | null>(null)
+  const [executiveSummaryLoading, setExecutiveSummaryLoading] = useState(false)
+  const [executiveSummaryError, setExecutiveSummaryError] = useState('')
 
   async function handleLoadCases() {
     setLoading(true)
@@ -43,6 +46,23 @@ function App() {
       setAnalysisError('Não foi possível analisar o caso selecionado.')
     } finally {
       setAnalysisLoading(false)
+    }
+  }
+
+
+  async function handleLoadExecutiveSummary(caseId: number) {
+    setExecutiveSummaryLoading(true)
+    setExecutiveSummaryError('')
+    setSelectedCaseId(caseId)
+
+    try {
+      const data = await getExecutiveSummary(token, caseId)
+      setExecutiveSummaryData(data)
+    } catch (err) {
+      console.error(err)
+      setExecutiveSummaryError('Não foi possível carregar o executive summary do caso.')
+    } finally {
+      setExecutiveSummaryLoading(false)
     }
   }
 
@@ -276,6 +296,88 @@ function App() {
             border: '1px solid #1e2945',
             borderRadius: '16px',
             padding: '24px',
+            marginBottom: '24px',
+          }}
+        >
+          <div style={{ marginBottom: '20px' }}>
+            <h2 style={{ margin: 0, fontSize: '22px' }}>Executive Summary</h2>
+            <p style={{ margin: '8px 0 0', color: '#9aa4bf' }}>
+              Resumo executivo real do caso selecionado.
+            </p>
+          </div>
+
+          {executiveSummaryError ? (
+            <p style={{ color: '#ff7b7b', marginBottom: '12px' }}>{executiveSummaryError}</p>
+          ) : null}
+
+          {!executiveSummaryData && !executiveSummaryLoading ? (
+            <p style={{ color: '#9aa4bf' }}>
+              Clique em “Executive Summary” em um dos casos para carregar o resumo executivo.
+            </p>
+          ) : null}
+
+          {executiveSummaryLoading ? (
+            <p style={{ color: '#9aa4bf' }}>Carregando executive summary...</p>
+          ) : null}
+
+          {executiveSummaryData ? (
+            <article
+              style={{
+                background: '#0f172a',
+                border: '1px solid #24304f',
+                borderRadius: '14px',
+                padding: '16px',
+              }}
+            >
+              <p style={{ margin: '0 0 10px', color: '#9aa4bf' }}>
+                Caso: {executiveSummaryData.case.title} | Nº {executiveSummaryData.case.case_number}
+              </p>
+
+              <p style={{ margin: '0 0 10px', color: '#f5f7fb' }}>
+                <strong>Resumo técnico:</strong>{' '}
+                {executiveSummaryData.technical_analysis?.summary || 'Resumo não disponível.'}
+              </p>
+
+              <p style={{ margin: '0 0 10px', color: '#f5f7fb' }}>
+                <strong>Risco:</strong>{' '}
+                {executiveSummaryData.technical_analysis?.risk_level || 'Não informado'}
+              </p>
+
+              <div style={{ marginBottom: '10px' }}>
+                <strong style={{ display: 'block', marginBottom: '6px' }}>Pontos de atenção</strong>
+                <ul style={{ margin: 0, paddingLeft: '18px', color: '#c7d0e0' }}>
+                  {(executiveSummaryData.technical_analysis?.issues || []).length > 0 ? (
+                    (executiveSummaryData.technical_analysis?.issues || []).map((item, index) => (
+                      <li key={index}>{item}</li>
+                    ))
+                  ) : (
+                    <li>Nenhum ponto crítico informado.</li>
+                  )}
+                </ul>
+              </div>
+
+              <div>
+                <strong style={{ display: 'block', marginBottom: '6px' }}>Próximos passos</strong>
+                <ul style={{ margin: 0, paddingLeft: '18px', color: '#c7d0e0' }}>
+                  {(executiveSummaryData.technical_analysis?.next_steps || []).length > 0 ? (
+                    (executiveSummaryData.technical_analysis?.next_steps || []).map((item, index) => (
+                      <li key={index}>{item}</li>
+                    ))
+                  ) : (
+                    <li>Nenhum próximo passo informado.</li>
+                  )}
+                </ul>
+              </div>
+            </article>
+          ) : null}
+        </section>
+
+        <section
+          style={{
+            background: '#121a2f',
+            border: '1px solid #1e2945',
+            borderRadius: '16px',
+            padding: '24px',
           }}
         >
           <div style={{ marginBottom: '20px' }}>
@@ -368,6 +470,23 @@ function App() {
                     }}
                   >
                     {analysisLoading && selectedCaseId === caso.id ? 'Analisando...' : 'Analisar caso'}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleLoadExecutiveSummary(caso.id)}
+                    disabled={executiveSummaryLoading}
+                    style={{
+                      background: executiveSummaryLoading && selectedCaseId === caso.id ? '#5b6478' : '#7dd3fc',
+                      color: '#111',
+                      border: 'none',
+                      borderRadius: '10px',
+                      padding: '10px 14px',
+                      fontWeight: 700,
+                      cursor: executiveSummaryLoading ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    {executiveSummaryLoading && selectedCaseId === caso.id ? 'Carregando resumo...' : 'Executive Summary'}
                   </button>
                 </div>
               </article>

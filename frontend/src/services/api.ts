@@ -56,3 +56,34 @@ export async function getCaseAnalysis(token: string, caseId: number): Promise<Ca
   return response.json()
 }
 
+export type ExecutiveSummaryResponse = {
+  case: {
+    id: number
+    case_number: string
+    title: string
+  }
+  technical_analysis?: {
+    summary?: string
+    risk_level?: string
+    issues?: string[]
+    next_steps?: string[]
+  }
+  strategic_analysis?: Record<string, unknown>
+  viability?: Record<string, unknown>
+  executive_decision?: Record<string, unknown>
+}
+
+export async function getExecutiveSummary(token: string, caseId: number): Promise<ExecutiveSummaryResponse> {
+  const response = await fetch(`${API_URL}/cases/${caseId}/executive-summary`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+
+  if (!response.ok) {
+    throw new Error("Erro ao buscar executive summary")
+  }
+
+  return response.json()
+}
+
