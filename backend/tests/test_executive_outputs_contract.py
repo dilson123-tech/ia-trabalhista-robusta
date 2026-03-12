@@ -1,0 +1,89 @@
+from fastapi.testclient import TestClient
+import uuid
+
+from app.main import app
+from app.core.settings import settings
+
+client = TestClient(app)
+
+
+def _auth_headers(monkeypatch):
+    monkeypatch.setattr(settings, "ALLOW_SEED_ADMIN", True)
+    monkeypatch.setattr(settings, "ADMIN_SEED_TOKEN", "test-seed-token")
+
+    seed_payload = {
+        "username": f"admin_exec_{uuid.uuid4().hex[:8]}@example.com",
+        "password": "dev",
+        "role": "admin",
+    }
+
+    r_seed = client.post(
+        "/api/v1/auth/seed-admin",
+        json=seed_payload,
+        headers={"x-seed-token": "test-seed-token"},
+    )
+    assert r_seed.status_code == 200
+    assert r_seed.json()["ok"] is True
+
+    r_login = client.post(
+        "/api/v1/auth/login",
+        json={
+            "username": seed_payload["username"],
+            "password": seed_payload["password"],
+        },
+    )
+    assert r_login.status_code == 200
+
+    token = r_login.json()["access_token"]
+    return {"Authorization": f"Bearer {token}"}
+
+
+def test_executive_outputs_contract_and_missing_case(monkeypatch):
+    headers = _auth_headers(monkeypatch)
+
+    create_payload = {
+        "case_number": f"EXEC-{uuid.uuid4()}",
+        "title": "Caso executivo de contrato",
+        "description": "Teste de summary, report e pdf.",
+        "status": "draft",
+    }
+
+    create_resp = client.post("/api/v1/cases", json=create_payload, headers=headers)
+    assert create_resp.status_code == 200
+    case_id = create_resp.json()["id"]
+
+    summary = client.get(f"/api/v1/cases/{case_id}/executive-summary", headers=headers)
+    assert summary.status_code == 200
+    summary_body = summary.json()
+    assert summary_body["case"]["id"] == case_id
+    assert summary_body["case"]["case_number"] == create_payload["case_number"]
+    assert summary_body["case"]["title"] == create_payload["title"]
+    assert "technical_analysis" in summary_body
+    assert "strategic_analysis" in summary_body
+    assert "viability" in summary_body
+    assert "executive_decision" in summary_body
+
+    report = client.get(f"/api/v1/cases/{case_id}/executive-report", headers=headers)
+    assert report.status_code == 200
+    report_body = report.json()
+    assert report_body["case_id"] == case_id
+    assert "executive_decision" in report_body
+    assert "report_html" in report_body
+    assert isinstance(report_body["report_html"], str)
+    assert len(report_body["report_html"]) > 50
+
+    pdf = client.get(f"/api/v1/cases/{case_id}/executive-pdf", headers=headers)
+    assert pdf.status_code == 200
+    assert pdf.headers["content-type"].startswith("application/pdf")
+    assert len(pdf.content) > 100
+
+    missing_id = 999999
+
+    missing_summary = client.get(f"/api/v1/cases/{missing_id}/executive-summary", headers=headers)
+    assert missing_summary.status_code == 404
+
+    missing_report = client.get(f"/api/v1/cases/{missing_id}/executive-report", headers=headers)
+    assert missing_report.status_code == 404
+
+    missing_pdf = client.get(f"/api/v1/cases/{missing_id}/executive-pdf", headers=headers)
+    assert missing_pdf.status_code == 404
