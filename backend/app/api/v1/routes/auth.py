@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Depends, Header, HTTPException, status
 from sqlalchemy import text
 from sqlalchemy.orm import Session
-from sqlalchemy import text
 from sqlalchemy import select, inspect, Table, MetaData
 from sqlalchemy.exc import IntegrityError
 
@@ -13,6 +12,7 @@ from app.core.settings import settings
 from app.core.security import issue_token, require_auth, require_role, pwd_context
 from app.db.session import get_db
 from app.core.tenant import set_tenant_on_session
+from app.core.plans import PlanType, limits_for
 from app.models.tenant_member import TenantMember
 from app.models.user import User
 from app.schemas.auth import LoginIn, TokenOut, UserOut, SeedAdminIn, ChangePasswordIn
@@ -128,13 +128,19 @@ def _ensure_membership(db: Session, u: User) -> TenantMember:
     # RLS FORCE: operar como tenant alvo para inserts/updates
     set_tenant_on_session(db, tenant_id)
     exp = _dt.datetime.utcnow() + _dt.timedelta(days=30)
+    basic_limits = limits_for(PlanType.basic)
     db.execute(
         text(
             "INSERT INTO subscriptions (tenant_id, plan_type, status, case_limit, active, expires_at) "
             "VALUES (:tid, 'basic', 'trial', :case_limit, :active, :exp) "
             "ON CONFLICT (tenant_id) DO NOTHING"
         ),
-        {"tid": tenant_id, "case_limit": 10, "active": True, "exp": exp},
+        {
+            "tid": tenant_id,
+            "case_limit": basic_limits.cases_per_month,
+            "active": True,
+            "exp": exp,
+        },
     )
 
 

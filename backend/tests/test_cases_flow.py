@@ -7,25 +7,25 @@ from app.core.settings import settings
 client = TestClient(app)
 
 
-def _auth_headers():
-    # garante que existe um admin seedado e faz login
+def _auth_headers(monkeypatch):
+    monkeypatch.setattr(settings, "ALLOW_SEED_ADMIN", True)
+    monkeypatch.setattr(settings, "ADMIN_SEED_TOKEN", "test-seed-token")
+
     seed_payload = {
         "username": f"admin_d07_{uuid.uuid4().hex[:8]}@example.com",
-        "password": f"admin_d07_pass_{uuid.uuid4().hex[:8]}",
+        "password": "dev",
         "role": "admin",
     }
 
-    # seed-admin é idempotente: se já existir, só ignora
     r_seed = client.post(
         "/api/v1/auth/seed-admin",
         json=seed_payload,
-        headers={"x-seed-token": settings.ADMIN_SEED_TOKEN},
+        headers={"x-seed-token": "test-seed-token"},
     )
     assert r_seed.status_code == 200
     body_seed = r_seed.json()
     assert body_seed["ok"] is True
 
-    # login
     r_login = client.post(
         "/api/v1/auth/login",
         json={
@@ -38,10 +38,9 @@ def _auth_headers():
     return {"Authorization": f"Bearer {token}"}
 
 
-def test_create_and_get_case_flow():
-    headers = _auth_headers()
+def test_create_and_get_case_flow(monkeypatch):
+    headers = _auth_headers(monkeypatch)
 
-    # cria um case
     create_payload = {
         "case_number": "0001234-56.2025.5.12.0001",
         "title": "Reclamação trabalhista por verbas rescisórias",
@@ -58,13 +57,11 @@ def test_create_and_get_case_flow():
 
     case_id = created["id"]
 
-    # lista cases
     r_list = client.get("/api/v1/cases", headers=headers)
     assert r_list.status_code == 200
     items = r_list.json()
     assert any(item["id"] == case_id for item in items)
 
-    # detalhe do case
     r_detail = client.get(f"/api/v1/cases/{case_id}", headers=headers)
     assert r_detail.status_code == 200
     detail = r_detail.json()
