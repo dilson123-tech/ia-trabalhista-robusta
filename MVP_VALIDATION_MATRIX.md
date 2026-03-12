@@ -9,7 +9,7 @@ Legenda:
 - [x] GET /health -> 200
 - [x] GET /ready -> 200 com banco ok
 - [x] smoke principal executando sem falhas graves
-- [ ] comportamento validado quando banco estiver indisponível
+- [x] comportamento validado quando banco estiver indisponível
 
 ## 2) Auth
 - [x] login válido -> 200
@@ -51,7 +51,7 @@ Legenda:
 - [x] case inexistente -> 404
 - [x] tenant errado -> bloqueado
 - [x] sem análise prévia -> comportamento validado
-- [ ] erro interno de geração PDF -> comportamento validado/documentado
+- [x] erro interno de geração PDF -> comportamento validado/documentado
 
 ## 7) Usage / limits / plans
 - [x] usage summary -> 200
@@ -67,7 +67,7 @@ Legenda:
 - [x] admin subscription upsert -> funcional
 - [x] admin sem X-Admin-Key -> bloqueado corretamente
 - [x] admin com key inválida -> bloqueado corretamente
-- [ ] reset de contexto tenant após operação admin -> validado formalmente
+- [x] reset de contexto tenant após operação admin -> validado formalmente
 
 ## 9) Release gate
 - [ ] todos os fluxos críticos validados
