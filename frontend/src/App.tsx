@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { getCases, getCaseAnalysis, getExecutiveSummary, type CaseItem, type CaseAnalysisResponse, type ExecutiveSummaryResponse } from './services/api'
+import { getCases, getCaseAnalysis, getExecutiveSummary, getExecutiveReport, type CaseItem, type CaseAnalysisResponse, type ExecutiveSummaryResponse, type ExecutiveReportResponse } from './services/api'
 
 function App() {
   const [token, setToken] = useState('')
@@ -14,6 +14,9 @@ function App() {
   const [executiveSummaryData, setExecutiveSummaryData] = useState<ExecutiveSummaryResponse | null>(null)
   const [executiveSummaryLoading, setExecutiveSummaryLoading] = useState(false)
   const [executiveSummaryError, setExecutiveSummaryError] = useState('')
+  const [executiveReportData, setExecutiveReportData] = useState<ExecutiveReportResponse | null>(null)
+  const [executiveReportLoading, setExecutiveReportLoading] = useState(false)
+  const [executiveReportError, setExecutiveReportError] = useState('')
 
   async function handleLoadCases() {
     setLoading(true)
@@ -63,6 +66,23 @@ function App() {
       setExecutiveSummaryError('Não foi possível carregar o executive summary do caso.')
     } finally {
       setExecutiveSummaryLoading(false)
+    }
+  }
+
+
+  async function handleLoadExecutiveReport(caseId: number) {
+    setExecutiveReportLoading(true)
+    setExecutiveReportError('')
+    setSelectedCaseId(caseId)
+
+    try {
+      const data = await getExecutiveReport(token, caseId)
+      setExecutiveReportData(data)
+    } catch (err) {
+      console.error(err)
+      setExecutiveReportError('Não foi possível carregar o executive report do caso.')
+    } finally {
+      setExecutiveReportLoading(false)
     }
   }
 
@@ -378,6 +398,64 @@ function App() {
             border: '1px solid #1e2945',
             borderRadius: '16px',
             padding: '24px',
+            marginBottom: '24px',
+          }}
+        >
+          <div style={{ marginBottom: '20px' }}>
+            <h2 style={{ margin: 0, fontSize: '22px' }}>Executive Report</h2>
+            <p style={{ margin: '8px 0 0', color: '#9aa4bf' }}>
+              Relatório executivo real do caso selecionado.
+            </p>
+          </div>
+
+          {executiveReportError ? (
+            <p style={{ color: '#ff7b7b', marginBottom: '12px' }}>{executiveReportError}</p>
+          ) : null}
+
+          {!executiveReportData && !executiveReportLoading ? (
+            <p style={{ color: '#9aa4bf' }}>
+              Clique em “Executive Report” em um dos casos para carregar o relatório executivo.
+            </p>
+          ) : null}
+
+          {executiveReportLoading ? (
+            <p style={{ color: '#9aa4bf' }}>Carregando executive report...</p>
+          ) : null}
+
+          {executiveReportData ? (
+            <article
+              style={{
+                background: '#0f172a',
+                border: '1px solid #24304f',
+                borderRadius: '14px',
+                padding: '16px',
+              }}
+            >
+              <p style={{ margin: '0 0 12px', color: '#9aa4bf' }}>
+                Caso analisado: {executiveReportData.case_id}
+              </p>
+
+              <div
+                style={{
+                  background: '#0b1020',
+                  border: '1px solid #24304f',
+                  borderRadius: '12px',
+                  padding: '14px',
+                  color: '#c7d0e0',
+                  overflowX: 'auto',
+                }}
+                dangerouslySetInnerHTML={{ __html: executiveReportData.report_html }}
+              />
+            </article>
+          ) : null}
+        </section>
+
+        <section
+          style={{
+            background: '#121a2f',
+            border: '1px solid #1e2945',
+            borderRadius: '16px',
+            padding: '24px',
           }}
         >
           <div style={{ marginBottom: '20px' }}>
@@ -487,6 +565,23 @@ function App() {
                     }}
                   >
                     {executiveSummaryLoading && selectedCaseId === caso.id ? 'Carregando resumo...' : 'Executive Summary'}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleLoadExecutiveReport(caso.id)}
+                    disabled={executiveReportLoading}
+                    style={{
+                      background: executiveReportLoading && selectedCaseId === caso.id ? '#5b6478' : '#86efac',
+                      color: '#111',
+                      border: 'none',
+                      borderRadius: '10px',
+                      padding: '10px 14px',
+                      fontWeight: 700,
+                      cursor: executiveReportLoading ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    {executiveReportLoading && selectedCaseId === caso.id ? 'Carregando report...' : 'Executive Report'}
                   </button>
                 </div>
               </article>

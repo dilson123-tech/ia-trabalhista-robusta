@@ -87,3 +87,23 @@ export async function getExecutiveSummary(token: string, caseId: number): Promis
   return response.json()
 }
 
+export type ExecutiveReportResponse = {
+  case_id: number
+  executive_decision?: Record<string, unknown>
+  report_html: string
+}
+
+export async function getExecutiveReport(token: string, caseId: number): Promise<ExecutiveReportResponse> {
+  const response = await fetch(`${API_URL}/cases/${caseId}/executive-report`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+
+  if (!response.ok) {
+    throw new Error("Erro ao buscar executive report")
+  }
+
+  return response.json()
+}
+
