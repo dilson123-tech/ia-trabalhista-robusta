@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Request, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text as sql_text
 from app.db.session import SessionLocal
 
@@ -16,6 +17,18 @@ setup_logging(settings.LOG_LEVEL)
 app = FastAPI(
     title=settings.APP_NAME,
     version="0.1.0",
+)
+
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Garantia: audit middleware sempre ativo
