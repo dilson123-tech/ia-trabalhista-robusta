@@ -119,10 +119,18 @@ def require_auth(
     claims = decode_token(creds.credentials)
 
     tenant_id = claims.get("tenant_id")
-    user = db.execute(text("SELECT id FROM users WHERE username = :u"), {"u": claims.get("sub")}).fetchone()
+    user = db.execute(
+        text("SELECT id, is_active FROM users WHERE username = :u"),
+        {"u": claims.get("sub")},
+    ).fetchone()
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="user not found")
-    member = db.execute(text("SELECT 1 FROM tenant_members WHERE user_id = :uid AND tenant_id = :tid"), {"uid": user[0], "tid": tenant_id}).fetchone()
+    if not user[1]:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="user is inactive")
+    member = db.execute(
+        text("SELECT 1 FROM tenant_members WHERE user_id = :uid AND tenant_id = :tid"),
+        {"uid": user[0], "tid": tenant_id},
+    ).fetchone()
     if not member:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="invalid tenant membership")
     if not tenant_id:
