@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { getCases, type CaseItem } from './services/api'
+import { getCases, getCaseAnalysis, type CaseItem, type CaseAnalysisResponse } from './services/api'
 
 function App() {
   const [token, setToken] = useState('')
@@ -7,6 +7,10 @@ function App() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [loaded, setLoaded] = useState(false)
+  const [selectedCaseId, setSelectedCaseId] = useState<number | null>(null)
+  const [analysisData, setAnalysisData] = useState<CaseAnalysisResponse | null>(null)
+  const [analysisLoading, setAnalysisLoading] = useState(false)
+  const [analysisError, setAnalysisError] = useState('')
 
   async function handleLoadCases() {
     setLoading(true)
@@ -22,6 +26,23 @@ function App() {
       setLoaded(true)
     } finally {
       setLoading(false)
+    }
+  }
+
+
+  async function handleAnalyzeCase(caseId: number) {
+    setAnalysisLoading(true)
+    setAnalysisError('')
+    setSelectedCaseId(caseId)
+
+    try {
+      const data = await getCaseAnalysis(token, caseId)
+      setAnalysisData(data)
+    } catch (err) {
+      console.error(err)
+      setAnalysisError('Não foi possível analisar o caso selecionado.')
+    } finally {
+      setAnalysisLoading(false)
     }
   }
 
@@ -166,6 +187,95 @@ function App() {
             border: '1px solid #1e2945',
             borderRadius: '16px',
             padding: '24px',
+            marginBottom: '24px',
+          }}
+        >
+          <div style={{ marginBottom: '20px' }}>
+            <h2 style={{ margin: 0, fontSize: '22px' }}>Resultado da análise jurídica</h2>
+            <p style={{ margin: '8px 0 0', color: '#9aa4bf' }}>
+              Retorno real da IA para o caso selecionado.
+            </p>
+          </div>
+
+          {analysisError ? (
+            <p style={{ color: '#ff7b7b', marginBottom: '12px' }}>{analysisError}</p>
+          ) : null}
+
+          {!analysisData && !analysisLoading ? (
+            <p style={{ color: '#9aa4bf' }}>
+              Clique em “Analisar caso” em um dos cards para carregar o diagnóstico.
+            </p>
+          ) : null}
+
+          {analysisLoading ? (
+            <p style={{ color: '#9aa4bf' }}>Analisando caso selecionado...</p>
+          ) : null}
+
+          {analysisData ? (
+            <div
+              style={{
+                display: 'grid',
+                gap: '12px',
+              }}
+            >
+              <article
+                style={{
+                  background: '#0f172a',
+                  border: '1px solid #24304f',
+                  borderRadius: '14px',
+                  padding: '16px',
+                }}
+              >
+                <p style={{ margin: '0 0 10px', color: '#9aa4bf' }}>
+                  Caso analisado: {analysisData.case_id} | Análise: {analysisData.analysis_id}
+                </p>
+
+                <p style={{ margin: '0 0 10px', color: '#f5f7fb' }}>
+                  <strong>Resumo técnico:</strong>{' '}
+                  {analysisData.analysis?.technical?.summary || 'Resumo não disponível.'}
+                </p>
+
+                <p style={{ margin: '0 0 10px', color: '#f5f7fb' }}>
+                  <strong>Nível de risco:</strong>{' '}
+                  {analysisData.analysis?.technical?.risk_level || 'Não informado'}
+                </p>
+
+                <div style={{ marginBottom: '10px' }}>
+                  <strong style={{ display: 'block', marginBottom: '6px' }}>Pontos de atenção</strong>
+                  <ul style={{ margin: 0, paddingLeft: '18px', color: '#c7d0e0' }}>
+                    {(analysisData.analysis?.technical?.issues || []).length > 0 ? (
+                      (analysisData.analysis?.technical?.issues || []).map((item, index) => (
+                        <li key={index}>{item}</li>
+                      ))
+                    ) : (
+                      <li>Nenhum ponto crítico informado.</li>
+                    )}
+                  </ul>
+                </div>
+
+                <div>
+                  <strong style={{ display: 'block', marginBottom: '6px' }}>Próximos passos</strong>
+                  <ul style={{ margin: 0, paddingLeft: '18px', color: '#c7d0e0' }}>
+                    {(analysisData.analysis?.technical?.next_steps || []).length > 0 ? (
+                      (analysisData.analysis?.technical?.next_steps || []).map((item, index) => (
+                        <li key={index}>{item}</li>
+                      ))
+                    ) : (
+                      <li>Nenhum próximo passo informado.</li>
+                    )}
+                  </ul>
+                </div>
+              </article>
+            </div>
+          ) : null}
+        </section>
+
+        <section
+          style={{
+            background: '#121a2f',
+            border: '1px solid #1e2945',
+            borderRadius: '16px',
+            padding: '24px',
           }}
         >
           <div style={{ marginBottom: '20px' }}>
@@ -242,6 +352,23 @@ function App() {
                   <span style={{ color: '#9aa4bf', fontSize: '13px' }}>
                     Tenant: {caso.tenant_id}
                   </span>
+
+                  <button
+                    type="button"
+                    onClick={() => handleAnalyzeCase(caso.id)}
+                    disabled={analysisLoading}
+                    style={{
+                      background: analysisLoading && selectedCaseId === caso.id ? '#5b6478' : '#d4af37',
+                      color: '#111',
+                      border: 'none',
+                      borderRadius: '10px',
+                      padding: '10px 14px',
+                      fontWeight: 700,
+                      cursor: analysisLoading ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    {analysisLoading && selectedCaseId === caso.id ? 'Analisando...' : 'Analisar caso'}
+                  </button>
                 </div>
               </article>
             ))}

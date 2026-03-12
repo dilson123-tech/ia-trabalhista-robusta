@@ -24,3 +24,35 @@ export async function getCases(token: string): Promise<CaseItem[]> {
 
   return response.json()
 }
+
+export type CaseAnalysisResponse = {
+  case_id: number
+  analysis_id: number
+  analysis: {
+    technical?: {
+      summary?: string
+      risk_level?: string
+      issues?: string[]
+      next_steps?: string[]
+    }
+    strategic?: Record<string, unknown>
+    viability?: Record<string, unknown>
+    decision?: Record<string, unknown>
+  }
+  viability?: Record<string, unknown>
+}
+
+export async function getCaseAnalysis(token: string, caseId: number): Promise<CaseAnalysisResponse> {
+  const response = await fetch(`${API_URL}/cases/${caseId}/analysis`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+
+  if (!response.ok) {
+    throw new Error("Erro ao analisar caso")
+  }
+
+  return response.json()
+}
+
