@@ -1,5 +1,34 @@
 const API_URL = "http://127.0.0.1:8099/api/v1"
 
+export class ApiError extends Error {
+  status: number
+
+  constructor(message: string, status: number) {
+    super(message)
+    this.name = "ApiError"
+    this.status = status
+  }
+}
+
+async function parseError(response: Response, fallbackMessage: string): Promise<never> {
+  if (response.status === 401) {
+    throw new ApiError("Sessão expirada ou token inválido. Gere um novo token e tente novamente.", 401)
+  }
+
+  let message = fallbackMessage
+
+  try {
+    const data = await response.json()
+    if (data && typeof data.detail === "string" && data.detail.trim()) {
+      message = data.detail
+    }
+  } catch {
+    // ignora parse inválido e mantém fallback
+  }
+
+  throw new ApiError(message, response.status)
+}
+
 export type CaseItem = {
   id: number
   case_number: string
@@ -19,7 +48,7 @@ export async function getCases(token: string): Promise<CaseItem[]> {
   })
 
   if (!response.ok) {
-    throw new Error("Erro ao buscar casos")
+    await parseError(response, "Erro ao buscar casos")
   }
 
   return response.json()
@@ -50,7 +79,7 @@ export async function getCaseAnalysis(token: string, caseId: number): Promise<Ca
   })
 
   if (!response.ok) {
-    throw new Error("Erro ao analisar caso")
+    await parseError(response, "Erro ao analisar caso")
   }
 
   return response.json()
@@ -81,7 +110,7 @@ export async function getExecutiveSummary(token: string, caseId: number): Promis
   })
 
   if (!response.ok) {
-    throw new Error("Erro ao buscar executive summary")
+    await parseError(response, "Erro ao buscar executive summary")
   }
 
   return response.json()
@@ -101,9 +130,23 @@ export async function getExecutiveReport(token: string, caseId: number): Promise
   })
 
   if (!response.ok) {
-    throw new Error("Erro ao buscar executive report")
+    await parseError(response, "Erro ao buscar executive report")
   }
 
   return response.json()
+}
+
+export async function getExecutivePdf(token: string, caseId: number): Promise<Blob> {
+  const response = await fetch(`${API_URL}/cases/${caseId}/executive-pdf`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+
+  if (!response.ok) {
+    await parseError(response, "Erro ao buscar executive pdf")
+  }
+
+  return response.blob()
 }
 

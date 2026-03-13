@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { getCases, getCaseAnalysis, getExecutiveSummary, getExecutiveReport, type CaseItem, type CaseAnalysisResponse, type ExecutiveSummaryResponse, type ExecutiveReportResponse } from './services/api'
+import { ApiError, getCases, getCaseAnalysis, getExecutiveSummary, getExecutiveReport, getExecutivePdf, type CaseItem, type CaseAnalysisResponse, type ExecutiveSummaryResponse, type ExecutiveReportResponse } from './services/api'
 
 function App() {
   const [token, setToken] = useState('')
@@ -17,6 +17,31 @@ function App() {
   const [executiveReportData, setExecutiveReportData] = useState<ExecutiveReportResponse | null>(null)
   const [executiveReportLoading, setExecutiveReportLoading] = useState(false)
   const [executiveReportError, setExecutiveReportError] = useState('')
+  const [executivePdfLoading, setExecutivePdfLoading] = useState(false)
+  const [executivePdfError, setExecutivePdfError] = useState('')
+
+  function handleApiFailure(err: unknown, fallbackMessage: string) {
+    console.error(err)
+
+    if (err instanceof ApiError && err.status === 401) {
+      setToken('')
+      setCases([])
+      setLoaded(false)
+      setSelectedCaseId(null)
+      setAnalysisData(null)
+      setExecutiveSummaryData(null)
+      setExecutiveReportData(null)
+      setError(err.message)
+      setAnalysisError('')
+      setExecutiveSummaryError('')
+      setExecutiveReportError('')
+      setExecutivePdfError('')
+      return
+    }
+
+    setError('')
+    return fallbackMessage
+  }
 
   async function handleLoadCases() {
     setLoading(true)
@@ -27,9 +52,11 @@ function App() {
       setCases(data)
       setLoaded(true)
     } catch (err) {
-      console.error(err)
-      setError('Não foi possível carregar os casos. Verifique o token e o backend.')
-      setLoaded(true)
+      const fallback = handleApiFailure(err, 'Não foi possível carregar os casos. Verifique o token e o backend.')
+      if (fallback) {
+        setError(fallback)
+        setLoaded(true)
+      }
     } finally {
       setLoading(false)
     }
@@ -45,8 +72,10 @@ function App() {
       const data = await getCaseAnalysis(token, caseId)
       setAnalysisData(data)
     } catch (err) {
-      console.error(err)
-      setAnalysisError('Não foi possível analisar o caso selecionado.')
+      const fallback = handleApiFailure(err, 'Não foi possível analisar o caso selecionado.')
+      if (fallback) {
+        setAnalysisError(fallback)
+      }
     } finally {
       setAnalysisLoading(false)
     }
@@ -62,8 +91,10 @@ function App() {
       const data = await getExecutiveSummary(token, caseId)
       setExecutiveSummaryData(data)
     } catch (err) {
-      console.error(err)
-      setExecutiveSummaryError('Não foi possível carregar o executive summary do caso.')
+      const fallback = handleApiFailure(err, 'Não foi possível carregar o executive summary do caso.')
+      if (fallback) {
+        setExecutiveSummaryError(fallback)
+      }
     } finally {
       setExecutiveSummaryLoading(false)
     }
@@ -79,10 +110,32 @@ function App() {
       const data = await getExecutiveReport(token, caseId)
       setExecutiveReportData(data)
     } catch (err) {
-      console.error(err)
-      setExecutiveReportError('Não foi possível carregar o executive report do caso.')
+      const fallback = handleApiFailure(err, 'Não foi possível carregar o executive report do caso.')
+      if (fallback) {
+        setExecutiveReportError(fallback)
+      }
     } finally {
       setExecutiveReportLoading(false)
+    }
+  }
+
+  async function handleOpenExecutivePdf(caseId: number) {
+    setExecutivePdfLoading(true)
+    setExecutivePdfError('')
+    setSelectedCaseId(caseId)
+
+    try {
+      const pdfBlob = await getExecutivePdf(token, caseId)
+      const pdfUrl = window.URL.createObjectURL(pdfBlob)
+      window.open(pdfUrl, '_blank', 'noopener,noreferrer')
+      window.setTimeout(() => window.URL.revokeObjectURL(pdfUrl), 60000)
+    } catch (err) {
+      const fallback = handleApiFailure(err, 'Não foi possível abrir o executive PDF do caso.')
+      if (fallback) {
+        setExecutivePdfError(fallback)
+      }
+    } finally {
+      setExecutivePdfLoading(false)
     }
   }
 
@@ -412,6 +465,10 @@ function App() {
             <p style={{ color: '#ff7b7b', marginBottom: '12px' }}>{executiveReportError}</p>
           ) : null}
 
+          {executivePdfError ? (
+            <p style={{ color: '#ff7b7b', marginBottom: '12px' }}>{executivePdfError}</p>
+          ) : null}
+
           {!executiveReportData && !executiveReportLoading ? (
             <p style={{ color: '#9aa4bf' }}>
               Clique em “Executive Report” em um dos casos para carregar o relatório executivo.
@@ -425,27 +482,227 @@ function App() {
           {executiveReportData ? (
             <article
               style={{
-                background: '#0f172a',
-                border: '1px solid #24304f',
-                borderRadius: '14px',
-                padding: '16px',
+                background: 'linear-gradient(180deg, #0f172a 0%, #0b1220 100%)',
+                border: '1px solid #2a3655',
+                borderRadius: '18px',
+                padding: '20px',
+                boxShadow: '0 10px 30px rgba(0, 0, 0, 0.28)',
               }}
             >
-              <p style={{ margin: '0 0 12px', color: '#9aa4bf' }}>
-                Caso analisado: {executiveReportData.case_id}
-              </p>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: '12px',
+                  marginBottom: '16px',
+                  flexWrap: 'wrap',
+                }}
+              >
+                <p
+                  style={{
+                    margin: 0,
+                    color: '#cbd5e1',
+                    fontSize: '14px',
+                    fontWeight: 600,
+                    letterSpacing: '0.2px',
+                  }}
+                >
+                  Caso analisado: #{executiveReportData.case_id}
+                </p>
+
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    padding: '6px 10px',
+                    borderRadius: '999px',
+                    background: 'rgba(134, 239, 172, 0.12)',
+                    border: '1px solid rgba(134, 239, 172, 0.35)',
+                    color: '#86efac',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                  }}
+                >
+                  Relatório executivo real
+                </span>
+              </div>
 
               <div
                 style={{
-                  background: '#0b1020',
+                  background: '#0a0f1c',
                   border: '1px solid #24304f',
-                  borderRadius: '12px',
-                  padding: '14px',
-                  color: '#c7d0e0',
+                  borderRadius: '14px',
+                  padding: '22px',
+                  color: '#dbe4f0',
                   overflowX: 'auto',
+                  lineHeight: 1.7,
+                  fontSize: '15px',
                 }}
-                dangerouslySetInnerHTML={{ __html: executiveReportData.report_html }}
-              />
+              >
+                <style>
+                  {`
+                    .executive-report-html,
+                    .executive-report-html * {
+                      color: #e5edf7 !important;
+                      box-sizing: border-box;
+                    }
+
+                    .executive-report-html {
+                      background: #0a0f1c !important;
+                    }
+
+                    .executive-report-html h1,
+                    .executive-report-html h2,
+                    .executive-report-html h3,
+                    .executive-report-html h4 {
+                      color: #f8fafc !important;
+                      margin-top: 0;
+                      margin-bottom: 12px;
+                      line-height: 1.25;
+                      background: transparent !important;
+                    }
+
+                    .executive-report-html h1 {
+                      font-size: 28px;
+                      margin-bottom: 18px;
+                      padding-bottom: 10px;
+                      border-bottom: 1px solid #24304f;
+                    }
+
+                    .executive-report-html h2 {
+                      font-size: 22px;
+                      margin-top: 28px;
+                      padding-left: 12px;
+                      border-left: 4px solid #86efac;
+                    }
+
+                    .executive-report-html h3 {
+                      font-size: 18px;
+                      margin-top: 22px;
+                      color: #dbeafe !important;
+                    }
+
+                    .executive-report-html p,
+                    .executive-report-html span,
+                    .executive-report-html div,
+                    .executive-report-html li,
+                    .executive-report-html small {
+                      color: #cbd5e1 !important;
+                      background: transparent !important;
+                    }
+
+                    .executive-report-html p {
+                      margin: 0 0 14px;
+                    }
+
+                    .executive-report-html ul,
+                    .executive-report-html ol {
+                      margin: 0 0 16px 0;
+                      padding-left: 22px;
+                      color: #cbd5e1 !important;
+                      background: transparent !important;
+                    }
+
+                    .executive-report-html li {
+                      margin-bottom: 8px;
+                    }
+
+                    .executive-report-html strong,
+                    .executive-report-html b {
+                      color: #f8fafc !important;
+                    }
+
+                    .executive-report-html section,
+                    .executive-report-html article,
+                    .executive-report-html header {
+                      background: transparent !important;
+                    }
+
+                    .executive-report-html table {
+                      width: 100%;
+                      border-collapse: collapse;
+                      margin: 18px 0;
+                      background: #0f172a !important;
+                      border: 1px solid #24304f;
+                      border-radius: 12px;
+                      overflow: hidden;
+                    }
+
+                    .executive-report-html th,
+                    .executive-report-html td {
+                      border: 1px solid #24304f;
+                      padding: 12px;
+                      text-align: left;
+                      color: #dbe4f0 !important;
+                      background: #0f172a !important;
+                    }
+
+                    .executive-report-html th {
+                      background: #111a2e !important;
+                      color: #f8fafc !important;
+                      font-weight: 700;
+                    }
+
+                    .executive-report-html tr:nth-child(even) td {
+                      background: #101a30 !important;
+                    }
+
+                    .executive-report-html blockquote {
+                      margin: 18px 0;
+                      padding: 14px 16px;
+                      border-left: 4px solid #60a5fa;
+                      background: rgba(96, 165, 250, 0.08) !important;
+                      color: #dbeafe !important;
+                      border-radius: 10px;
+                    }
+
+                    .executive-report-html hr {
+                      border: none;
+                      border-top: 1px solid #24304f;
+                      margin: 24px 0;
+                    }
+
+                    .executive-report-html code {
+                      background: #111827 !important;
+                      border: 1px solid #24304f;
+                      color: #fde68a !important;
+                      padding: 2px 6px;
+                      border-radius: 6px;
+                      font-size: 13px;
+                    }
+
+                    .executive-report-html [style*="background"],
+                    .executive-report-html [style*="background-color"] {
+                      background: transparent !important;
+                    }
+
+                    .executive-report-html [style*="color: white"],
+                    .executive-report-html [style*="color:#fff"],
+                    .executive-report-html [style*="color: #fff"],
+                    .executive-report-html [style*="color:#ffffff"],
+                    .executive-report-html [style*="color: #ffffff"],
+                    .executive-report-html [style*="color: black"],
+                    .executive-report-html [style*="color:#000"],
+                    .executive-report-html [style*="color: #000"],
+                    .executive-report-html [style*="color:#000000"],
+                    .executive-report-html [style*="color: #000000"] {
+                      color: #e5edf7 !important;
+                    }
+
+                    .executive-report-html > div,
+                    .executive-report-html > section,
+                    .executive-report-html > article {
+                      background: transparent !important;
+                    }
+                  `}
+                </style>
+
+                <div
+                  className="executive-report-html"
+                  dangerouslySetInnerHTML={{ __html: executiveReportData.report_html }}
+                />
+              </div>
             </article>
           ) : null}
         </section>
@@ -582,6 +839,23 @@ function App() {
                     }}
                   >
                     {executiveReportLoading && selectedCaseId === caso.id ? 'Carregando report...' : 'Executive Report'}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleOpenExecutivePdf(caso.id)}
+                    disabled={executivePdfLoading}
+                    style={{
+                      background: executivePdfLoading && selectedCaseId === caso.id ? '#5b6478' : '#fca5a5',
+                      color: '#111',
+                      border: 'none',
+                      borderRadius: '10px',
+                      padding: '10px 14px',
+                      fontWeight: 700,
+                      cursor: executivePdfLoading ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    {executivePdfLoading && selectedCaseId === caso.id ? 'Abrindo PDF...' : 'Executive PDF'}
                   </button>
                 </div>
               </article>
