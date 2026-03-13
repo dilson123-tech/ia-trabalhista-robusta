@@ -40,6 +40,13 @@ export type CaseItem = {
   updated_at: string
 }
 
+export type CaseCreatePayload = {
+  case_number: string
+  title: string
+  description?: string
+  status?: string
+}
+
 export async function getCases(token: string): Promise<CaseItem[]> {
   const response = await fetch(`${API_URL}/cases`, {
     headers: {
@@ -148,5 +155,22 @@ export async function getExecutivePdf(token: string, caseId: number): Promise<Bl
   }
 
   return response.blob()
+}
+
+export async function createCase(token: string, payload: CaseCreatePayload): Promise<CaseItem> {
+  const response = await fetch(`${API_URL}/cases`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  })
+
+  if (!response.ok) {
+    await parseError(response, "Erro ao criar novo caso")
+  }
+
+  return response.json()
 }
 

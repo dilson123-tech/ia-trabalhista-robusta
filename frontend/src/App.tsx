@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ApiError, getCases, getCaseAnalysis, getExecutiveSummary, getExecutiveReport, getExecutivePdf, type CaseItem, type CaseAnalysisResponse, type ExecutiveSummaryResponse, type ExecutiveReportResponse } from './services/api'
+import { ApiError, createCase, getCases, getCaseAnalysis, getExecutiveSummary, getExecutiveReport, getExecutivePdf, type CaseItem, type CaseAnalysisResponse, type ExecutiveSummaryResponse, type ExecutiveReportResponse } from './services/api'
 
 function App() {
   const [token, setToken] = useState('')
@@ -19,6 +19,16 @@ function App() {
   const [executiveReportError, setExecutiveReportError] = useState('')
   const [executivePdfLoading, setExecutivePdfLoading] = useState(false)
   const [executivePdfError, setExecutivePdfError] = useState('')
+  const [showNewCaseForm, setShowNewCaseForm] = useState(false)
+  const [newCaseLoading, setNewCaseLoading] = useState(false)
+  const [newCaseError, setNewCaseError] = useState('')
+  const [newCaseSuccess, setNewCaseSuccess] = useState('')
+  const [newCaseForm, setNewCaseForm] = useState({
+    case_number: '',
+    title: '',
+    description: '',
+    status: 'draft',
+  })
 
   function handleApiFailure(err: unknown, fallbackMessage: string) {
     console.error(err)
@@ -139,6 +149,46 @@ function App() {
     }
   }
 
+  function handleNewCaseFieldChange(field: 'case_number' | 'title' | 'description' | 'status', value: string) {
+    setNewCaseForm((prev) => ({
+      ...prev,
+      [field]: value,
+    }))
+  }
+
+  async function handleCreateNewCase() {
+    setNewCaseLoading(true)
+    setNewCaseError('')
+    setNewCaseSuccess('')
+
+    try {
+      const createdCase = await createCase(token, {
+        case_number: newCaseForm.case_number.trim(),
+        title: newCaseForm.title.trim(),
+        description: newCaseForm.description.trim() || undefined,
+        status: newCaseForm.status,
+      })
+
+      setCases((prev) => [createdCase, ...prev])
+      setLoaded(true)
+      setShowNewCaseForm(false)
+      setNewCaseForm({
+        case_number: '',
+        title: '',
+        description: '',
+        status: 'draft',
+      })
+      setNewCaseSuccess(`Caso "${createdCase.title}" criado com sucesso.`)
+    } catch (err) {
+      const fallback = handleApiFailure(err, 'Não foi possível criar o novo caso.')
+      if (fallback) {
+        setNewCaseError(fallback)
+      }
+    } finally {
+      setNewCaseLoading(false)
+    }
+  }
+
   return (
     <main
       style={{
@@ -185,10 +235,173 @@ function App() {
               cursor: 'pointer',
             }}
             type="button"
+            onClick={() => {
+              setShowNewCaseForm((prev) => !prev)
+              setNewCaseError('')
+              setNewCaseSuccess('')
+            }}
           >
-            + Novo Caso
+            {showNewCaseForm ? 'Fechar Novo Caso' : '+ Novo Caso'}
           </button>
         </header>
+
+        {showNewCaseForm ? (
+          <section
+            style={{
+              background: '#121a2f',
+              border: '1px solid #1e2945',
+              borderRadius: '16px',
+              padding: '24px',
+              marginBottom: '24px',
+            }}
+          >
+            <h2 style={{ marginTop: 0 }}>Novo Caso</h2>
+            <p style={{ color: '#9aa4bf', marginBottom: '16px' }}>
+              Crie um novo caso real no backend da IA Trabalhista Robusta.
+            </p>
+
+            <div style={{ display: 'grid', gap: '14px' }}>
+              <input
+                value={newCaseForm.case_number}
+                onChange={(e) => handleNewCaseFieldChange('case_number', e.target.value)}
+                placeholder="Número do processo"
+                style={{
+                  width: '100%',
+                  borderRadius: '12px',
+                  border: '1px solid #24304f',
+                  background: '#0f172a',
+                  color: '#f5f7fb',
+                  padding: '14px',
+                  fontSize: '14px',
+                  boxSizing: 'border-box',
+                }}
+              />
+
+              <input
+                value={newCaseForm.title}
+                onChange={(e) => handleNewCaseFieldChange('title', e.target.value)}
+                placeholder="Título do caso"
+                style={{
+                  width: '100%',
+                  borderRadius: '12px',
+                  border: '1px solid #24304f',
+                  background: '#0f172a',
+                  color: '#f5f7fb',
+                  padding: '14px',
+                  fontSize: '14px',
+                  boxSizing: 'border-box',
+                }}
+              />
+
+              <textarea
+                value={newCaseForm.description}
+                onChange={(e) => handleNewCaseFieldChange('description', e.target.value)}
+                placeholder="Descrição do caso"
+                style={{
+                  width: '100%',
+                  minHeight: '110px',
+                  resize: 'vertical',
+                  borderRadius: '12px',
+                  border: '1px solid #24304f',
+                  background: '#0f172a',
+                  color: '#f5f7fb',
+                  padding: '14px',
+                  fontSize: '14px',
+                  boxSizing: 'border-box',
+                }}
+              />
+
+              <select
+                value={newCaseForm.status}
+                onChange={(e) => handleNewCaseFieldChange('status', e.target.value)}
+                style={{
+                  width: '100%',
+                  borderRadius: '12px',
+                  border: '1px solid #24304f',
+                  background: '#0f172a',
+                  color: '#f5f7fb',
+                  padding: '14px',
+                  fontSize: '14px',
+                  boxSizing: 'border-box',
+                }}
+              >
+                <option value="draft">draft</option>
+                <option value="active">active</option>
+                <option value="review">review</option>
+              </select>
+
+              <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  onClick={handleCreateNewCase}
+                  disabled={
+                    newCaseLoading ||
+                    !token.trim() ||
+                    !newCaseForm.case_number.trim() ||
+                    !newCaseForm.title.trim()
+                  }
+                  style={{
+                    background:
+                      newCaseLoading ||
+                      !token.trim() ||
+                      !newCaseForm.case_number.trim() ||
+                      !newCaseForm.title.trim()
+                        ? '#5b6478'
+                        : '#d4af37',
+                    color: '#111',
+                    border: 'none',
+                    borderRadius: '10px',
+                    padding: '14px 20px',
+                    fontWeight: 700,
+                    cursor:
+                      newCaseLoading ||
+                      !token.trim() ||
+                      !newCaseForm.case_number.trim() ||
+                      !newCaseForm.title.trim()
+                        ? 'not-allowed'
+                        : 'pointer',
+                  }}
+                >
+                  {newCaseLoading ? 'Criando caso...' : 'Criar caso real'}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowNewCaseForm(false)
+                    setNewCaseError('')
+                    setNewCaseSuccess('')
+                  }}
+                  style={{
+                    background: '#24304f',
+                    color: '#f5f7fb',
+                    border: 'none',
+                    borderRadius: '10px',
+                    padding: '14px 20px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Cancelar
+                </button>
+              </div>
+
+              {!token.trim() ? (
+                <p style={{ color: '#fbbf24', margin: 0 }}>
+                  Informe um token válido antes de criar um caso.
+                </p>
+              ) : null}
+
+              {newCaseError ? (
+                <p style={{ color: '#ff7b7b', margin: 0 }}>{newCaseError}</p>
+              ) : null}
+
+              {newCaseSuccess ? (
+                <p style={{ color: '#86efac', margin: 0 }}>{newCaseSuccess}</p>
+              ) : null}
+            </div>
+          </section>
+        ) : null}
 
         <section
           style={{
