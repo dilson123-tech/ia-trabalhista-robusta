@@ -143,21 +143,24 @@ def generate_executive_pdf(case_data: dict, executive_data: dict) -> bytes:
             h1 {{
               margin: 6px 0 4px;
               font-size: 24px;
-              color: #111827;
+              color: #0b1220;
+              font-weight: 800;
             }}
             h2 {{
               margin: 0 0 10px;
               font-size: 16px;
-              color: #111827;
+              color: #0f172a;
+              font-weight: 800;
             }}
             .muted {{
-              color: #6b7280;
+              color: #374151;
               font-size: 12px;
+              font-weight: 600;
             }}
             .section {{
               margin-top: 20px;
               padding-top: 16px;
-              border-top: 1px solid #e5e7eb;
+              border-top: 1px solid #d9dee7;
             }}
             .grid {{
               display: grid;
@@ -165,8 +168,8 @@ def generate_executive_pdf(case_data: dict, executive_data: dict) -> bytes:
               gap: 10px;
             }}
             .card {{
-              background: #fafaf9;
-              border: 1px solid #ececec;
+              background: #f8fafc;
+              border: 1px solid #c8d2e0;
               border-radius: 10px;
               padding: 10px 12px;
             }}
@@ -175,18 +178,21 @@ def generate_executive_pdf(case_data: dict, executive_data: dict) -> bytes:
               font-size: 11px;
               text-transform: uppercase;
               letter-spacing: 0.05em;
-              color: #6b7280;
+              color: #334155;
+              font-weight: 800;
               margin-bottom: 4px;
             }}
             .value {{
               font-size: 14px;
-              font-weight: bold;
-              color: #111827;
+              font-weight: 800;
+              color: #0b1220;
+              line-height: 1.5;
             }}
             .footer {{
               margin-top: 22px;
               font-size: 11px;
-              color: #6b7280;
+              color: #334155;
+              font-weight: 600;
             }}
           </style>
         </head>
@@ -212,7 +218,7 @@ def generate_executive_pdf(case_data: dict, executive_data: dict) -> bytes:
 
             <div class="section">
               <h2>Resumo Executivo</h2>
-              <p>{_safe(decision.get("executive_summary")) or "Sem resumo executivo disponível."}</p>
+              <p style="color: #111827; line-height: 1.72; font-weight: 500;">{_safe(decision.get("executive_summary")) or "Sem resumo executivo disponível."}</p>
             </div>
 
             <div class="section">
@@ -247,7 +253,7 @@ def generate_executive_pdf(case_data: dict, executive_data: dict) -> bytes:
 
             <div class="section">
               <h2>Observação Operacional</h2>
-              <p>Este documento possui finalidade de apoio à análise e à tomada de decisão jurídica, devendo ser validado pelo profissional responsável antes de uso externo, estratégico ou comercial.</p>
+              <p style="color: #1f2937; line-height: 1.72; font-weight: 500;">Este documento possui finalidade de apoio à análise e à tomada de decisão jurídica, devendo ser validado pelo profissional responsável antes de uso externo, estratégico ou comercial.</p>
             </div>
 
             <div class="footer">
