@@ -1,8 +1,12 @@
+import './App.css'
 import { useState } from 'react'
-import { ApiError, createCase, getCases, getCaseAnalysis, getExecutiveSummary, getExecutiveReport, getExecutivePdf, type CaseItem, type CaseAnalysisResponse, type ExecutiveSummaryResponse, type ExecutiveReportResponse } from './services/api'
+import { ApiError, createCase, getCases, getCaseAnalysis, getExecutiveSummary, getExecutiveReport, getExecutivePdf, login, type CaseItem, type CaseAnalysisResponse, type ExecutiveSummaryResponse, type ExecutiveReportResponse } from './services/api'
 
 function App() {
   const [token, setToken] = useState('')
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
+  const [authLoading, setAuthLoading] = useState(false)
   const [cases, setCases] = useState<CaseItem[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -23,6 +27,8 @@ function App() {
   const [newCaseLoading, setNewCaseLoading] = useState(false)
   const [newCaseError, setNewCaseError] = useState('')
   const [newCaseSuccess, setNewCaseSuccess] = useState('')
+  const [showToken, setShowToken] = useState(false)
+  const [showAccessForm, setShowAccessForm] = useState(false)
   const [newCaseForm, setNewCaseForm] = useState({
     case_number: '',
     title: '',
@@ -72,6 +78,33 @@ function App() {
     }
   }
 
+  async function handleLogin() {
+    setAuthLoading(true)
+    setError('')
+
+    try {
+      const auth = await login({
+        username: username.trim(),
+        password,
+      })
+
+      setToken(auth.access_token)
+
+      const data = await getCases(auth.access_token)
+      setCases(data)
+      setLoaded(true)
+      setShowAccessForm(false)
+      setShowToken(false)
+      setPassword('')
+    } catch (err) {
+      const fallback = handleApiFailure(err, 'Não foi possível autenticar no sistema.')
+      if (fallback) {
+        setError(fallback)
+      }
+    } finally {
+      setAuthLoading(false)
+    }
+  }
 
   async function handleAnalyzeCase(caseId: number) {
     setAnalysisLoading(true)
@@ -91,7 +124,6 @@ function App() {
     }
   }
 
-
   async function handleLoadExecutiveSummary(caseId: number) {
     setExecutiveSummaryLoading(true)
     setExecutiveSummaryError('')
@@ -109,7 +141,6 @@ function App() {
       setExecutiveSummaryLoading(false)
     }
   }
-
 
   async function handleLoadExecutiveReport(caseId: number) {
     setExecutiveReportLoading(true)
@@ -190,148 +221,218 @@ function App() {
   }
 
   return (
-    <main
-      style={{
-        minHeight: '100vh',
-        background: '#0b1020',
-        color: '#f5f7fb',
-        fontFamily: 'Arial, sans-serif',
-        padding: '32px',
-      }}
-    >
-      <section
-        style={{
-          maxWidth: '1100px',
-          margin: '0 auto',
-        }}
-      >
-        <header
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: '32px',
-            gap: '16px',
-            flexWrap: 'wrap',
-          }}
-        >
-          <div>
-            <p style={{ margin: 0, color: '#9aa4bf', fontSize: '14px' }}>
-              IA Trabalhista Robusta
+    <main className="app-shell">
+      <section className="app-container">
+        <section className="hero-panel">
+          <div className="hero-card">
+            <p className="hero-kicker">Plataforma estratégica trabalhista</p>
+            <h1 className="hero-heading">Painel do Advogado</h1>
+            <p className="hero-description">
+              Centralize análise jurídica, leitura de risco, resumos executivos e relatórios estratégicos
+              em um ambiente com visão clara para decisão, operação e apresentação ao cliente.
             </p>
-            <h1 style={{ margin: '8px 0 0', fontSize: '32px' }}>
-              Painel do Advogado
-            </h1>
+
+            <div className="hero-actions">
+              <button
+                className={`btn ${showNewCaseForm ? 'btn-secondary' : 'btn-primary'}`}
+                type="button"
+                onClick={() => {
+                  setShowNewCaseForm((prev) => !prev)
+                  setNewCaseError('')
+                  setNewCaseSuccess('')
+                }}
+              >
+                {showNewCaseForm ? 'Fechar Novo Caso' : '+ Novo Caso'}
+              </button>
+
+              <button
+                className="btn btn-ghost"
+                type="button"
+                onClick={handleLoadCases}
+                disabled={loading || !token.trim()}
+              >
+                {loading ? 'Carregando casos...' : 'Atualizar carteira'}
+              </button>
+            </div>
           </div>
 
-          <button
-            style={{
-              background: '#d4af37',
-              color: '#111',
-              border: 'none',
-              borderRadius: '10px',
-              padding: '14px 20px',
-              fontWeight: 700,
-              cursor: 'pointer',
-            }}
-            type="button"
-            onClick={() => {
-              setShowNewCaseForm((prev) => !prev)
-              setNewCaseError('')
-              setNewCaseSuccess('')
-            }}
-          >
-            {showNewCaseForm ? 'Fechar Novo Caso' : '+ Novo Caso'}
-          </button>
-        </header>
+          {loaded && token.trim() ? (
+            <aside className="technical-card technical-card--connected">
+              <div className="technical-topbar">
+                <div>
+                  <h2 className="technical-title">Sessão ativa</h2>
+                  <p className="technical-description">
+                    Backend autenticado e carteira pronta para operação no painel.
+                  </p>
+                </div>
+
+                <span className="connection-badge connection-badge--ok">
+                  API conectada
+                </span>
+              </div>
+
+              <div className="actions-row">
+                <button
+                  className="btn btn-ghost"
+                  type="button"
+                  onClick={() => {
+                    setToken('')
+                    setCases([])
+                    setLoaded(false)
+                    setSelectedCaseId(null)
+                    setAnalysisData(null)
+                    setExecutiveSummaryData(null)
+                    setExecutiveReportData(null)
+                    setExecutivePdfError('')
+                    setAnalysisError('')
+                    setExecutiveSummaryError('')
+                    setExecutiveReportError('')
+                    setError('')
+                    setShowToken(false)
+                  }}
+                >
+                  Trocar acesso
+                </button>
+              </div>
+            </aside>
+          ) : (
+            <aside className="technical-card">
+              <div className="technical-topbar">
+                <div>
+                  <h2 className="technical-title">Acesso ao sistema</h2>
+                  <p className="technical-description">
+                    Entrada segura para autenticação manual no backend enquanto o login oficial não entra no ar.
+                  </p>
+                </div>
+
+                <span className="connection-badge connection-badge--pending">
+                  {token.trim() ? 'Token informado' : 'Sessão inativa'}
+                </span>
+              </div>
+
+              {!showAccessForm ? (
+                <div className="actions-row">
+                  <button
+                    className="btn btn-primary"
+                    type="button"
+                    onClick={() => setShowAccessForm(true)}
+                  >
+                    Acessar sistema
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="form-grid token-field">
+                    <input
+                      className="form-control"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      placeholder="Usuário"
+                    />
+
+                    <input
+                      className="form-control"
+                      type={showToken ? 'text' : 'password'}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Senha"
+                    />
+                  </div>
+
+                  <div className="actions-row">
+                    <button
+                      className={`btn ${authLoading || !username.trim() || !password.trim() ? 'btn-muted' : 'btn-primary'}`}
+                      type="button"
+                      onClick={handleLogin}
+                      disabled={authLoading || !username.trim() || !password.trim()}
+                    >
+                      {authLoading ? 'Entrando...' : 'Entrar no sistema'}
+                    </button>
+
+                    <button
+                      className="btn btn-ghost"
+                      type="button"
+                      onClick={() => setShowToken((prev) => !prev)}
+                      disabled={!password.trim()}
+                    >
+                      {showToken ? 'Ocultar senha' : 'Mostrar senha'}
+                    </button>
+
+                    <button
+                      className="btn btn-ghost"
+                      type="button"
+                      onClick={() => {
+                        setShowAccessForm(false)
+                        setShowToken(false)
+                        setUsername('')
+                        setPassword('')
+                        setError('')
+                      }}
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+
+                  {error ? (
+                    <p className="status-message status-message--error">{error}</p>
+                  ) : null}
+                </>
+              )}
+            </aside>
+          )}
+        </section>
 
         {showNewCaseForm ? (
-          <section
-            style={{
-              background: '#121a2f',
-              border: '1px solid #1e2945',
-              borderRadius: '16px',
-              padding: '24px',
-              marginBottom: '24px',
-            }}
-          >
-            <h2 style={{ marginTop: 0 }}>Novo Caso</h2>
-            <p style={{ color: '#9aa4bf', marginBottom: '16px' }}>
-              Crie um novo caso real no backend da IA Trabalhista Robusta.
-            </p>
+          <section className="section-card">
+            <div className="section-head">
+              <h2 className="section-heading">Novo Caso</h2>
+              <p className="section-description">
+                Cadastre um novo processo com dados reais para alimentar a esteira analítica e executiva.
+              </p>
+            </div>
 
-            <div style={{ display: 'grid', gap: '14px' }}>
+            <div className="form-grid">
               <input
+                className="form-control"
                 value={newCaseForm.case_number}
                 onChange={(e) => handleNewCaseFieldChange('case_number', e.target.value)}
                 placeholder="Número do processo"
-                style={{
-                  width: '100%',
-                  borderRadius: '12px',
-                  border: '1px solid #24304f',
-                  background: '#0f172a',
-                  color: '#f5f7fb',
-                  padding: '14px',
-                  fontSize: '14px',
-                  boxSizing: 'border-box',
-                }}
               />
 
               <input
+                className="form-control"
                 value={newCaseForm.title}
                 onChange={(e) => handleNewCaseFieldChange('title', e.target.value)}
                 placeholder="Título do caso"
-                style={{
-                  width: '100%',
-                  borderRadius: '12px',
-                  border: '1px solid #24304f',
-                  background: '#0f172a',
-                  color: '#f5f7fb',
-                  padding: '14px',
-                  fontSize: '14px',
-                  boxSizing: 'border-box',
-                }}
               />
 
               <textarea
+                className="form-control form-control--textarea"
                 value={newCaseForm.description}
                 onChange={(e) => handleNewCaseFieldChange('description', e.target.value)}
                 placeholder="Descrição do caso"
-                style={{
-                  width: '100%',
-                  minHeight: '110px',
-                  resize: 'vertical',
-                  borderRadius: '12px',
-                  border: '1px solid #24304f',
-                  background: '#0f172a',
-                  color: '#f5f7fb',
-                  padding: '14px',
-                  fontSize: '14px',
-                  boxSizing: 'border-box',
-                }}
               />
 
               <select
+                className="form-control"
                 value={newCaseForm.status}
                 onChange={(e) => handleNewCaseFieldChange('status', e.target.value)}
-                style={{
-                  width: '100%',
-                  borderRadius: '12px',
-                  border: '1px solid #24304f',
-                  background: '#0f172a',
-                  color: '#f5f7fb',
-                  padding: '14px',
-                  fontSize: '14px',
-                  boxSizing: 'border-box',
-                }}
               >
                 <option value="draft">draft</option>
                 <option value="active">active</option>
                 <option value="review">review</option>
               </select>
 
-              <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+              <div className="actions-row">
                 <button
+                  className={`btn ${
+                    newCaseLoading ||
+                    !token.trim() ||
+                    !newCaseForm.case_number.trim() ||
+                    !newCaseForm.title.trim()
+                      ? 'btn-muted'
+                      : 'btn-primary'
+                  }`}
                   type="button"
                   onClick={handleCreateNewCase}
                   disabled={
@@ -340,46 +441,17 @@ function App() {
                     !newCaseForm.case_number.trim() ||
                     !newCaseForm.title.trim()
                   }
-                  style={{
-                    background:
-                      newCaseLoading ||
-                      !token.trim() ||
-                      !newCaseForm.case_number.trim() ||
-                      !newCaseForm.title.trim()
-                        ? '#5b6478'
-                        : '#d4af37',
-                    color: '#111',
-                    border: 'none',
-                    borderRadius: '10px',
-                    padding: '14px 20px',
-                    fontWeight: 700,
-                    cursor:
-                      newCaseLoading ||
-                      !token.trim() ||
-                      !newCaseForm.case_number.trim() ||
-                      !newCaseForm.title.trim()
-                        ? 'not-allowed'
-                        : 'pointer',
-                  }}
                 >
                   {newCaseLoading ? 'Criando caso...' : 'Criar caso real'}
                 </button>
 
                 <button
+                  className="btn btn-secondary"
                   type="button"
                   onClick={() => {
                     setShowNewCaseForm(false)
                     setNewCaseError('')
                     setNewCaseSuccess('')
-                  }}
-                  style={{
-                    background: '#24304f',
-                    color: '#f5f7fb',
-                    border: 'none',
-                    borderRadius: '10px',
-                    padding: '14px 20px',
-                    fontWeight: 700,
-                    cursor: 'pointer',
                   }}
                 >
                   Cancelar
@@ -387,168 +459,82 @@ function App() {
               </div>
 
               {!token.trim() ? (
-                <p style={{ color: '#fbbf24', margin: 0 }}>
+                <p className="status-message status-message--warning">
                   Informe um token válido antes de criar um caso.
                 </p>
               ) : null}
 
               {newCaseError ? (
-                <p style={{ color: '#ff7b7b', margin: 0 }}>{newCaseError}</p>
+                <p className="status-message status-message--error">{newCaseError}</p>
               ) : null}
 
               {newCaseSuccess ? (
-                <p style={{ color: '#86efac', margin: 0 }}>{newCaseSuccess}</p>
+                <p className="status-message status-message--success">{newCaseSuccess}</p>
               ) : null}
             </div>
           </section>
         ) : null}
 
-        <section
-          style={{
-            background: '#121a2f',
-            border: '1px solid #1e2945',
-            borderRadius: '16px',
-            padding: '24px',
-            marginBottom: '24px',
-          }}
-        >
-          <h2 style={{ marginTop: 0 }}>Conectar com a API</h2>
-          <p style={{ color: '#9aa4bf' }}>
-            Cole abaixo o token Bearer obtido no backend para carregar os casos reais.
-          </p>
-
-          <textarea
-            value={token}
-            onChange={(e) => setToken(e.target.value)}
-            placeholder="Cole aqui o token JWT"
-            style={{
-              width: '100%',
-              minHeight: '110px',
-              resize: 'vertical',
-              borderRadius: '12px',
-              border: '1px solid #24304f',
-              background: '#0f172a',
-              color: '#f5f7fb',
-              padding: '14px',
-              fontSize: '14px',
-              boxSizing: 'border-box',
-              marginBottom: '16px',
-            }}
-          />
-
-          <button
-            type="button"
-            onClick={handleLoadCases}
-            disabled={loading || !token.trim()}
-            style={{
-              background: loading || !token.trim() ? '#5b6478' : '#d4af37',
-              color: '#111',
-              border: 'none',
-              borderRadius: '10px',
-              padding: '14px 20px',
-              fontWeight: 700,
-              cursor: loading || !token.trim() ? 'not-allowed' : 'pointer',
-            }}
-          >
-            {loading ? 'Carregando casos...' : 'Carregar casos reais'}
-          </button>
-
-          {error ? (
-            <p style={{ color: '#ff7b7b', marginTop: '14px' }}>{error}</p>
-          ) : null}
-        </section>
-
-        <section
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-            gap: '16px',
-            marginBottom: '32px',
-          }}
-        >
+        <section className="metrics-grid metrics-grid--hero">
           {[
-            ['Casos carregados', String(cases.length)],
-            ['Backend', 'Online'],
-            ['Modo', loaded ? 'Real' : 'Demo'],
-            ['Token', token.trim() ? 'Informado' : 'Pendente'],
-          ].map(([label, value]) => (
-            <article
-              key={label}
-              style={{
-                background: '#121a2f',
-                border: '1px solid #1e2945',
-                borderRadius: '16px',
-                padding: '20px',
-              }}
-            >
-              <p style={{ margin: 0, color: '#9aa4bf', fontSize: '14px' }}>{label}</p>
-              <h2 style={{ margin: '10px 0 0', fontSize: '28px' }}>{value}</h2>
+            ['Casos carregados', String(cases.length), 'metric-card metric-card--highlight', 'metric-value metric-value--gold'],
+            ['Backend', 'Online', 'metric-card', 'metric-value'],
+            ['Modo', loaded ? 'Real' : 'Demo', 'metric-card', 'metric-value'],
+            ['Sessão', token.trim() ? 'Ativa' : 'Pendente', 'metric-card', 'metric-value'],
+          ].map(([label, value, cardClass, valueClass]) => (
+            <article key={label} className={cardClass}>
+              <p className="metric-label">{label}</p>
+              <h2 className={valueClass}>{value}</h2>
             </article>
           ))}
         </section>
 
-        <section
-          style={{
-            background: '#121a2f',
-            border: '1px solid #1e2945',
-            borderRadius: '16px',
-            padding: '24px',
-            marginBottom: '24px',
-          }}
-        >
-          <div style={{ marginBottom: '20px' }}>
-            <h2 style={{ margin: 0, fontSize: '22px' }}>Resultado da análise jurídica</h2>
-            <p style={{ margin: '8px 0 0', color: '#9aa4bf' }}>
-              Retorno real da IA para o caso selecionado.
-            </p>
+        <section className="insight-card">
+          <div className="insight-head">
+            <div>
+              <p className="insight-kicker">Diagnóstico técnico</p>
+              <h2 className="insight-title">Resultado da análise jurídica</h2>
+              <p className="insight-description">
+                Retorno analítico da IA para apoiar decisão, estratégia e priorização do caso selecionado.
+              </p>
+            </div>
+            <span className="insight-badge">Leitura técnica em tempo real</span>
           </div>
 
           {analysisError ? (
-            <p style={{ color: '#ff7b7b', marginBottom: '12px' }}>{analysisError}</p>
+            <p className="status-message status-message--error">{analysisError}</p>
           ) : null}
 
           {!analysisData && !analysisLoading ? (
-            <p style={{ color: '#9aa4bf' }}>
-              Clique em “Analisar caso” em um dos cards para carregar o diagnóstico.
+            <p className="insight-empty">
+              Clique em “Analisar caso” em um dos cards para carregar o diagnóstico estratégico.
             </p>
           ) : null}
 
           {analysisLoading ? (
-            <p style={{ color: '#9aa4bf' }}>Analisando caso selecionado...</p>
+            <p className="insight-empty">Analisando caso selecionado...</p>
           ) : null}
 
           {analysisData ? (
-            <div
-              style={{
-                display: 'grid',
-                gap: '12px',
-              }}
-            >
-              <article
-                style={{
-                  background: '#0f172a',
-                  border: '1px solid #24304f',
-                  borderRadius: '14px',
-                  padding: '16px',
-                }}
-              >
-                <p style={{ margin: '0 0 10px', color: '#9aa4bf' }}>
+            <div className="content-stack">
+              <article className="info-card">
+                <p className="info-meta">
                   Caso analisado: {analysisData.case_id} | Análise: {analysisData.analysis_id}
                 </p>
 
-                <p style={{ margin: '0 0 10px', color: '#f5f7fb' }}>
+                <p className="info-text">
                   <strong>Resumo técnico:</strong>{' '}
                   {analysisData.analysis?.technical?.summary || 'Resumo não disponível.'}
                 </p>
 
-                <p style={{ margin: '0 0 10px', color: '#f5f7fb' }}>
+                <p className="info-text">
                   <strong>Nível de risco:</strong>{' '}
                   {analysisData.analysis?.technical?.risk_level || 'Não informado'}
                 </p>
 
-                <div style={{ marginBottom: '10px' }}>
-                  <strong style={{ display: 'block', marginBottom: '6px' }}>Pontos de atenção</strong>
-                  <ul style={{ margin: 0, paddingLeft: '18px', color: '#c7d0e0' }}>
+                <div style={{ marginBottom: '12px' }}>
+                  <strong className="info-list-title">Pontos de atenção</strong>
+                  <ul className="info-list">
                     {(analysisData.analysis?.technical?.issues || []).length > 0 ? (
                       (analysisData.analysis?.technical?.issues || []).map((item, index) => (
                         <li key={index}>{item}</li>
@@ -560,8 +546,8 @@ function App() {
                 </div>
 
                 <div>
-                  <strong style={{ display: 'block', marginBottom: '6px' }}>Próximos passos</strong>
-                  <ul style={{ margin: 0, paddingLeft: '18px', color: '#c7d0e0' }}>
+                  <strong className="info-list-title">Próximos passos</strong>
+                  <ul className="info-list">
                     {(analysisData.analysis?.technical?.next_steps || []).length > 0 ? (
                       (analysisData.analysis?.technical?.next_steps || []).map((item, index) => (
                         <li key={index}>{item}</li>
@@ -576,62 +562,51 @@ function App() {
           ) : null}
         </section>
 
-        <section
-          style={{
-            background: '#121a2f',
-            border: '1px solid #1e2945',
-            borderRadius: '16px',
-            padding: '24px',
-            marginBottom: '24px',
-          }}
-        >
-          <div style={{ marginBottom: '20px' }}>
-            <h2 style={{ margin: 0, fontSize: '22px' }}>Executive Summary</h2>
-            <p style={{ margin: '8px 0 0', color: '#9aa4bf' }}>
-              Resumo executivo real do caso selecionado.
-            </p>
+        <section className="insight-card">
+          <div className="insight-head">
+            <div>
+              <p className="insight-kicker">Resumo executivo</p>
+              <h2 className="insight-title">Executive Summary</h2>
+              <p className="insight-description">
+                Versão consolidada do caso para leitura rápida, comunicação interna e alinhamento com gestão.
+              </p>
+            </div>
+            <span className="insight-badge">Visão executiva</span>
           </div>
 
           {executiveSummaryError ? (
-            <p style={{ color: '#ff7b7b', marginBottom: '12px' }}>{executiveSummaryError}</p>
+            <p className="status-message status-message--error">{executiveSummaryError}</p>
           ) : null}
 
           {!executiveSummaryData && !executiveSummaryLoading ? (
-            <p style={{ color: '#9aa4bf' }}>
+            <p className="insight-empty">
               Clique em “Executive Summary” em um dos casos para carregar o resumo executivo.
             </p>
           ) : null}
 
           {executiveSummaryLoading ? (
-            <p style={{ color: '#9aa4bf' }}>Carregando executive summary...</p>
+            <p className="insight-empty">Carregando executive summary...</p>
           ) : null}
 
           {executiveSummaryData ? (
-            <article
-              style={{
-                background: '#0f172a',
-                border: '1px solid #24304f',
-                borderRadius: '14px',
-                padding: '16px',
-              }}
-            >
-              <p style={{ margin: '0 0 10px', color: '#9aa4bf' }}>
+            <article className="info-card">
+              <p className="info-meta">
                 Caso: {executiveSummaryData.case.title} | Nº {executiveSummaryData.case.case_number}
               </p>
 
-              <p style={{ margin: '0 0 10px', color: '#f5f7fb' }}>
+              <p className="info-text">
                 <strong>Resumo técnico:</strong>{' '}
                 {executiveSummaryData.technical_analysis?.summary || 'Resumo não disponível.'}
               </p>
 
-              <p style={{ margin: '0 0 10px', color: '#f5f7fb' }}>
+              <p className="info-text">
                 <strong>Risco:</strong>{' '}
                 {executiveSummaryData.technical_analysis?.risk_level || 'Não informado'}
               </p>
 
-              <div style={{ marginBottom: '10px' }}>
-                <strong style={{ display: 'block', marginBottom: '6px' }}>Pontos de atenção</strong>
-                <ul style={{ margin: 0, paddingLeft: '18px', color: '#c7d0e0' }}>
+              <div style={{ marginBottom: '12px' }}>
+                <strong className="info-list-title">Pontos de atenção</strong>
+                <ul className="info-list">
                   {(executiveSummaryData.technical_analysis?.issues || []).length > 0 ? (
                     (executiveSummaryData.technical_analysis?.issues || []).map((item, index) => (
                       <li key={index}>{item}</li>
@@ -643,8 +618,8 @@ function App() {
               </div>
 
               <div>
-                <strong style={{ display: 'block', marginBottom: '6px' }}>Próximos passos</strong>
-                <ul style={{ margin: 0, paddingLeft: '18px', color: '#c7d0e0' }}>
+                <strong className="info-list-title">Próximos passos</strong>
+                <ul className="info-list">
                   {(executiveSummaryData.technical_analysis?.next_steps || []).length > 0 ? (
                     (executiveSummaryData.technical_analysis?.next_steps || []).map((item, index) => (
                       <li key={index}>{item}</li>
@@ -658,38 +633,34 @@ function App() {
           ) : null}
         </section>
 
-        <section
-          style={{
-            background: '#121a2f',
-            border: '1px solid #1e2945',
-            borderRadius: '16px',
-            padding: '24px',
-            marginBottom: '24px',
-          }}
-        >
-          <div style={{ marginBottom: '20px' }}>
-            <h2 style={{ margin: 0, fontSize: '22px' }}>Executive Report</h2>
-            <p style={{ margin: '8px 0 0', color: '#9aa4bf' }}>
-              Relatório executivo real do caso selecionado.
-            </p>
+        <section className="insight-card">
+          <div className="insight-head">
+            <div>
+              <p className="insight-kicker">Relatório executivo</p>
+              <h2 className="insight-title">Executive Report</h2>
+              <p className="insight-description">
+                Documento executivo para apresentação estruturada, leitura aprofundada e comunicação estratégica.
+              </p>
+            </div>
+            <span className="insight-badge">Relatório analítico</span>
           </div>
 
           {executiveReportError ? (
-            <p style={{ color: '#ff7b7b', marginBottom: '12px' }}>{executiveReportError}</p>
+            <p className="status-message status-message--error">{executiveReportError}</p>
           ) : null}
 
           {executivePdfError ? (
-            <p style={{ color: '#ff7b7b', marginBottom: '12px' }}>{executivePdfError}</p>
+            <p className="status-message status-message--error">{executivePdfError}</p>
           ) : null}
 
           {!executiveReportData && !executiveReportLoading ? (
-            <p style={{ color: '#9aa4bf' }}>
+            <p className="insight-empty">
               Clique em “Executive Report” em um dos casos para carregar o relatório executivo.
             </p>
           ) : null}
 
           {executiveReportLoading ? (
-            <p style={{ color: '#9aa4bf' }}>Carregando executive report...</p>
+            <p className="insight-empty">Carregando executive report...</p>
           ) : null}
 
           {executiveReportData ? (
@@ -724,19 +695,7 @@ function App() {
                   Caso analisado: #{executiveReportData.case_id}
                 </p>
 
-                <span
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    padding: '6px 10px',
-                    borderRadius: '999px',
-                    background: 'rgba(134, 239, 172, 0.12)',
-                    border: '1px solid rgba(134, 239, 172, 0.35)',
-                    color: '#86efac',
-                    fontSize: '12px',
-                    fontWeight: 700,
-                  }}
-                >
+                <span className="insight-badge">
                   Relatório executivo real
                 </span>
               </div>
@@ -757,7 +716,7 @@ function App() {
                   {`
                     .executive-report-html,
                     .executive-report-html * {
-                      color: #e5edf7 !important;
+                      color: #cfd9e8 !important;
                       box-sizing: border-box;
                     }
 
@@ -769,7 +728,7 @@ function App() {
                     .executive-report-html h2,
                     .executive-report-html h3,
                     .executive-report-html h4 {
-                      color: #f8fafc !important;
+                      color: #eaf2ff !important;
                       margin-top: 0;
                       margin-bottom: 12px;
                       line-height: 1.25;
@@ -780,20 +739,20 @@ function App() {
                       font-size: 28px;
                       margin-bottom: 18px;
                       padding-bottom: 10px;
-                      border-bottom: 1px solid #24304f;
+                      border-bottom: 1px solid #2b456b;
                     }
 
                     .executive-report-html h2 {
                       font-size: 22px;
                       margin-top: 28px;
                       padding-left: 12px;
-                      border-left: 4px solid #86efac;
+                      border-left: 4px solid #6fd6b2;
                     }
 
                     .executive-report-html h3 {
                       font-size: 18px;
                       margin-top: 22px;
-                      color: #dbeafe !important;
+                      color: #cfe1ff !important;
                     }
 
                     .executive-report-html p,
@@ -801,7 +760,7 @@ function App() {
                     .executive-report-html div,
                     .executive-report-html li,
                     .executive-report-html small {
-                      color: #cbd5e1 !important;
+                      color: #b8c7da !important;
                       background: transparent !important;
                     }
 
@@ -813,7 +772,7 @@ function App() {
                     .executive-report-html ol {
                       margin: 0 0 16px 0;
                       padding-left: 22px;
-                      color: #cbd5e1 !important;
+                      color: #b8c7da !important;
                       background: transparent !important;
                     }
 
@@ -823,7 +782,7 @@ function App() {
 
                     .executive-report-html strong,
                     .executive-report-html b {
-                      color: #f8fafc !important;
+                      color: #eaf2ff !important;
                     }
 
                     .executive-report-html section,
@@ -837,36 +796,36 @@ function App() {
                       border-collapse: collapse;
                       margin: 18px 0;
                       background: #0f172a !important;
-                      border: 1px solid #24304f;
+                      border: 1px solid #2b456b;
                       border-radius: 12px;
                       overflow: hidden;
                     }
 
                     .executive-report-html th,
                     .executive-report-html td {
-                      border: 1px solid #24304f;
+                      border: 1px solid #2b456b;
                       padding: 12px;
                       text-align: left;
-                      color: #dbe4f0 !important;
+                      color: #c7d4e6 !important;
                       background: #0f172a !important;
                     }
 
                     .executive-report-html th {
-                      background: #111a2e !important;
-                      color: #f8fafc !important;
+                      background: #10203a !important;
+                      color: #eaf2ff !important;
                       font-weight: 700;
                     }
 
                     .executive-report-html tr:nth-child(even) td {
-                      background: #101a30 !important;
+                      background: #0d1d36 !important;
                     }
 
                     .executive-report-html blockquote {
                       margin: 18px 0;
                       padding: 14px 16px;
                       border-left: 4px solid #60a5fa;
-                      background: rgba(96, 165, 250, 0.08) !important;
-                      color: #dbeafe !important;
+                      background: rgba(96, 165, 250, 0.05) !important;
+                      color: #cfe1ff !important;
                       border-radius: 10px;
                     }
 
@@ -878,8 +837,8 @@ function App() {
 
                     .executive-report-html code {
                       background: #111827 !important;
-                      border: 1px solid #24304f;
-                      color: #fde68a !important;
+                      border: 1px solid #2b456b;
+                      color: #f6d979 !important;
                       padding: 2px 6px;
                       border-radius: 6px;
                       font-size: 13px;
@@ -900,7 +859,7 @@ function App() {
                     .executive-report-html [style*="color: #000"],
                     .executive-report-html [style*="color:#000000"],
                     .executive-report-html [style*="color: #000000"] {
-                      color: #e5edf7 !important;
+                      color: #cfd9e8 !important;
                     }
 
                     .executive-report-html > div,
@@ -920,29 +879,26 @@ function App() {
           ) : null}
         </section>
 
-        <section
-          style={{
-            background: '#121a2f',
-            border: '1px solid #1e2945',
-            borderRadius: '16px',
-            padding: '24px',
-          }}
-        >
-          <div style={{ marginBottom: '20px' }}>
-            <h2 style={{ margin: 0, fontSize: '22px' }}>Casos do escritório</h2>
-            <p style={{ margin: '8px 0 0', color: '#9aa4bf' }}>
-              Lista vinda da API da IA Trabalhista Robusta.
-            </p>
+        <section className="insight-card">
+          <div className="insight-head">
+            <div>
+              <p className="insight-kicker">Carteira jurídica</p>
+              <h2 className="insight-title">Casos do escritório</h2>
+              <p className="insight-description">
+                Lista operacional dos casos carregados via API da IA Trabalhista Robusta.
+              </p>
+            </div>
+            <span className="insight-badge">Base jurídica ativa</span>
           </div>
 
           {!loaded ? (
-            <p style={{ color: '#9aa4bf' }}>
-              Informe o token e clique em “Carregar casos reais”.
+            <p className="insight-empty">
+              Informe o token e clique em “Conectar API” ou “Atualizar carteira”.
             </p>
           ) : null}
 
           {loaded && !loading && cases.length === 0 && !error ? (
-            <p style={{ color: '#9aa4bf' }}>Nenhum caso encontrado para este token.</p>
+            <p className="insight-empty">Nenhum caso encontrado para este token.</p>
           ) : null}
 
           <div

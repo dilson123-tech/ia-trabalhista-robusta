@@ -12,7 +12,11 @@ export class ApiError extends Error {
 
 async function parseError(response: Response, fallbackMessage: string): Promise<never> {
   if (response.status === 401) {
-    throw new ApiError("Sessão expirada ou token inválido. Gere um novo token e tente novamente.", 401)
+    if (fallbackMessage === "Erro ao autenticar no sistema") {
+      throw new ApiError("Usuário ou senha inválidos. Verifique os dados e tente novamente.", 401)
+    }
+
+    throw new ApiError("Sessão expirada ou token inválido. Faça login novamente.", 401)
   }
 
   let message = fallbackMessage
@@ -45,6 +49,32 @@ export type CaseCreatePayload = {
   title: string
   description?: string
   status?: string
+}
+
+export type LoginPayload = {
+  username: string
+  password: string
+}
+
+export type LoginResponse = {
+  access_token: string
+  token_type: string
+}
+
+export async function login(payload: LoginPayload): Promise<LoginResponse> {
+  const response = await fetch(`${API_URL}/auth/login`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  })
+
+  if (!response.ok) {
+    await parseError(response, "Erro ao autenticar no sistema")
+  }
+
+  return response.json()
 }
 
 export async function getCases(token: string): Promise<CaseItem[]> {
