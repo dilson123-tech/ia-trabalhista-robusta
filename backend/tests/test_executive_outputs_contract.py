@@ -1,8 +1,13 @@
 from fastapi.testclient import TestClient
+import json
 import uuid
+
+import fpdf
+from sqlalchemy import create_engine, text
 
 from app.main import app
 from app.core.settings import settings
+from app.services import pdf_executive as pdf_executive_service
 
 client = TestClient(app)
 
@@ -87,3 +92,122 @@ def test_executive_outputs_contract_and_missing_case(monkeypatch):
 
     missing_pdf = client.get(f"/api/v1/cases/{missing_id}/executive-pdf", headers=headers)
     assert missing_pdf.status_code == 404
+
+def test_executive_pdf_refreshes_stale_executive_data_before_generating(monkeypatch):
+    headers = _auth_headers(monkeypatch)
+
+    create_payload = {
+        "case_number": f"EXEC-STALE-{uuid.uuid4()}",
+        "title": "Caso com executive_data legado",
+        "description": "Teste de refresh de executive_data stale antes do PDF.",
+        "status": "draft",
+    }
+
+    create_resp = client.post("/api/v1/cases", json=create_payload, headers=headers)
+    assert create_resp.status_code == 200
+    case_id = create_resp.json()["id"]
+
+    analysis_resp = client.get(f"/api/v1/cases/{case_id}/analysis", headers=headers)
+    assert analysis_resp.status_code == 200
+
+    stale_payload = {
+        "viability": {
+            "score": 85,
+            "probability": 0.85,
+            "label": "Alta chance de êxito",
+            "complexity": "Baixa",
+            "estimated_time": "6-12 meses",
+            "recommendation": "Recomendado entrar com a ação",
+        },
+        "decision": {
+            "final_status": "FAVORÁVEL",
+            "confidence_level": 85.0,
+            "executive_recommendation": "Recomendado entrar com a ação",
+            "estimated_complexity": "Baixa",
+            "estimated_time": "6-12 meses",
+        },
+        "strategic": {
+            "success_probability": 0.8,
+            "complexity": "baixa",
+            "financial_risk": "baixo",
+            "recommended_strategy": "Reforçar provas documentais e preparar testemunhas.",
+            "critical_points": [],
+            "strong_points": ["Estrutura contratual existente"],
+        },
+    }
+
+    engine = create_engine(settings.DATABASE_URL)
+    with engine.begin() as conn:
+        conn.execute(
+            text("update case_analyses set executive_data = :payload where case_id = :case_id"),
+            {"payload": json.dumps(stale_payload), "case_id": case_id},
+        )
+
+    captured = {}
+
+    def _capture_pdf(case_data, executive_data):
+        captured["case_data"] = case_data
+        captured["executive_data"] = executive_data
+        return b"%PDF-1.4 regression"
+
+    monkeypatch.setattr("app.api.v1.routes.cases.generate_executive_pdf", _capture_pdf)
+
+    pdf = client.get(f"/api/v1/cases/{case_id}/executive-pdf", headers=headers)
+    assert pdf.status_code == 200
+    assert pdf.headers["content-type"].startswith("application/pdf")
+    assert pdf.content.startswith(b"%PDF-1.4 regression")
+
+    refreshed = captured["executive_data"]
+    assert refreshed["decision"]["executive_summary"]
+    assert refreshed["decision"]["probability_percent"] is not None
+    assert refreshed["strategic"]["financial_risk"] in {"baixo", "medio", "alto"}
+
+
+def test_pdf_fallback_uses_financial_risk_when_risk_level_is_missing(monkeypatch):
+    captured = []
+    real_fpdf = fpdf.FPDF
+
+    class SpyFPDF(real_fpdf):
+        def cell(self, *args, **kwargs):
+            text_value = kwargs.get("txt") or kwargs.get("text")
+            if text_value is None and len(args) >= 3:
+                text_value = args[2]
+            if text_value is not None:
+                captured.append(str(text_value))
+            return super().cell(*args, **kwargs)
+
+        def multi_cell(self, *args, **kwargs):
+            text_value = kwargs.get("txt") or kwargs.get("text")
+            if text_value is None and len(args) >= 3:
+                text_value = args[2]
+            if text_value is not None:
+                captured.append(str(text_value))
+            return super().multi_cell(*args, **kwargs)
+
+    monkeypatch.setattr(fpdf, "FPDF", SpyFPDF)
+
+    pdf_bytes = pdf_executive_service._pdf_via_fpdf2(
+        case_data={
+            "case_number": "EXEC-FPDF-RISK",
+            "title": "Caso fallback",
+        },
+        executive_data={
+            "viability": {
+                "probability": 0.34,
+                "complexity": "Alta",
+                "estimated_time": "24+ meses",
+                "recommendation": "Reavaliar provas e estratégia antes de ajuizar",
+            },
+            "decision": {
+                "executive_summary": "Resumo executivo de teste",
+                "final_status": "ARRISCADA",
+            },
+            "strategic": {
+                "financial_risk": "alto",
+            },
+        },
+    )
+
+    assert pdf_bytes.startswith(b"%PDF")
+    assert any("Nivel de risco: Alto" in item for item in captured)
+
