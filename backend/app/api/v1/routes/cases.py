@@ -341,9 +341,7 @@ def generate_executive_pdf_route(
     )
 
 
-    if not analysis:
-        enforce_plan_limits(db, current_user["tenant_id"], PlanAction.AI_ANALYSIS_CREATE)
-
+    def _build_executive_payload():
         analysis_data = analyze_case(
             case_number=case.case_number,
             title=case.title,
@@ -354,31 +352,66 @@ def generate_executive_pdf_route(
         viability = calculate_viability(analysis_data)
         decision = generate_decision(analysis_data, viability)
         decision = generate_executive_summary(analysis_data, viability, decision)
+        return analysis_data, strategic, viability, decision
 
-        record = CaseAnalysis(
-            tenant_id=current_user["tenant_id"],
-            case_id=case.id,
-            risk_level=analysis_data.get("risk_level", "medium"),
-            summary=analysis_data.get("summary", ""),
-            issues=analysis_data.get("issues", []),
-            next_steps=analysis_data.get("next_steps", []),
-            analysis={
-                "technical": analysis_data,
-                "strategic": strategic,
-                "viability": viability,
-                "decision": decision,
-            },
-            executive_data={
-                "viability": viability,
-                "decision": decision,
-                "strategic": strategic,
-            },
-        )
+    executive_data = analysis.executive_data if analysis else {}
+    decision_data = executive_data.get("decision", {}) if isinstance(executive_data, dict) else {}
+    strategic_data = executive_data.get("strategic", {}) if isinstance(executive_data, dict) else {}
 
-        db.add(record)
-        db.commit()
-        db.refresh(record)
-        analysis = record
+    needs_refresh = (
+        not analysis
+        or not isinstance(executive_data, dict)
+        or not isinstance(decision_data, dict)
+        or not isinstance(strategic_data, dict)
+        or not decision_data.get("executive_summary")
+        or decision_data.get("probability_percent") is None
+        or not strategic_data.get("financial_risk")
+    )
+
+    if needs_refresh:
+        if not analysis:
+            enforce_plan_limits(db, current_user["tenant_id"], PlanAction.AI_ANALYSIS_CREATE)
+
+        analysis_data, strategic, viability, decision = _build_executive_payload()
+
+        payload_analysis = {
+            "technical": analysis_data,
+            "strategic": strategic,
+            "viability": viability,
+            "decision": decision,
+        }
+        payload_executive = {
+            "viability": viability,
+            "decision": decision,
+            "strategic": strategic,
+        }
+
+        if analysis:
+            analysis.risk_level = analysis_data.get("risk_level", "medium")
+            analysis.summary = analysis_data.get("summary", "")
+            analysis.issues = analysis_data.get("issues", [])
+            analysis.next_steps = analysis_data.get("next_steps", [])
+            analysis.analysis = payload_analysis
+            analysis.executive_data = payload_executive
+            db.add(analysis)
+            db.commit()
+            db.refresh(analysis)
+        else:
+            record = CaseAnalysis(
+                tenant_id=current_user["tenant_id"],
+                case_id=case.id,
+                risk_level=analysis_data.get("risk_level", "medium"),
+                summary=analysis_data.get("summary", ""),
+                issues=analysis_data.get("issues", []),
+                next_steps=analysis_data.get("next_steps", []),
+                analysis=payload_analysis,
+                executive_data=payload_executive,
+            )
+
+            db.add(record)
+            db.commit()
+            db.refresh(record)
+            analysis = record
 
     pdf_bytes = generate_executive_pdf(
         case_data={
