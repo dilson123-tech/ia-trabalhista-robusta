@@ -595,24 +595,69 @@ function App() {
               </p>
 
               <p className="info-text">
-                <strong>Resumo técnico:</strong>{' '}
-                {executiveSummaryData.technical_analysis?.summary || 'Resumo não disponível.'}
+                <strong>Status final:</strong>{' '}
+                {executiveSummaryData.executive_decision?.final_status || executiveSummaryData.viability?.label || 'Não informado'}
               </p>
 
               <p className="info-text">
-                <strong>Risco:</strong>{' '}
-                {executiveSummaryData.technical_analysis?.risk_level || 'Não informado'}
+                <strong>Probabilidade estimada:</strong>{' '}
+                {typeof executiveSummaryData.executive_decision?.probability_percent === 'number'
+                  ? `${executiveSummaryData.executive_decision.probability_percent}%`
+                  : typeof executiveSummaryData.viability?.probability === 'number'
+                    ? `${Math.round(executiveSummaryData.viability.probability * 100)}%`
+                    : 'Não informado'}
+              </p>
+
+              <p className="info-text">
+                <strong>Resumo executivo:</strong>{' '}
+                {executiveSummaryData.executive_decision?.executive_summary || executiveSummaryData.technical_analysis?.summary || 'Resumo não disponível.'}
+              </p>
+
+              <p className="info-text">
+                <strong>Recomendação:</strong>{' '}
+                {executiveSummaryData.viability?.recommendation || executiveSummaryData.strategic_analysis?.recommended_strategy || 'Não informada'}
               </p>
 
               <div style={{ marginBottom: '12px' }}>
-                <strong className="info-list-title">Pontos de atenção</strong>
+                <strong className="info-list-title">Indicadores estratégicos</strong>
                 <ul className="info-list">
-                  {(executiveSummaryData.technical_analysis?.issues || []).length > 0 ? (
-                    (executiveSummaryData.technical_analysis?.issues || []).map((item, index) => (
+                  <li>Risco técnico: {executiveSummaryData.technical_analysis?.risk_level || 'Não informado'}</li>
+                  <li>Risco financeiro: {executiveSummaryData.strategic_analysis?.financial_risk || 'Não informado'}</li>
+                  <li>Complexidade: {executiveSummaryData.viability?.complexity || executiveSummaryData.strategic_analysis?.complexity || 'Não informada'}</li>
+                  <li>Tempo estimado: {executiveSummaryData.executive_decision?.estimated_time || executiveSummaryData.viability?.estimated_time || 'Não informado'}</li>
+                  <li>
+                    Score:{' '}
+                    {typeof executiveSummaryData.viability?.score === 'number'
+                      ? `${executiveSummaryData.viability.score}/100`
+                      : typeof executiveSummaryData.executive_decision?.score === 'number'
+                        ? `${executiveSummaryData.executive_decision.score}/100`
+                        : 'Não informado'}
+                  </li>
+                </ul>
+              </div>
+
+              <div style={{ marginBottom: '12px' }}>
+                <strong className="info-list-title">Pontos críticos</strong>
+                <ul className="info-list">
+                  {(executiveSummaryData.strategic_analysis?.critical_points || executiveSummaryData.technical_analysis?.issues || []).length > 0 ? (
+                    (executiveSummaryData.strategic_analysis?.critical_points || executiveSummaryData.technical_analysis?.issues || []).map((item, index) => (
                       <li key={index}>{item}</li>
                     ))
                   ) : (
                     <li>Nenhum ponto crítico informado.</li>
+                  )}
+                </ul>
+              </div>
+
+              <div style={{ marginBottom: '12px' }}>
+                <strong className="info-list-title">Pontos fortes</strong>
+                <ul className="info-list">
+                  {(executiveSummaryData.strategic_analysis?.strong_points || []).length > 0 ? (
+                    (executiveSummaryData.strategic_analysis?.strong_points || []).map((item, index) => (
+                      <li key={index}>{item}</li>
+                    ))
+                  ) : (
+                    <li>Nenhum ponto forte destacado.</li>
                   )}
                 </ul>
               </div>

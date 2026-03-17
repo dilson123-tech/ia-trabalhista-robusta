@@ -134,9 +134,31 @@ export type ExecutiveSummaryResponse = {
     issues?: string[]
     next_steps?: string[]
   }
-  strategic_analysis?: Record<string, unknown>
-  viability?: Record<string, unknown>
-  executive_decision?: Record<string, unknown>
+  strategic_analysis?: {
+    success_probability?: number
+    complexity?: string
+    financial_risk?: string
+    recommended_strategy?: string
+    critical_points?: string[]
+    strong_points?: string[]
+  }
+  viability?: {
+    score?: number
+    probability?: number
+    label?: string
+    complexity?: string
+    estimated_time?: string
+    recommendation?: string
+  }
+  executive_decision?: {
+    executive_summary?: string
+    final_status?: string
+    confidence_level?: number
+    probability_percent?: number
+    score?: number
+    complexity?: string
+    estimated_time?: string
+  }
 }
 
 export async function getExecutiveSummary(token: string, caseId: number): Promise<ExecutiveSummaryResponse> {
