@@ -63,7 +63,8 @@ def _pdf_via_fpdf2(case_data: dict, executive_data: dict) -> bytes:
     pdf.set_font("Helvetica", "B", 12)
     pdf.cell(0, 8, "Dados do Caso", ln=True)
     pdf.set_font("Helvetica", "", 11)
-    pdf.cell(0, 7, f"Processo: {case_number}", ln=True)
+    pdf.multi_cell(0, 6, f"Processo: {case_number}")
+    pdf.set_x(pdf.l_margin)
     pdf.multi_cell(0, 6, f"Titulo: {title}")
     pdf.ln(2)
 
@@ -187,6 +188,8 @@ def generate_executive_pdf(case_data: dict, executive_data: dict) -> bytes:
               font-weight: 800;
               color: #0b1220;
               line-height: 1.5;
+                overflow-wrap: anywhere;
+                word-break: break-word;
             }}
             .footer {{
               margin-top: 22px;
