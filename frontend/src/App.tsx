@@ -1,5 +1,6 @@
 import './App.css'
 import { useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { ApiError, createCase, getCases, getCaseAnalysis, getExecutiveSummary, getExecutiveReport, getExecutivePdf, login, type CaseItem, type CaseAnalysisResponse, type ExecutiveSummaryResponse, type ExecutiveReportResponse } from './services/api'
 
 function App() {
@@ -28,7 +29,12 @@ function App() {
   const [newCaseError, setNewCaseError] = useState('')
   const [newCaseSuccess, setNewCaseSuccess] = useState('')
   const [showToken, setShowToken] = useState(false)
-  const [showAccessForm, setShowAccessForm] = useState(false)
+  const [loginFormKey, setLoginFormKey] = useState(0)
+  const [loginFieldsUnlocked, setLoginFieldsUnlocked] = useState(false)
+  const navigate = useNavigate()
+  const location = useLocation()
+  const isLoginRoute = location.pathname === '/login'
+
   const [newCaseForm, setNewCaseForm] = useState({
     case_number: '',
     title: '',
@@ -36,22 +42,38 @@ function App() {
     status: 'draft',
   })
 
+  function clearSession() {
+    setToken('')
+    setUsername('')
+    setPassword('')
+    setCases([])
+    setLoaded(false)
+    setSelectedCaseId(null)
+    setAnalysisData(null)
+    setExecutiveSummaryData(null)
+    setExecutiveReportData(null)
+    setError('')
+    setLoginFieldsUnlocked(false)
+    setLoginFormKey((prev) => prev + 1)
+    setAnalysisError('')
+    setExecutiveSummaryError('')
+    setExecutiveReportError('')
+    setExecutivePdfError('')
+    setShowToken(false)
+    setShowNewCaseForm(false)
+    setNewCaseError('')
+    setNewCaseSuccess('')
+    setLoginFieldsUnlocked(false)
+    setLoginFormKey((prev) => prev + 1)
+  }
+
   function handleApiFailure(err: unknown, fallbackMessage: string) {
     console.error(err)
 
     if (err instanceof ApiError && err.status === 401) {
-      setToken('')
-      setCases([])
-      setLoaded(false)
-      setSelectedCaseId(null)
-      setAnalysisData(null)
-      setExecutiveSummaryData(null)
-      setExecutiveReportData(null)
+      clearSession()
       setError(err.message)
-      setAnalysisError('')
-      setExecutiveSummaryError('')
-      setExecutiveReportError('')
-      setExecutivePdfError('')
+      navigate('/login')
       return
     }
 
@@ -93,9 +115,9 @@ function App() {
       const data = await getCases(auth.access_token)
       setCases(data)
       setLoaded(true)
-      setShowAccessForm(false)
       setShowToken(false)
       setPassword('')
+      navigate('/')
     } catch (err) {
       const fallback = handleApiFailure(err, 'Não foi possível autenticar no sistema.')
       if (fallback) {
@@ -220,6 +242,157 @@ function App() {
     }
   }
 
+
+  if (isLoginRoute) {
+    return (
+      <main className="app-shell">
+        <section className="app-container">
+          <section className="hero-panel">
+            <div className="hero-card">
+              <p className="hero-kicker">IA Trabalhista Robusta</p>
+              <h1 className="hero-heading">Acesso ao sistema</h1>
+              <p className="hero-description">
+                Entre com usuário e senha para acessar o painel do advogado, a carteira de casos
+                e os fluxos executivos da plataforma.
+              </p>
+
+              <div className="hero-actions">
+                <button
+                  className="btn btn-ghost"
+                  type="button"
+                  onClick={() => navigate('/')}
+                >
+                  Voltar ao painel
+                </button>
+              </div>
+            </div>
+
+            <aside className="technical-card" key={loginFormKey}>
+              <div className="technical-topbar">
+                <div>
+                  <h2 className="technical-title">Login oficial</h2>
+                  <p className="technical-description">
+                    Entrada dedicada para autenticação do frontend, separada do hero principal
+                    para deixar a experiência mais limpa e com cara de produto SaaS.
+                  </p>
+                </div>
+
+                <span className={`connection-badge ${token.trim() ? 'connection-badge--ok' : 'connection-badge--pending'}`}>
+                  {token.trim() ? 'Sessão pronta' : 'Sessão inativa'}
+                </span>
+              </div>
+
+              <div className="form-grid token-field">
+                <input
+                  className="login-decoy"
+                  type="text"
+                  tabIndex={-1}
+                  autoComplete="username"
+                  aria-hidden="true"
+                />
+
+                <input
+                  className="login-decoy"
+                  type="password"
+                  tabIndex={-1}
+                  autoComplete="current-password"
+                  aria-hidden="true"
+                />
+
+                <input
+                  className="form-control"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  onFocus={() => setLoginFieldsUnlocked(true)}
+                  readOnly={!loginFieldsUnlocked}
+                  placeholder="Usuário"
+                  autoComplete="off"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  name={`login-user-${loginFormKey}`}
+                />
+
+                <div className="password-field">
+                  <input
+                    className="form-control"
+                    type={showToken ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    onFocus={() => setLoginFieldsUnlocked(true)}
+                    readOnly={!loginFieldsUnlocked}
+                    placeholder="Senha"
+                    autoComplete="new-password"
+                    name={`login-password-${loginFormKey}`}
+                  />
+                  <button
+                    className="password-toggle-icon"
+                    type="button"
+                    onClick={() => setShowToken((prev) => !prev)}
+                    disabled={!password.trim()}
+                    aria-label={showToken ? 'Ocultar senha' : 'Mostrar senha'}
+                    title={showToken ? 'Ocultar senha' : 'Mostrar senha'}
+                  >
+                    {showToken ? (
+                      <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M3 3l18 18" />
+                        <path d="M10.58 10.58a2 2 0 1 0 2.84 2.84" />
+                        <path d="M9.88 5.09A10.94 10.94 0 0 1 12 4c5 0 9.27 3.11 11 8-.9 2.54-2.66 4.61-4.94 5.94" />
+                        <path d="M6.1 6.1C3.8 7.45 2.04 9.5 1 12c1.73 4.89 6 8 11 8 1.73 0 3.37-.37 4.84-1.03" />
+                      </svg>
+                    ) : (
+                      <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z" />
+                        <circle cx="12" cy="12" r="3" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              <div className="actions-row">
+                <button
+                  className={`btn ${authLoading || !username.trim() || !password.trim() ? 'btn-muted' : 'btn-primary'}`}
+                  type="button"
+                  onClick={handleLogin}
+                  disabled={authLoading || !username.trim() || !password.trim()}
+                >
+                  {authLoading ? 'Entrando...' : 'Entrar no sistema'}
+                </button>
+
+                <button
+                  className="btn btn-ghost"
+                  type="button"
+                  onClick={() => {
+                    setShowToken(false)
+                    setUsername('')
+                    setPassword('')
+                    setError('')
+                  }}
+                >
+                  Limpar
+                </button>
+
+                {token.trim() ? (
+                  <button
+                    className="btn btn-secondary"
+                    type="button"
+                    onClick={() => navigate('/')}
+                  >
+                    Ir para o painel
+                  </button>
+                ) : null}
+              </div>
+
+              {error ? (
+                <p className="status-message status-message--error">{error}</p>
+              ) : null}
+            </aside>
+          </section>
+        </section>
+      </main>
+    )
+  }
+
   return (
     <main className="app-shell">
       <section className="app-container">
@@ -276,19 +449,8 @@ function App() {
                   className="btn btn-ghost"
                   type="button"
                   onClick={() => {
-                    setToken('')
-                    setCases([])
-                    setLoaded(false)
-                    setSelectedCaseId(null)
-                    setAnalysisData(null)
-                    setExecutiveSummaryData(null)
-                    setExecutiveReportData(null)
-                    setExecutivePdfError('')
-                    setAnalysisError('')
-                    setExecutiveSummaryError('')
-                    setExecutiveReportError('')
-                    setError('')
-                    setShowToken(false)
+                    clearSession()
+                    navigate('/login')
                   }}
                 >
                   Trocar acesso
@@ -301,83 +463,29 @@ function App() {
                 <div>
                   <h2 className="technical-title">Acesso ao sistema</h2>
                   <p className="technical-description">
-                    Entrada segura para autenticação manual no backend enquanto o login oficial não entra no ar.
+                    O acesso foi movido para a rota dedicada /login, deixando o painel principal
+                    mais limpo e com cara de produto SaaS.
                   </p>
                 </div>
 
                 <span className="connection-badge connection-badge--pending">
-                  {token.trim() ? 'Token informado' : 'Sessão inativa'}
+                  Sessão inativa
                 </span>
               </div>
 
-              {!showAccessForm ? (
-                <div className="actions-row">
-                  <button
-                    className="btn btn-primary"
-                    type="button"
-                    onClick={() => setShowAccessForm(true)}
-                  >
-                    Acessar sistema
-                  </button>
-                </div>
-              ) : (
-                <>
-                  <div className="form-grid token-field">
-                    <input
-                      className="form-control"
-                      value={username}
-                      onChange={(e) => setUsername(e.target.value)}
-                      placeholder="Usuário"
-                    />
+              <div className="actions-row">
+                <button
+                  className="btn btn-primary"
+                  type="button"
+                  onClick={() => navigate('/login')}
+                >
+                  Ir para login
+                </button>
+              </div>
 
-                    <input
-                      className="form-control"
-                      type={showToken ? 'text' : 'password'}
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="Senha"
-                    />
-                  </div>
-
-                  <div className="actions-row">
-                    <button
-                      className={`btn ${authLoading || !username.trim() || !password.trim() ? 'btn-muted' : 'btn-primary'}`}
-                      type="button"
-                      onClick={handleLogin}
-                      disabled={authLoading || !username.trim() || !password.trim()}
-                    >
-                      {authLoading ? 'Entrando...' : 'Entrar no sistema'}
-                    </button>
-
-                    <button
-                      className="btn btn-ghost"
-                      type="button"
-                      onClick={() => setShowToken((prev) => !prev)}
-                      disabled={!password.trim()}
-                    >
-                      {showToken ? 'Ocultar senha' : 'Mostrar senha'}
-                    </button>
-
-                    <button
-                      className="btn btn-ghost"
-                      type="button"
-                      onClick={() => {
-                        setShowAccessForm(false)
-                        setShowToken(false)
-                        setUsername('')
-                        setPassword('')
-                        setError('')
-                      }}
-                    >
-                      Cancelar
-                    </button>
-                  </div>
-
-                  {error ? (
-                    <p className="status-message status-message--error">{error}</p>
-                  ) : null}
-                </>
-              )}
+              {error ? (
+                <p className="status-message status-message--error">{error}</p>
+              ) : null}
             </aside>
           )}
         </section>
