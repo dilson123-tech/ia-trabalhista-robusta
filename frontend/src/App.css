@@ -361,6 +361,71 @@
   margin: 18px 0 14px;
 }
 
+.login-decoy {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+  width: 1px;
+  height: 1px;
+  border: 0;
+  padding: 0;
+}
+
+.password-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.password-field .form-control {
+  padding-right: 52px;
+}
+
+.password-toggle-icon {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 2;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.06);
+  border: 1px solid rgba(51, 65, 85, 0.18);
+  border-radius: 8px;
+  color: #334155;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+
+.password-toggle-icon:hover:not(:disabled) {
+  background: rgba(15, 23, 42, 0.12);
+}
+
+.password-toggle-icon:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.password-toggle-icon svg {
+  width: 18px;
+  height: 18px;
+  display: block;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.password-toggle-icon svg circle {
+  fill: currentColor;
+  stroke: none;
+}
+
 .metrics-grid--hero {
   margin-bottom: 28px;
 }
