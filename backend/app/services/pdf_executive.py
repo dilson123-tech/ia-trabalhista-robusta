@@ -43,7 +43,7 @@ def _pdf_via_fpdf2(case_data: dict, executive_data: dict) -> bytes:
     summary = _safe(decision.get("executive_summary")) or "(sem resumo executivo)"
     probability_pct = _probability_pct(executive_data)
     final_status = _safe(decision.get("final_status")) or "Indefinido"
-    risk_level = _risk_label(strategic.get("risk_level"))
+    risk_level = _risk_label(strategic.get("financial_risk") or strategic.get("risk_level"))
     complexity = _safe(viability.get("complexity")) or "Indefinida"
     estimated_time = _safe(viability.get("estimated_time")) or "Indefinido"
     recommendation = _safe(viability.get("recommendation")) or "Sem recomendação"
@@ -234,7 +234,7 @@ def generate_executive_pdf(case_data: dict, executive_data: dict) -> bytes:
                 </div>
                 <div class="card">
                   <span class="label">Nível de risco</span>
-                  <span class="value">{_risk_label(strategic.get("risk_level"))}</span>
+                  <span class="value">{_risk_label(strategic.get("financial_risk") or strategic.get("risk_level"))}</span>
                 </div>
                 <div class="card">
                   <span class="label">Complexidade</span>
