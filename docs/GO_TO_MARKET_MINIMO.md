@@ -56,21 +56,26 @@ Recomendação inicial de trial:
 
 ## Estrutura comercial inicial
 
-### Plano Piloto
+### Piloto Controlado
 - entrada controlada
 - acompanhamento próximo
 - coleta de feedback operacional
 
-### Plano Profissional
+### Basic
 - uso recorrente para advogado autônomo ou escritório pequeno
 - limites compatíveis com operação real moderada
 
-### Plano Escritório
+### Pro
+- escritório em crescimento
+- operação com volume mais forte de casos
+- uso frequente dos artefatos executivos
+
+### Office
 - uso por equipe
 - maior capacidade operacional e governança ampliada
 
 Observação:
-- preços finais, franquias e limites numéricos devem ser definidos em tabela comercial separada antes da abertura ampla
+- preços finais, franquias e limites numéricos seguem a tabela comercial inicial oficial e devem ser revisados apenas com decisão comercial/técnica consciente antes da abertura ampla
 
 ---
 
