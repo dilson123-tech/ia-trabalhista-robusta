@@ -46,6 +46,10 @@ function App() {
     return <Navigate to="/login" replace />
   }
 
+  if (isLoginRoute && token.trim()) {
+    return <Navigate to="/" replace />
+  }
+
   function clearSession() {
     setToken('')
     setUsername('')
