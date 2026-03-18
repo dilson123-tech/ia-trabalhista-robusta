@@ -31,15 +31,51 @@ function App() {
   const [showToken, setShowToken] = useState(false)
   const [loginFormKey, setLoginFormKey] = useState(0)
   const [loginFieldsUnlocked, setLoginFieldsUnlocked] = useState(false)
+  const [caseSearchTerm, setCaseSearchTerm] = useState('')
+  const [caseStatusFilter, setCaseStatusFilter] = useState('all')
   const navigate = useNavigate()
   const location = useLocation()
   const isLoginRoute = location.pathname === '/login'
+
+  const statusLabelMap: Record<string, string> = {
+    draft: 'Rascunho',
+    active: 'Ativo',
+    review: 'Em revisão',
+    archived: 'Arquivado',
+  }
+
+  const riskLabelMap: Record<string, string> = {
+    high: 'Alto',
+    medium: 'Médio',
+    low: 'Baixo',
+  }
+
+  function getStatusLabel(status: string) {
+    return statusLabelMap[status] ?? status
+  }
+
+  function getRiskLabel(risk: string | undefined) {
+    if (!risk) return 'Não informado'
+    return riskLabelMap[risk] ?? risk
+  }
 
   const [newCaseForm, setNewCaseForm] = useState({
     case_number: '',
     title: '',
     description: '',
     status: 'draft',
+  })
+
+  const normalizedCaseSearch = caseSearchTerm.trim().toLowerCase()
+
+  const filteredCases = cases.filter((caso) => {
+    const statusMatches = caseStatusFilter === 'all' || caso.status === caseStatusFilter
+    if (!statusMatches) return false
+
+    if (!normalizedCaseSearch) return true
+
+    const haystack = `${caso.case_number} ${caso.title} ${caso.description ?? ''}`.toLowerCase()
+    return haystack.includes(normalizedCaseSearch)
   })
 
   if (!isLoginRoute && !token.trim()) {
@@ -171,7 +207,7 @@ function App() {
       const data = await getExecutiveSummary(token, caseId)
       setExecutiveSummaryData(data)
     } catch (err) {
-      const fallback = handleApiFailure(err, 'Não foi possível carregar o executive summary do caso.')
+      const fallback = handleApiFailure(err, 'Não foi possível carregar o resumo executivo do caso.')
       if (fallback) {
         setExecutiveSummaryError(fallback)
       }
@@ -189,7 +225,7 @@ function App() {
       const data = await getExecutiveReport(token, caseId)
       setExecutiveReportData(data)
     } catch (err) {
-      const fallback = handleApiFailure(err, 'Não foi possível carregar o executive report do caso.')
+      const fallback = handleApiFailure(err, 'Não foi possível carregar o relatório executivo do caso.')
       if (fallback) {
         setExecutiveReportError(fallback)
       }
@@ -209,7 +245,7 @@ function App() {
       window.open(pdfUrl, '_blank', 'noopener,noreferrer')
       window.setTimeout(() => window.URL.revokeObjectURL(pdfUrl), 60000)
     } catch (err) {
-      const fallback = handleApiFailure(err, 'Não foi possível abrir o executive PDF do caso.')
+      const fallback = handleApiFailure(err, 'Não foi possível abrir o PDF executivo do caso.')
       if (fallback) {
         setExecutivePdfError(fallback)
       }
@@ -433,7 +469,7 @@ function App() {
                   setNewCaseSuccess('')
                 }}
               >
-                {showNewCaseForm ? 'Fechar Novo Caso' : '+ Novo Caso'}
+                {showNewCaseForm ? 'Ocultar formulário' : '+ Novo Caso'}
               </button>
 
               <button
@@ -516,9 +552,9 @@ function App() {
                 value={newCaseForm.status}
                 onChange={(e) => handleNewCaseFieldChange('status', e.target.value)}
               >
-                <option value="draft">draft</option>
-                <option value="active">active</option>
-                <option value="review">review</option>
+                <option value="draft">Rascunho</option>
+                <option value="active">Ativo</option>
+                <option value="review">Em revisão</option>
               </select>
 
               <div className="actions-row">
@@ -540,7 +576,7 @@ function App() {
                     !newCaseForm.title.trim()
                   }
                 >
-                  {newCaseLoading ? 'Criando caso...' : 'Criar caso real'}
+                  {newCaseLoading ? 'Criando caso...' : 'Cadastrar caso'}
                 </button>
 
                 <button
@@ -627,7 +663,7 @@ function App() {
 
                 <p className="info-text">
                   <strong>Nível de risco:</strong>{' '}
-                  {analysisData.analysis?.technical?.risk_level || 'Não informado'}
+                  {getRiskLabel(analysisData.analysis?.technical?.risk_level)}
                 </p>
 
                 <div style={{ marginBottom: '12px' }}>
@@ -664,7 +700,7 @@ function App() {
           <div className="insight-head">
             <div>
               <p className="insight-kicker">Resumo executivo</p>
-              <h2 className="insight-title">Executive Summary</h2>
+              <h2 className="insight-title">Resumo Executivo</h2>
               <p className="insight-description">
                 Versão consolidada do caso para leitura rápida, comunicação interna e alinhamento com gestão.
               </p>
@@ -678,12 +714,12 @@ function App() {
 
           {!executiveSummaryData && !executiveSummaryLoading ? (
             <p className="insight-empty">
-              Clique em “Executive Summary” em um dos casos para carregar o resumo executivo.
+              Clique em “Resumo Executivo” em um dos casos para carregar o resumo executivo.
             </p>
           ) : null}
 
           {executiveSummaryLoading ? (
-            <p className="insight-empty">Carregando executive summary...</p>
+            <p className="insight-empty">Carregando resumo executivo...</p>
           ) : null}
 
           {executiveSummaryData ? (
@@ -719,7 +755,7 @@ function App() {
               <div style={{ marginBottom: '12px' }}>
                 <strong className="info-list-title">Indicadores estratégicos</strong>
                 <ul className="info-list">
-                  <li>Risco técnico: {executiveSummaryData.technical_analysis?.risk_level || 'Não informado'}</li>
+                  <li>Risco técnico: {getRiskLabel(executiveSummaryData.technical_analysis?.risk_level)}</li>
                   <li>Risco financeiro: {executiveSummaryData.strategic_analysis?.financial_risk || 'Não informado'}</li>
                   <li>Complexidade: {executiveSummaryData.viability?.complexity || executiveSummaryData.strategic_analysis?.complexity || 'Não informada'}</li>
                   <li>Tempo estimado: {executiveSummaryData.executive_decision?.estimated_time || executiveSummaryData.viability?.estimated_time || 'Não informado'}</li>
@@ -780,7 +816,7 @@ function App() {
           <div className="insight-head">
             <div>
               <p className="insight-kicker">Relatório executivo</p>
-              <h2 className="insight-title">Executive Report</h2>
+              <h2 className="insight-title">Relatório Executivo</h2>
               <p className="insight-description">
                 Documento executivo para apresentação estruturada, leitura aprofundada e comunicação estratégica.
               </p>
@@ -798,12 +834,12 @@ function App() {
 
           {!executiveReportData && !executiveReportLoading ? (
             <p className="insight-empty">
-              Clique em “Executive Report” em um dos casos para carregar o relatório executivo.
+              Clique em “Relatório Executivo” em um dos casos para carregar o relatório executivo.
             </p>
           ) : null}
 
           {executiveReportLoading ? (
-            <p className="insight-empty">Carregando executive report...</p>
+            <p className="insight-empty">Carregando relatório executivo...</p>
           ) : null}
 
           {executiveReportData ? (
@@ -1044,13 +1080,72 @@ function App() {
             <p className="insight-empty">Nenhum caso encontrado para este token.</p>
           ) : null}
 
+          {loaded && cases.length > 0 ? (
+            <div
+              style={{
+                display: 'grid',
+                gap: '12px',
+                marginBottom: '18px',
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  gap: '12px',
+                  flexWrap: 'wrap',
+                  alignItems: 'center',
+                }}
+              >
+                <input
+                  className="form-control"
+                  style={{ maxWidth: '320px' }}
+                  value={caseSearchTerm}
+                  onChange={(e) => setCaseSearchTerm(e.target.value)}
+                  placeholder="Buscar por número ou título"
+                />
+
+                <select
+                  className="form-control"
+                  style={{ maxWidth: '220px' }}
+                  value={caseStatusFilter}
+                  onChange={(e) => setCaseStatusFilter(e.target.value)}
+                >
+                  <option value="all">Todos os status</option>
+                  <option value="draft">Rascunhos</option>
+                  <option value="active">Ativos</option>
+                  <option value="review">Em revisão</option>
+                  <option value="archived">Arquivados</option>
+                </select>
+
+                <button
+                  className="btn btn-ghost"
+                  type="button"
+                  onClick={() => {
+                    setCaseSearchTerm('')
+                    setCaseStatusFilter('all')
+                  }}
+                >
+                  Limpar filtros
+                </button>
+              </div>
+
+              <p className="section-description" style={{ margin: 0 }}>
+                Exibindo {filteredCases.length} de {cases.length} caso(s) carregado(s).
+              </p>
+            </div>
+          ) : null}
+
+          {loaded && !loading && cases.length > 0 && filteredCases.length === 0 ? (
+            <p className="insight-empty">Nenhum caso encontrado para os filtros atuais.</p>
+          ) : null}
+
           <div
             style={{
               display: 'grid',
               gap: '12px',
             }}
           >
-            {cases.map((caso) => (
+            {filteredCases.map((caso) => (
               <article
                 key={caso.id}
                 style={{
@@ -1091,7 +1186,7 @@ function App() {
                       fontWeight: 700,
                     }}
                   >
-                    {caso.status}
+                    {getStatusLabel(caso.status)}
                   </span>
 
                   <span style={{ color: '#9aa4bf', fontSize: '13px' }}>
@@ -1133,7 +1228,7 @@ function App() {
                       cursor: executiveSummaryLoading ? 'not-allowed' : 'pointer',
                     }}
                   >
-                    {executiveSummaryLoading && selectedCaseId === caso.id ? 'Carregando resumo...' : 'Executive Summary'}
+                    {executiveSummaryLoading && selectedCaseId === caso.id ? 'Carregando resumo...' : 'Resumo Executivo'}
                   </button>
 
                   <button
@@ -1150,7 +1245,7 @@ function App() {
                       cursor: executiveReportLoading ? 'not-allowed' : 'pointer',
                     }}
                   >
-                    {executiveReportLoading && selectedCaseId === caso.id ? 'Carregando report...' : 'Executive Report'}
+                    {executiveReportLoading && selectedCaseId === caso.id ? 'Carregando relatório...' : 'Relatório Executivo'}
                   </button>
 
                   <button
@@ -1167,7 +1262,7 @@ function App() {
                       cursor: executivePdfLoading ? 'not-allowed' : 'pointer',
                     }}
                   >
-                    {executivePdfLoading && selectedCaseId === caso.id ? 'Abrindo PDF...' : 'Executive PDF'}
+                    {executivePdfLoading && selectedCaseId === caso.id ? 'Abrindo PDF...' : 'PDF Executivo'}
                   </button>
                 </div>
               </article>
