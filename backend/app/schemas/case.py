@@ -21,3 +21,15 @@ class CaseOut(CaseBase):
 
     class Config:
         from_attributes = True
+
+
+from typing import Literal
+
+
+class CaseStatusUpdate(BaseModel):
+    status: Literal["draft", "active", "review", "archived"]
+
+
+class DemoCleanupOut(BaseModel):
+    deleted_cases: int
+    deleted_analyses: int
