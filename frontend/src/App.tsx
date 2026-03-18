@@ -1,6 +1,6 @@
 import './App.css'
 import { useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { ApiError, createCase, getCases, getCaseAnalysis, getExecutiveSummary, getExecutiveReport, getExecutivePdf, login, type CaseItem, type CaseAnalysisResponse, type ExecutiveSummaryResponse, type ExecutiveReportResponse } from './services/api'
 
 function App() {
@@ -41,6 +41,10 @@ function App() {
     description: '',
     status: 'draft',
   })
+
+  if (!isLoginRoute && !token.trim()) {
+    return <Navigate to="/login" replace />
+  }
 
   function clearSession() {
     setToken('')
@@ -429,7 +433,6 @@ function App() {
             </div>
           </div>
 
-          {loaded && token.trim() ? (
             <aside className="technical-card technical-card--connected">
               <div className="technical-topbar">
                 <div>
@@ -456,38 +459,11 @@ function App() {
                   Trocar acesso
                 </button>
               </div>
-            </aside>
-          ) : (
-            <aside className="technical-card">
-              <div className="technical-topbar">
-                <div>
-                  <h2 className="technical-title">Acesso ao sistema</h2>
-                  <p className="technical-description">
-                    O acesso foi movido para a rota dedicada /login, deixando o painel principal
-                    mais limpo e com cara de produto SaaS.
-                  </p>
-                </div>
-
-                <span className="connection-badge connection-badge--pending">
-                  Sessão inativa
-                </span>
-              </div>
-
-              <div className="actions-row">
-                <button
-                  className="btn btn-primary"
-                  type="button"
-                  onClick={() => navigate('/login')}
-                >
-                  Ir para login
-                </button>
-              </div>
 
               {error ? (
                 <p className="status-message status-message--error">{error}</p>
               ) : null}
             </aside>
-          )}
         </section>
 
         {showNewCaseForm ? (
