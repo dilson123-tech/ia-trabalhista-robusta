@@ -1,5 +1,5 @@
 import './App.css'
-import { useState } from 'react'
+import { useState, type KeyboardEvent } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { ApiError, createCase, getCases, getCaseAnalysis, getExecutiveSummary, getExecutiveReport, getExecutivePdf, login, type CaseItem, type CaseAnalysisResponse, type ExecutiveSummaryResponse, type ExecutiveReportResponse } from './services/api'
 
@@ -130,6 +130,14 @@ function App() {
     } finally {
       setAuthLoading(false)
     }
+  }
+
+  function handleLoginKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key !== 'Enter') return
+    event.preventDefault()
+
+    if (authLoading || !username.trim() || !password.trim()) return
+    void handleLogin()
   }
 
   async function handleAnalyzeCase(caseId: number) {
@@ -314,6 +322,7 @@ function App() {
                   autoCapitalize="none"
                   spellCheck={false}
                   name={`login-user-${loginFormKey}`}
+                    onKeyDown={handleLoginKeyDown}
                 />
 
                 <div className="password-field">
@@ -327,6 +336,7 @@ function App() {
                     placeholder="Senha"
                     autoComplete="new-password"
                     name={`login-password-${loginFormKey}`}
+                      onKeyDown={handleLoginKeyDown}
                   />
                   <button
                     className="password-toggle-icon"
