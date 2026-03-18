@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.models import Case, CaseAnalysis
-from app.schemas import CaseCreate, CaseOut
+from app.schemas.case import CaseCreate, CaseOut, CaseStatusUpdate, DemoCleanupOut
 from app.core.security import require_role, require_auth
 from app.core.tenant import scoped_query
 from app.services.report_engine import generate_report_html
@@ -76,6 +76,77 @@ def create_case(
     }
 
     return response_data
+
+
+@router.patch(
+    "/{case_id}/status",
+    response_model=CaseOut,
+    dependencies=[Depends(require_role("admin", "advogado"))],
+)
+def update_case_status(
+    case_id: int,
+    payload: CaseStatusUpdate,
+    db: Session = Depends(get_db),
+    current_user = Depends(require_auth),
+):
+    case = scoped_query(db, Case, current_user).filter(Case.id == case_id).first()
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
+
+    case.status = payload.status
+    db.add(case)
+    db.commit()
+    db.refresh(case)
+    return case
+
+
+@router.post(
+    "/cleanup-demo",
+    response_model=DemoCleanupOut,
+    dependencies=[Depends(require_role("admin"))],
+)
+def cleanup_demo_cases(
+    db: Session = Depends(get_db),
+    current_user = Depends(require_auth),
+):
+    demo_cases = (
+        scoped_query(db, Case, current_user)
+        .filter(Case.case_number.like("DEMO-%"))
+        .all()
+    )
+
+    if not demo_cases:
+        return {
+            "deleted_cases": 0,
+            "deleted_analyses": 0,
+        }
+
+    case_ids = [case.id for case in demo_cases]
+
+    deleted_analyses = (
+        db.query(CaseAnalysis)
+        .filter(
+            CaseAnalysis.tenant_id == current_user["tenant_id"],
+            CaseAnalysis.case_id.in_(case_ids),
+        )
+        .delete(synchronize_session=False)
+    )
+
+    deleted_cases = (
+        db.query(Case)
+        .filter(
+            Case.tenant_id == current_user["tenant_id"],
+            Case.id.in_(case_ids),
+        )
+        .delete(synchronize_session=False)
+    )
+
+    db.commit()
+
+    return {
+        "deleted_cases": deleted_cases,
+        "deleted_analyses": deleted_analyses,
+    }
 
 
 @router.get(
