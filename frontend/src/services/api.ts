@@ -209,6 +209,53 @@ export async function getExecutivePdf(token: string, caseId: number): Promise<Bl
   return response.blob()
 }
 
+export type CaseStatus = "draft" | "active" | "review" | "archived"
+
+export type CaseStatusUpdatePayload = {
+  status: CaseStatus
+}
+
+export type DemoCleanupResponse = {
+  deleted_cases: number
+  deleted_analyses: number
+}
+
+export async function updateCaseStatus(
+  token: string,
+  caseId: number,
+  payload: CaseStatusUpdatePayload,
+): Promise<CaseItem> {
+  const response = await fetch(`${API_URL}/cases/${caseId}/status`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  })
+
+  if (!response.ok) {
+    await parseError(response, "Erro ao atualizar status do caso")
+  }
+
+  return response.json()
+}
+
+export async function cleanupDemoCases(token: string): Promise<DemoCleanupResponse> {
+  const response = await fetch(`${API_URL}/cases/cleanup-demo`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+
+  if (!response.ok) {
+    await parseError(response, "Erro ao limpar casos de demonstração")
+  }
+
+  return response.json()
+}
+
 export async function createCase(token: string, payload: CaseCreatePayload): Promise<CaseItem> {
   const response = await fetch(`${API_URL}/cases`, {
     method: "POST",
