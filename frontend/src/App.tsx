@@ -1,7 +1,7 @@
 import './App.css'
 import { useState, type KeyboardEvent } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
-import { ApiError, createCase, getCases, getCaseAnalysis, getExecutiveSummary, getExecutiveReport, getExecutivePdf, login, type CaseItem, type CaseAnalysisResponse, type ExecutiveSummaryResponse, type ExecutiveReportResponse } from './services/api'
+import { ApiError, cleanupDemoCases, createCase, getCases, getCaseAnalysis, getExecutiveSummary, getExecutiveReport, getExecutivePdf, login, updateCaseStatus, type CaseItem, type CaseAnalysisResponse, type ExecutiveSummaryResponse, type ExecutiveReportResponse } from './services/api'
 
 function App() {
   const [token, setToken] = useState('')
@@ -32,7 +32,11 @@ function App() {
   const [loginFormKey, setLoginFormKey] = useState(0)
   const [loginFieldsUnlocked, setLoginFieldsUnlocked] = useState(false)
   const [caseSearchTerm, setCaseSearchTerm] = useState('')
-  const [caseStatusFilter, setCaseStatusFilter] = useState('all')
+  const [caseStatusFilter, setCaseStatusFilter] = useState('main')
+  const [caseActionLoadingId, setCaseActionLoadingId] = useState<number | null>(null)
+  const [caseActionError, setCaseActionError] = useState('')
+  const [caseActionSuccess, setCaseActionSuccess] = useState('')
+  const [cleanupDemoLoading, setCleanupDemoLoading] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()
   const isLoginRoute = location.pathname === '/login'
@@ -59,6 +63,24 @@ function App() {
     return riskLabelMap[risk] ?? risk
   }
 
+  function sortCasesForDisplay(list: CaseItem[]) {
+    const statusPriority: Record<string, number> = {
+      active: 0,
+      draft: 1,
+      review: 2,
+      archived: 3,
+    }
+
+    return [...list].sort((a, b) => {
+      const statusDiff = (statusPriority[a.status] ?? 99) - (statusPriority[b.status] ?? 99)
+      if (statusDiff !== 0) return statusDiff
+
+      const aTime = new Date(a.updated_at || a.created_at).getTime()
+      const bTime = new Date(b.updated_at || b.created_at).getTime()
+      return bTime - aTime
+    })
+  }
+
   const [newCaseForm, setNewCaseForm] = useState({
     case_number: '',
     title: '',
@@ -69,7 +91,13 @@ function App() {
   const normalizedCaseSearch = caseSearchTerm.trim().toLowerCase()
 
   const filteredCases = cases.filter((caso) => {
-    const statusMatches = caseStatusFilter === 'all' || caso.status === caseStatusFilter
+    const statusMatches =
+      caseStatusFilter === 'all'
+        ? true
+        : caseStatusFilter === 'main'
+          ? caso.status !== 'archived'
+          : caso.status === caseStatusFilter
+
     if (!statusMatches) return false
 
     if (!normalizedCaseSearch) return true
@@ -107,6 +135,12 @@ function App() {
     setShowNewCaseForm(false)
     setNewCaseError('')
     setNewCaseSuccess('')
+    setCaseActionError('')
+    setCaseActionSuccess('')
+    setCaseSearchTerm('')
+    setCaseStatusFilter('main')
+    setCleanupDemoLoading(false)
+    setCaseActionLoadingId(null)
     setLoginFieldsUnlocked(false)
     setLoginFormKey((prev) => prev + 1)
   }
@@ -131,7 +165,7 @@ function App() {
 
     try {
       const data = await getCases(token)
-      setCases(data)
+      setCases(sortCasesForDisplay(data))
       setLoaded(true)
     } catch (err) {
       const fallback = handleApiFailure(err, 'Não foi possível carregar os casos. Verifique o token e o backend.')
@@ -157,7 +191,7 @@ function App() {
       setToken(auth.access_token)
 
       const data = await getCases(auth.access_token)
-      setCases(data)
+      setCases(sortCasesForDisplay(data))
       setLoaded(true)
       setShowToken(false)
       setPassword('')
@@ -274,8 +308,10 @@ function App() {
         status: newCaseForm.status,
       })
 
-      setCases((prev) => [createdCase, ...prev])
+      setCases((prev) => sortCasesForDisplay([createdCase, ...prev]))
       setLoaded(true)
+      setCaseActionError('')
+      setCaseActionSuccess('')
       setShowNewCaseForm(false)
       setNewCaseForm({
         case_number: '',
@@ -294,6 +330,56 @@ function App() {
     }
   }
 
+  async function handleArchiveCase(caseId: number) {
+    setCaseActionLoadingId(caseId)
+    setCaseActionError('')
+    setCaseActionSuccess('')
+
+    try {
+      const updatedCase = await updateCaseStatus(token, caseId, { status: 'archived' })
+
+      setCases((prev) =>
+        sortCasesForDisplay(prev.map((caso) => (caso.id === caseId ? updatedCase : caso))),
+      )
+      setCaseActionSuccess(`Caso "${updatedCase.title}" arquivado com sucesso.`)
+    } catch (err) {
+      const fallback = handleApiFailure(err, 'Não foi possível arquivar o caso selecionado.')
+      if (fallback) {
+        setCaseActionError(fallback)
+      }
+    } finally {
+      setCaseActionLoadingId(null)
+    }
+  }
+
+  async function handleCleanupDemo() {
+    const confirmed = window.confirm(
+      'Isso vai remover permanentemente os casos de demonstração com prefixo DEMO-. Deseja continuar?',
+    )
+
+    if (!confirmed) return
+
+    setCleanupDemoLoading(true)
+    setCaseActionError('')
+    setCaseActionSuccess('')
+
+    try {
+      const result = await cleanupDemoCases(token)
+      const refreshedCases = await getCases(token)
+      setCases(sortCasesForDisplay(refreshedCases))
+      setLoaded(true)
+      setCaseActionSuccess(
+        `Limpeza concluída: ${result.deleted_cases} caso(s) demo e ${result.deleted_analyses} análise(s) removidos.`,
+      )
+    } catch (err) {
+      const fallback = handleApiFailure(err, 'Não foi possível limpar os casos de demonstração.')
+      if (fallback) {
+        setCaseActionError(fallback)
+      }
+    } finally {
+      setCleanupDemoLoading(false)
+    }
+  }
 
   if (isLoginRoute) {
     return (
@@ -1110,6 +1196,7 @@ function App() {
                   value={caseStatusFilter}
                   onChange={(e) => setCaseStatusFilter(e.target.value)}
                 >
+                  <option value="main">Carteira principal</option>
                   <option value="all">Todos os status</option>
                   <option value="draft">Rascunhos</option>
                   <option value="active">Ativos</option>
@@ -1122,16 +1209,37 @@ function App() {
                   type="button"
                   onClick={() => {
                     setCaseSearchTerm('')
-                    setCaseStatusFilter('all')
+                    setCaseStatusFilter('main')
                   }}
                 >
                   Limpar filtros
+                </button>
+
+                <button
+                  className="btn btn-ghost"
+                  type="button"
+                  onClick={() => void handleCleanupDemo()}
+                  disabled={cleanupDemoLoading}
+                >
+                  {cleanupDemoLoading ? 'Limpando demonstração...' : 'Limpar demonstração'}
                 </button>
               </div>
 
               <p className="section-description" style={{ margin: 0 }}>
                 Exibindo {filteredCases.length} de {cases.length} caso(s) carregado(s).
               </p>
+
+              {caseActionError ? (
+                <p className="status-message status-message--error" style={{ margin: 0 }}>
+                  {caseActionError}
+                </p>
+              ) : null}
+
+              {caseActionSuccess ? (
+                <p className="status-message status-message--success" style={{ margin: 0 }}>
+                  {caseActionSuccess}
+                </p>
+              ) : null}
             </div>
           ) : null}
 
@@ -1196,6 +1304,25 @@ function App() {
                   <span style={{ color: '#9aa4bf', fontSize: '13px' }}>
                     Tenant: {caso.tenant_id}
                   </span>
+
+                  {caso.status !== 'archived' ? (
+                    <button
+                      type="button"
+                      onClick={() => void handleArchiveCase(caso.id)}
+                      disabled={caseActionLoadingId === caso.id}
+                      style={{
+                        background: caseActionLoadingId === caso.id ? '#5b6478' : '#f59e0b',
+                        color: '#111',
+                        border: 'none',
+                        borderRadius: '10px',
+                        padding: '10px 14px',
+                        fontWeight: 700,
+                        cursor: caseActionLoadingId === caso.id ? 'not-allowed' : 'pointer',
+                      }}
+                    >
+                      {caseActionLoadingId === caso.id ? 'Arquivando...' : 'Arquivar'}
+                    </button>
+                  ) : null}
 
                   <button
                     type="button"
