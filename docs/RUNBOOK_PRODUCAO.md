@@ -62,7 +62,7 @@ Sinais:
 
 Checagem inicial:
 ```bash
-cd ~/projetos/ia_trabalhista_robusta/backend && curl -i http://127.0.0.1:8099/healthz
+cd ~/projetos/ia_trabalhista_robusta/backend && curl -i http://127.0.0.1:8099/health
 ```
 
 Interpretação:
@@ -72,7 +72,7 @@ Interpretação:
 
 ### 2. Readiness falhando
 Sinais:
-- `/healthz` pode responder
+- `/health` pode responder
 - `/ready` falha
 - sintomas de dependência indisponível, especialmente banco
 
@@ -197,7 +197,7 @@ Registrar:
 
 ### Etapa 2 — coletar evidências mínimas
 Coletar antes de mexer:
-- resultado de `/healthz`
+- resultado de `/health`
 - resultado de `/ready`
 - request curl exato
 - response body
@@ -212,7 +212,7 @@ cd ~/projetos/ia_trabalhista_robusta && git status -sb && git log --oneline -n 5
 ```
 
 ```bash
-cd ~/projetos/ia_trabalhista_robusta/backend && curl -i http://127.0.0.1:8099/healthz && echo && curl -i http://127.0.0.1:8099/ready
+cd ~/projetos/ia_trabalhista_robusta/backend && curl -i http://127.0.0.1:8099/health && echo && curl -i http://127.0.0.1:8099/ready
 ```
 
 ### Etapa 3 — classificar incidente
@@ -244,7 +244,7 @@ Regras:
 - validar logo após aplicar
 
 Validação mínima após correção:
-- `/healthz`
+- `/health`
 - `/ready`
 - login
 - rota afetada
@@ -338,7 +338,7 @@ Verificar:
 
 ### Saúde
 ```bash
-cd ~/projetos/ia_trabalhista_robusta/backend && curl -i http://127.0.0.1:8099/healthz
+cd ~/projetos/ia_trabalhista_robusta/backend && curl -i http://127.0.0.1:8099/health
 ```
 
 ### Prontidão
@@ -397,7 +397,7 @@ Após estabilizar:
 
 ## Estado esperado para considerar produção estável
 Produção é considerada estável quando:
-- `/healthz` responde 200
+- `/health` responde 200
 - `/ready` responde 200
 - login responde corretamente
 - rota crítica do fluxo principal responde

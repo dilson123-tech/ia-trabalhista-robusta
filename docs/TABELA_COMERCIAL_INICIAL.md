@@ -65,7 +65,7 @@ Isso significa:
 
 ---
 
-### 2) Plano Basic
+### 2) Basic
 
 **Perfil indicado**
 - advogado autônomo com operação recorrente
@@ -90,7 +90,7 @@ Isso significa:
 
 ---
 
-### 3) Plano Pro
+### 3) Pro
 
 **Perfil indicado**
 - escritório em crescimento
@@ -116,7 +116,7 @@ Isso significa:
 
 ---
 
-### 4) Plano Office
+### 4) Office
 
 **Perfil indicado**
 - escritório estruturado
@@ -213,7 +213,7 @@ Regra:
 A recomendação mais segura de entrada comercial hoje é:
 
 1. **Piloto Controlado**
-2. **Plano Basic**
+2. **Basic**
 3. subir para **Pro** ou **Office** apenas quando houver aderência real do cliente
 
 Isso reduz risco operacional e evita prometer escala maior cedo demais.
