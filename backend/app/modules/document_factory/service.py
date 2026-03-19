@@ -38,12 +38,20 @@ class DocumentFactoryService:
         engine = get_engine(area)
         result = engine.generate_pleading(context, pleading_type)
 
+        metadata = dict(result.metadata or {})
+        if case_id is not None:
+            metadata["case_id"] = case_id
+        if tenant_id is not None:
+            metadata["tenant_id"] = tenant_id
+        if user_id is not None:
+            metadata["user_id"] = user_id
+
         return PleadingDraft(
             area=result.area,
             pleading_type=result.pleading_type,
             title=result.title,
             sections=result.sections,
-            metadata=result.metadata,
+            metadata=metadata,
         )
 
     def build_peticao_inicial_trabalhista_from_intake(
