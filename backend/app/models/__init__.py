@@ -9,6 +9,11 @@ from .case_party_state import CasePartyModel  # noqa: F401
 from .case_party_state import CasePartyRepresentativeModel  # noqa: F401
 from .case_party_state import CasePartyRelationshipModel  # noqa: F401
 from .case_party_state import CasePartyEventModel  # noqa: F401
+from .appeal_reaction_state import AppealReactionStateModel  # noqa: F401
+from .appeal_reaction_state import AppealDecisionPointModel  # noqa: F401
+from .appeal_reaction_state import AppealDeadlineModel  # noqa: F401
+from .appeal_reaction_state import AppealStrategyItemModel  # noqa: F401
+from .appeal_reaction_state import AppealDraftRefModel  # noqa: F401
 
 from .tenant import Tenant  # noqa: F401
 from .tenant_member import TenantMember  # noqa: F401
