@@ -2,6 +2,7 @@ import './App.css'
 import { useState, type KeyboardEvent } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { ApiError, cleanupDemoCases, createCase, getCases, getCaseAnalysis, getExecutiveSummary, getExecutiveReport, getExecutivePdf, login, updateCaseStatus, type CaseItem, type CaseAnalysisResponse, type ExecutiveSummaryResponse, type ExecutiveReportResponse } from './services/api'
+import { ExpansionWorkspace } from './components/expansion/ExpansionWorkspace'
 
 function App() {
   const [token, setToken] = useState('')
@@ -708,6 +709,8 @@ function App() {
             </article>
           ))}
         </section>
+
+        <ExpansionWorkspace token={token} selectedCaseId={selectedCaseId} />
 
         <section className="insight-card">
           <div className="insight-head">
