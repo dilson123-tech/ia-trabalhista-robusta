@@ -14,6 +14,29 @@ type EditorModulePanelProps = {
   selectedCaseId: number | null
 }
 
+type EditableDocumentVersion = EditableDocumentDetail['versions'][number]
+type EditableSection = EditableDocumentVersion['sections'][number]
+
+type CompareRow = {
+  key: string
+  title: string
+  changed: boolean
+  baseStatus: string
+  targetStatus: string
+  baseSource: string
+  targetSource: string
+  baseContent: string
+  targetContent: string
+}
+
+function normalizeText(value: string | undefined) {
+  return (value ?? '').replace(/\s+/g, ' ').trim()
+}
+
+function getSectionIdentifier(section: EditableSection) {
+  return section.key || section.title
+}
+
 export function EditorModulePanel({ token, selectedCaseId }: EditorModulePanelProps) {
   const [documents, setDocuments] = useState<EditableDocumentItem[]>([])
   const [selectedDocumentId, setSelectedDocumentId] = useState<number | null>(null)
@@ -28,6 +51,8 @@ export function EditorModulePanel({ token, selectedCaseId }: EditorModulePanelPr
   const [versionActionLoading, setVersionActionLoading] = useState<'new' | 'approve' | null>(null)
   const [versionError, setVersionError] = useState('')
   const [versionSuccess, setVersionSuccess] = useState('')
+  const [compareBaseVersionNumber, setCompareBaseVersionNumber] = useState<number | null>(null)
+  const [compareTargetVersionNumber, setCompareTargetVersionNumber] = useState<number | null>(null)
   const [newDocumentTitle, setNewDocumentTitle] = useState('')
   const [newDocumentType, setNewDocumentType] = useState('peticao_inicial')
   const [newDocumentArea, setNewDocumentArea] = useState('trabalhista')
@@ -80,6 +105,8 @@ export function EditorModulePanel({ token, selectedCaseId }: EditorModulePanelPr
       setCreateSuccess('')
       setVersionError('')
       setVersionSuccess('')
+      setCompareBaseVersionNumber(null)
+      setCompareTargetVersionNumber(null)
       setShowCreateForm(false)
       return
     }
@@ -187,6 +214,89 @@ export function EditorModulePanel({ token, selectedCaseId }: EditorModulePanelPr
     return [...selectedDocument.versions].sort((a, b) => b.version_number - a.version_number)
   }, [selectedDocument])
 
+  useEffect(() => {
+    if (versionsTimeline.length === 0) {
+      setCompareBaseVersionNumber(null)
+      setCompareTargetVersionNumber(null)
+      return
+    }
+
+    setCompareTargetVersionNumber((current) => {
+      if (current && versionsTimeline.some((version) => version.version_number === current)) {
+        return current
+      }
+      return versionsTimeline[0].version_number
+    })
+
+    setCompareBaseVersionNumber((current) => {
+      if (current && versionsTimeline.some((version) => version.version_number === current)) {
+        return current
+      }
+      return (versionsTimeline[1] ?? versionsTimeline[0]).version_number
+    })
+  }, [versionsTimeline])
+
+  const compareBaseVersion = useMemo(() => {
+    if (compareBaseVersionNumber === null) return null
+    return versionsTimeline.find((version) => version.version_number === compareBaseVersionNumber) ?? null
+  }, [compareBaseVersionNumber, versionsTimeline])
+
+  const compareTargetVersion = useMemo(() => {
+    if (compareTargetVersionNumber === null) return null
+    return versionsTimeline.find((version) => version.version_number === compareTargetVersionNumber) ?? null
+  }, [compareTargetVersionNumber, versionsTimeline])
+
+  const compareRows = useMemo<CompareRow[]>(() => {
+    if (!compareBaseVersion || !compareTargetVersion) return []
+
+    const identifiers = Array.from(
+      new Set([
+        ...compareBaseVersion.sections.map((section) => getSectionIdentifier(section)),
+        ...compareTargetVersion.sections.map((section) => getSectionIdentifier(section)),
+      ]),
+    )
+
+    return identifiers.map((identifier) => {
+      const baseSection =
+        compareBaseVersion.sections.find((section) => getSectionIdentifier(section) === identifier) ?? null
+      const targetSection =
+        compareTargetVersion.sections.find((section) => getSectionIdentifier(section) === identifier) ?? null
+
+      const baseContent = baseSection?.content ?? ''
+      const targetContent = targetSection?.content ?? ''
+      const baseStatus = baseSection?.status ?? '—'
+      const targetStatus = targetSection?.status ?? '—'
+      const baseSource = baseSection?.source ?? '—'
+      const targetSource = targetSection?.source ?? '—'
+
+      const changed =
+        normalizeText(baseContent) !== normalizeText(targetContent) ||
+        normalizeText(baseStatus) !== normalizeText(targetStatus) ||
+        normalizeText(baseSource) !== normalizeText(targetSource)
+
+      return {
+        key: identifier,
+        title: targetSection?.title ?? baseSection?.title ?? identifier,
+        changed,
+        baseStatus,
+        targetStatus,
+        baseSource,
+        targetSource,
+        baseContent,
+        targetContent,
+      }
+    })
+  }, [compareBaseVersion, compareTargetVersion])
+
+  const compareSummary = useMemo(() => {
+    const changed = compareRows.filter((row) => row.changed).length
+    return {
+      total: compareRows.length,
+      changed,
+      unchanged: Math.max(compareRows.length - changed, 0),
+    }
+  }, [compareRows])
+
   async function handleCreateDocument() {
     if (!token.trim() || !selectedCaseId || !newDocumentTitle.trim()) return
 
@@ -292,7 +402,7 @@ export function EditorModulePanel({ token, selectedCaseId }: EditorModulePanelPr
       setVersionSuccess(
         approved
           ? `Versão ${createdVersion.version_number} criada como snapshot aprovado com sucesso.`
-          : `Nova versão ${createdVersion.version_number} criada com sucesso.`
+          : `Nova versão ${createdVersion.version_number} criada com sucesso.`,
       )
     } catch (err) {
       if (err instanceof ApiError) {
@@ -301,7 +411,7 @@ export function EditorModulePanel({ token, selectedCaseId }: EditorModulePanelPr
         setVersionError(
           approved
             ? 'Não foi possível aprovar a versão atual.'
-            : 'Não foi possível criar uma nova versão.'
+            : 'Não foi possível criar uma nova versão.',
         )
       }
     } finally {
@@ -337,12 +447,10 @@ export function EditorModulePanel({ token, selectedCaseId }: EditorModulePanelPr
           <p className="insight-kicker">Editor Jurídico Vivo</p>
           <h2 className="insight-title">Peça editável por blocos</h2>
           <p className="insight-description">
-            Lista real de documentos editáveis do caso, com detalhe, versão atual e blocos estruturados.
+            Lista real de documentos editáveis do caso, com detalhe, versão atual, blocos estruturados e comparação visual.
           </p>
         </div>
-        <span className="insight-badge">
-          Caso em foco: #{selectedCaseId}
-        </span>
+        <span className="insight-badge">Caso em foco: #{selectedCaseId}</span>
       </div>
 
       <div className="actions-row" style={{ marginBottom: '16px' }}>
@@ -417,29 +525,13 @@ export function EditorModulePanel({ token, selectedCaseId }: EditorModulePanelPr
         </article>
       ) : null}
 
-      {error ? (
-        <p className="status-message status-message--error">{error}</p>
-      ) : null}
+      {error ? <p className="status-message status-message--error">{error}</p> : null}
+      {createError ? <p className="status-message status-message--error">{createError}</p> : null}
+      {createSuccess ? <p className="status-message status-message--success">{createSuccess}</p> : null}
+      {versionError ? <p className="status-message status-message--error">{versionError}</p> : null}
+      {versionSuccess ? <p className="status-message status-message--success">{versionSuccess}</p> : null}
 
-      {createError ? (
-        <p className="status-message status-message--error">{createError}</p>
-      ) : null}
-
-      {createSuccess ? (
-        <p className="status-message status-message--success">{createSuccess}</p>
-      ) : null}
-
-      {versionError ? (
-        <p className="status-message status-message--error">{versionError}</p>
-      ) : null}
-
-      {versionSuccess ? (
-        <p className="status-message status-message--success">{versionSuccess}</p>
-      ) : null}
-
-      {loadingList ? (
-        <p className="insight-empty">Carregando documentos editáveis do caso...</p>
-      ) : null}
+      {loadingList ? <p className="insight-empty">Carregando documentos editáveis do caso...</p> : null}
 
       {!loadingList && documents.length === 0 ? (
         <article className="info-card">
@@ -477,9 +569,7 @@ export function EditorModulePanel({ token, selectedCaseId }: EditorModulePanelPr
             </div>
           </article>
 
-          {loadingDetail ? (
-            <p className="insight-empty">Carregando detalhe do documento...</p>
-          ) : null}
+          {loadingDetail ? <p className="insight-empty">Carregando detalhe do documento...</p> : null}
 
           {selectedDocument ? (
             <>
@@ -563,6 +653,164 @@ export function EditorModulePanel({ token, selectedCaseId }: EditorModulePanelPr
                   <p className="body-text" style={{ marginTop: '12px' }}>
                     Nenhuma versão encontrada para este documento.
                   </p>
+                )}
+              </article>
+
+              <article className="info-card">
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    gap: '12px',
+                    alignItems: 'center',
+                    flexWrap: 'wrap',
+                    marginBottom: '12px',
+                  }}
+                >
+                  <strong className="info-list-title">Comparação entre versões</strong>
+                  <span className="insight-badge">
+                    {compareSummary.changed} bloco(s) alterado(s) de {compareSummary.total}
+                  </span>
+                </div>
+
+                {versionsTimeline.length < 2 ? (
+                  <p className="body-text">
+                    Crie ao menos duas versões para liberar a comparação visual.
+                  </p>
+                ) : (
+                  <>
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                        gap: '12px',
+                        marginBottom: '16px',
+                      }}
+                    >
+                      <label style={{ display: 'grid', gap: '8px' }}>
+                        <span className="info-meta">Versão base</span>
+                        <select
+                          className="form-control"
+                          value={compareBaseVersionNumber ?? ''}
+                          onChange={(e) => setCompareBaseVersionNumber(Number(e.target.value))}
+                        >
+                          {versionsTimeline.map((version) => (
+                            <option key={`base-${version.id}`} value={version.version_number}>
+                              V{version.version_number} — {version.approved ? 'aprovada' : 'rascunho'}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+
+                      <label style={{ display: 'grid', gap: '8px' }}>
+                        <span className="info-meta">Versão comparada</span>
+                        <select
+                          className="form-control"
+                          value={compareTargetVersionNumber ?? ''}
+                          onChange={(e) => setCompareTargetVersionNumber(Number(e.target.value))}
+                        >
+                          {versionsTimeline.map((version) => (
+                            <option key={`target-${version.id}`} value={version.version_number}>
+                              V{version.version_number} — {version.approved ? 'aprovada' : 'rascunho'}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
+
+                    {compareBaseVersion && compareTargetVersion ? (
+                      <>
+                        <p className="info-text">
+                          <strong>Resumo:</strong> V{compareBaseVersion.version_number} → V
+                          {compareTargetVersion.version_number} • {compareSummary.changed} alteração(ões) •{' '}
+                          {compareSummary.unchanged} bloco(s) sem mudança
+                        </p>
+
+                        <div
+                          style={{
+                            display: 'grid',
+                            gap: '12px',
+                            marginTop: '16px',
+                          }}
+                        >
+                          {compareRows.map((row) => (
+                            <article
+                              key={row.key}
+                              style={{
+                                border: row.changed ? '1px solid rgba(212, 175, 55, 0.45)' : '1px solid rgba(255,255,255,0.08)',
+                                borderRadius: '16px',
+                                padding: '16px',
+                                background: row.changed ? 'rgba(212, 175, 55, 0.08)' : 'rgba(255,255,255,0.02)',
+                              }}
+                            >
+                              <div
+                                style={{
+                                  display: 'flex',
+                                  justifyContent: 'space-between',
+                                  gap: '12px',
+                                  alignItems: 'center',
+                                  flexWrap: 'wrap',
+                                  marginBottom: '12px',
+                                }}
+                              >
+                                <strong>{row.title}</strong>
+                                <span className="insight-badge">{row.changed ? 'Alterado' : 'Sem mudança'}</span>
+                              </div>
+
+                              <p className="info-meta" style={{ marginBottom: '12px' }}>
+                                Status: V{compareBaseVersion.version_number} {row.baseStatus} → V
+                                {compareTargetVersion.version_number} {row.targetStatus} • Fonte: {row.baseSource} → {row.targetSource}
+                              </p>
+
+                              <div
+                                style={{
+                                  display: 'grid',
+                                  gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+                                  gap: '12px',
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    borderRadius: '12px',
+                                    padding: '12px',
+                                    background: 'rgba(255,255,255,0.03)',
+                                    border: '1px solid rgba(255,255,255,0.06)',
+                                  }}
+                                >
+                                  <p className="info-meta" style={{ marginBottom: '8px' }}>
+                                    V{compareBaseVersion.version_number}
+                                  </p>
+                                  <p className="body-text" style={{ whiteSpace: 'pre-wrap' }}>
+                                    {row.baseContent || 'Sem conteúdo registrado nesta versão.'}
+                                  </p>
+                                </div>
+
+                                <div
+                                  style={{
+                                    borderRadius: '12px',
+                                    padding: '12px',
+                                    background: row.changed ? 'rgba(125, 211, 252, 0.08)' : 'rgba(255,255,255,0.03)',
+                                    border: row.changed
+                                      ? '1px solid rgba(125, 211, 252, 0.25)'
+                                      : '1px solid rgba(255,255,255,0.06)',
+                                  }}
+                                >
+                                  <p className="info-meta" style={{ marginBottom: '8px' }}>
+                                    V{compareTargetVersion.version_number}
+                                  </p>
+                                  <p className="body-text" style={{ whiteSpace: 'pre-wrap' }}>
+                                    {row.targetContent || 'Sem conteúdo registrado nesta versão.'}
+                                  </p>
+                                </div>
+                              </div>
+                            </article>
+                          ))}
+                        </div>
+                      </>
+                    ) : (
+                      <p className="body-text">Selecione duas versões válidas para comparar.</p>
+                    )}
+                  </>
                 )}
               </article>
 
