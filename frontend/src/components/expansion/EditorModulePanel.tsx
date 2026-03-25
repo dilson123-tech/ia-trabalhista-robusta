@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   ApiError,
   createEditableDocument,
+  createEditableDocumentVersion,
   getEditableDocument,
   listEditableDocumentsForCase,
   type EditableDocumentDetail,
@@ -24,9 +25,50 @@ export function EditorModulePanel({ token, selectedCaseId }: EditorModulePanelPr
   const [createLoading, setCreateLoading] = useState(false)
   const [createError, setCreateError] = useState('')
   const [createSuccess, setCreateSuccess] = useState('')
+  const [versionActionLoading, setVersionActionLoading] = useState<'new' | 'approve' | null>(null)
+  const [versionError, setVersionError] = useState('')
+  const [versionSuccess, setVersionSuccess] = useState('')
   const [newDocumentTitle, setNewDocumentTitle] = useState('')
   const [newDocumentType, setNewDocumentType] = useState('peticao_inicial')
   const [newDocumentArea, setNewDocumentArea] = useState('trabalhista')
+
+  function mapDetailToListItem(detail: EditableDocumentDetail): EditableDocumentItem {
+    return {
+      id: detail.id,
+      tenant_id: detail.tenant_id,
+      case_id: detail.case_id,
+      created_by_user_id: detail.created_by_user_id,
+      area: detail.area,
+      document_type: detail.document_type,
+      title: detail.title,
+      status: detail.status,
+      current_version_number: detail.current_version_number,
+      document_metadata: detail.document_metadata,
+      created_at: detail.created_at,
+      updated_at: detail.updated_at,
+    }
+  }
+
+  function upsertDocumentInList(detail: EditableDocumentDetail) {
+    const mapped = mapDetailToListItem(detail)
+
+    setDocuments((prev) => {
+      const exists = prev.some((doc) => doc.id === mapped.id)
+
+      if (!exists) {
+        return [mapped, ...prev]
+      }
+
+      return prev.map((doc) => (doc.id === mapped.id ? mapped : doc))
+    })
+  }
+
+  async function refreshDocumentDetail(documentId: number) {
+    const detail = await getEditableDocument(token, documentId)
+    setSelectedDocument(detail)
+    upsertDocumentInList(detail)
+    return detail
+  }
 
   useEffect(() => {
     if (!token.trim() || !selectedCaseId) {
@@ -36,6 +78,8 @@ export function EditorModulePanel({ token, selectedCaseId }: EditorModulePanelPr
       setError('')
       setCreateError('')
       setCreateSuccess('')
+      setVersionError('')
+      setVersionSuccess('')
       setShowCreateForm(false)
       return
     }
@@ -108,6 +152,7 @@ export function EditorModulePanel({ token, selectedCaseId }: EditorModulePanelPr
         const data = await getEditableDocument(token, documentId)
         if (!isActive) return
         setSelectedDocument(data)
+        upsertDocumentInList(data)
       } catch (err) {
         if (!isActive) return
 
@@ -137,12 +182,19 @@ export function EditorModulePanel({ token, selectedCaseId }: EditorModulePanelPr
     return selectedDocument.versions[selectedDocument.versions.length - 1]
   }, [selectedDocument])
 
+  const versionsTimeline = useMemo(() => {
+    if (!selectedDocument) return []
+    return [...selectedDocument.versions].sort((a, b) => b.version_number - a.version_number)
+  }, [selectedDocument])
+
   async function handleCreateDocument() {
     if (!token.trim() || !selectedCaseId || !newDocumentTitle.trim()) return
 
     setCreateLoading(true)
     setCreateError('')
     setCreateSuccess('')
+    setVersionError('')
+    setVersionSuccess('')
 
     try {
       const created = await createEditableDocument(token, {
@@ -182,23 +234,7 @@ export function EditorModulePanel({ token, selectedCaseId }: EditorModulePanelPr
         ],
       })
 
-      setDocuments((prev) => [
-        {
-          id: created.id,
-          tenant_id: created.tenant_id,
-          case_id: created.case_id,
-          created_by_user_id: created.created_by_user_id,
-          area: created.area,
-          document_type: created.document_type,
-          title: created.title,
-          status: created.status,
-          current_version_number: created.current_version_number,
-          document_metadata: created.document_metadata,
-          created_at: created.created_at,
-          updated_at: created.updated_at,
-        },
-        ...prev,
-      ])
+      setDocuments((prev) => [mapDetailToListItem(created), ...prev])
       setSelectedDocumentId(created.id)
       setSelectedDocument(created)
       setShowCreateForm(false)
@@ -214,6 +250,62 @@ export function EditorModulePanel({ token, selectedCaseId }: EditorModulePanelPr
       }
     } finally {
       setCreateLoading(false)
+    }
+  }
+
+  async function handleCreateVersion(approved: boolean) {
+    if (!token.trim() || !selectedDocument || !currentVersion) return
+
+    setVersionActionLoading(approved ? 'approve' : 'new')
+    setVersionError('')
+    setVersionSuccess('')
+    setCreateError('')
+    setCreateSuccess('')
+
+    try {
+      const createdVersion = await createEditableDocumentVersion(token, selectedDocument.id, {
+        sections: currentVersion.sections.map((section) => ({
+          key: section.key,
+          title: section.title,
+          content: section.content,
+          source: section.source,
+          status: section.status,
+          metadata: section.metadata ?? {},
+        })),
+        notes: approved
+          ? currentVersion.notes
+            ? `${currentVersion.notes}\n\nSnapshot aprovado pelo frontend da expansão.`
+            : 'Snapshot aprovado pelo frontend da expansão.'
+          : currentVersion.notes
+            ? `${currentVersion.notes}\n\nNova versão gerada pelo frontend da expansão.`
+            : 'Nova versão gerada pelo frontend da expansão.',
+        metadata: {
+          ...(currentVersion.version_metadata ?? {}),
+          source: approved ? 'frontend_expansion_approval' : 'frontend_expansion_new_version',
+          based_on_version_number: currentVersion.version_number,
+        },
+        approved,
+      })
+
+      await refreshDocumentDetail(selectedDocument.id)
+
+      setVersionSuccess(
+        approved
+          ? `Versão ${createdVersion.version_number} criada como snapshot aprovado com sucesso.`
+          : `Nova versão ${createdVersion.version_number} criada com sucesso.`
+      )
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setVersionError(err.message)
+      } else {
+        setVersionError(
+          approved
+            ? 'Não foi possível aprovar a versão atual.'
+            : 'Não foi possível criar uma nova versão.'
+        )
+      }
+    } finally {
+      setVersionActionLoading(null)
     }
   }
 
@@ -337,6 +429,14 @@ export function EditorModulePanel({ token, selectedCaseId }: EditorModulePanelPr
         <p className="status-message status-message--success">{createSuccess}</p>
       ) : null}
 
+      {versionError ? (
+        <p className="status-message status-message--error">{versionError}</p>
+      ) : null}
+
+      {versionSuccess ? (
+        <p className="status-message status-message--success">{versionSuccess}</p>
+      ) : null}
+
       {loadingList ? (
         <p className="insight-empty">Carregando documentos editáveis do caso...</p>
       ) : null}
@@ -365,7 +465,11 @@ export function EditorModulePanel({ token, selectedCaseId }: EditorModulePanelPr
                   key={document.id}
                   type="button"
                   className={`btn ${selectedDocumentId === document.id ? 'btn-primary' : 'btn-ghost'}`}
-                  onClick={() => setSelectedDocumentId(document.id)}
+                  onClick={() => {
+                    setSelectedDocumentId(document.id)
+                    setVersionError('')
+                    setVersionSuccess('')
+                  }}
                 >
                   {document.title}
                 </button>
@@ -396,6 +500,34 @@ export function EditorModulePanel({ token, selectedCaseId }: EditorModulePanelPr
                 <p className="info-text">
                   <strong>Versões registradas:</strong> {selectedDocument.versions.length}
                 </p>
+
+                <div className="actions-row" style={{ marginTop: '12px' }}>
+                  <button
+                    type="button"
+                    className={`btn ${versionActionLoading || !currentVersion ? 'btn-muted' : 'btn-primary'}`}
+                    onClick={() => void handleCreateVersion(false)}
+                    disabled={Boolean(versionActionLoading) || !currentVersion}
+                  >
+                    {versionActionLoading === 'new' ? 'Criando versão...' : 'Nova versão'}
+                  </button>
+
+                  <button
+                    type="button"
+                    className={`btn ${
+                      versionActionLoading || !currentVersion || currentVersion.approved
+                        ? 'btn-muted'
+                        : 'btn-secondary'
+                    }`}
+                    onClick={() => void handleCreateVersion(true)}
+                    disabled={Boolean(versionActionLoading) || !currentVersion || currentVersion.approved}
+                  >
+                    {versionActionLoading === 'approve'
+                      ? 'Aprovando versão...'
+                      : currentVersion?.approved
+                        ? 'Versão já aprovada'
+                        : 'Aprovar versão atual'}
+                  </button>
+                </div>
               </article>
 
               <article className="info-card">
@@ -432,6 +564,23 @@ export function EditorModulePanel({ token, selectedCaseId }: EditorModulePanelPr
                     Nenhuma versão encontrada para este documento.
                   </p>
                 )}
+              </article>
+
+              <article className="info-card">
+                <strong className="info-list-title">Linha do tempo de versões</strong>
+
+                <ul className="info-list" style={{ marginTop: '12px' }}>
+                  {versionsTimeline.length > 0 ? (
+                    versionsTimeline.map((version) => (
+                      <li key={version.id}>
+                        <strong>V{version.version_number}</strong> — {version.approved ? 'aprovada' : 'rascunho'}
+                        {version.version_number === selectedDocument.current_version_number ? ' • atual' : ''}
+                      </li>
+                    ))
+                  ) : (
+                    <li>Nenhuma versão registrada até aqui.</li>
+                  )}
+                </ul>
               </article>
             </>
           ) : null}
