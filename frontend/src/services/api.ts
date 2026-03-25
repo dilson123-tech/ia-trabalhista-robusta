@@ -273,3 +273,136 @@ export async function createCase(token: string, payload: CaseCreatePayload): Pro
   return response.json()
 }
 
+export type EditableSection = {
+  key: string
+  title: string
+  content: string
+  source?: string
+  status?: string
+  metadata?: Record<string, unknown>
+}
+
+export type EditableDocumentCreatePayload = {
+  case_id: number
+  area: string
+  document_type: string
+  title: string
+  sections?: EditableSection[]
+  notes?: string
+  metadata?: Record<string, unknown>
+}
+
+export type EditableDocumentVersionCreatePayload = {
+  sections?: EditableSection[]
+  notes?: string
+  metadata?: Record<string, unknown>
+  approved?: boolean
+}
+
+export type EditableDocumentVersionItem = {
+  id: number
+  editable_document_id: number
+  tenant_id: number
+  version_number: number
+  approved: boolean
+  notes?: string | null
+  sections: EditableSection[]
+  version_metadata: Record<string, unknown>
+  created_by_user_id?: number | null
+  created_at: string
+}
+
+export type EditableDocumentItem = {
+  id: number
+  tenant_id: number
+  case_id: number
+  created_by_user_id?: number | null
+  area: string
+  document_type: string
+  title: string
+  status: string
+  current_version_number: number
+  document_metadata: Record<string, unknown>
+  created_at: string
+  updated_at: string
+}
+
+export type EditableDocumentDetail = EditableDocumentItem & {
+  versions: EditableDocumentVersionItem[]
+}
+
+export async function listEditableDocumentsForCase(
+  token: string,
+  caseId: number,
+): Promise<EditableDocumentItem[]> {
+  const response = await fetch(`${API_URL}/editable-documents/case/${caseId}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+
+  if (!response.ok) {
+    await parseError(response, "Erro ao listar documentos editáveis do caso")
+  }
+
+  return response.json()
+}
+
+export async function getEditableDocument(
+  token: string,
+  documentId: number,
+): Promise<EditableDocumentDetail> {
+  const response = await fetch(`${API_URL}/editable-documents/${documentId}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+
+  if (!response.ok) {
+    await parseError(response, "Erro ao carregar documento editável")
+  }
+
+  return response.json()
+}
+
+export async function createEditableDocument(
+  token: string,
+  payload: EditableDocumentCreatePayload,
+): Promise<EditableDocumentDetail> {
+  const response = await fetch(`${API_URL}/editable-documents`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  })
+
+  if (!response.ok) {
+    await parseError(response, "Erro ao criar documento editável")
+  }
+
+  return response.json()
+}
+
+export async function createEditableDocumentVersion(
+  token: string,
+  documentId: number,
+  payload: EditableDocumentVersionCreatePayload,
+): Promise<EditableDocumentVersionItem> {
+  const response = await fetch(`${API_URL}/editable-documents/${documentId}/versions`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  })
+
+  if (!response.ok) {
+    await parseError(response, "Erro ao criar nova versão do documento")
+  }
+
+  return response.json()
+}
+
