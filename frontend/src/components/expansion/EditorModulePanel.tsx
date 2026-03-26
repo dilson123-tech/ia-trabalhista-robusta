@@ -766,6 +766,21 @@ export function EditorModulePanel({ token, selectedCaseId }: EditorModulePanelPr
 
                     <div style={{ marginTop: '12px' }}>
                       <strong className="info-list-title">Blocos da versão</strong>
+                      {currentVersion.approved ? (
+                        <p
+                          className="info-meta"
+                          style={{
+                            marginTop: '8px',
+                            marginBottom: '12px',
+                            padding: '10px 12px',
+                            borderRadius: '12px',
+                            background: 'rgba(245, 158, 11, 0.10)',
+                            border: '1px solid rgba(245, 158, 11, 0.25)',
+                          }}
+                        >
+                          Esta versão está aprovada e bloqueada para edição direta. Crie uma nova versão para alterar qualquer bloco.
+                        </p>
+                      ) : null}
                         <ul className="info-list">
                           {currentVersion.sections.length > 0 ? (
                             currentVersion.sections.map((section, index) => {
@@ -796,11 +811,6 @@ export function EditorModulePanel({ token, selectedCaseId }: EditorModulePanelPr
                                           {currentVersion.approved ? 'Versão aprovada' : 'Editar bloco'}
                                         </button>
 
-                                        {currentVersion.approved ? (
-                                          <p className="info-meta" style={{ marginTop: '8px' }}>
-                                            Esta versão está aprovada e bloqueada para edição direta. Crie uma nova versão para alterar este bloco.
-                                          </p>
-                                        ) : null}
                                       </>
                                     ) : (
                                       <>
