@@ -895,9 +895,13 @@ export function EditorModulePanel({ token, selectedCaseId }: EditorModulePanelPr
                               key={row.key}
                               style={{
                                 border: row.changed ? '1px solid rgba(212, 175, 55, 0.45)' : '1px solid rgba(255,255,255,0.08)',
+                                borderLeft: row.changed ? '4px solid rgba(212, 175, 55, 0.9)' : '4px solid rgba(255,255,255,0.06)',
+                                boxShadow: row.changed ? '0 10px 30px rgba(212, 175, 55, 0.10)' : 'none',
                                 borderRadius: '16px',
                                 padding: '16px',
-                                background: row.changed ? 'rgba(212, 175, 55, 0.08)' : 'rgba(255,255,255,0.02)',
+                                background: row.changed
+                                  ? 'linear-gradient(180deg, rgba(212, 175, 55, 0.10), rgba(255,255,255,0.02))'
+                                  : 'rgba(255,255,255,0.02)',
                               }}
                             >
                               <div
@@ -930,12 +934,14 @@ export function EditorModulePanel({ token, selectedCaseId }: EditorModulePanelPr
                                   style={{
                                     borderRadius: '12px',
                                     padding: '12px',
-                                    background: 'rgba(255,255,255,0.03)',
-                                    border: '1px solid rgba(255,255,255,0.06)',
+                                    background: row.changed ? 'rgba(239, 68, 68, 0.08)' : 'rgba(255,255,255,0.03)',
+                                    border: row.changed
+                                      ? '1px solid rgba(239, 68, 68, 0.26)'
+                                      : '1px solid rgba(255,255,255,0.06)',
                                   }}
                                 >
                                   <p className="info-meta" style={{ marginBottom: '8px' }}>
-                                    V{compareBaseVersion.version_number}
+                                    Antes • V{compareBaseVersion.version_number}
                                   </p>
                                   <p className="body-text" style={{ whiteSpace: 'pre-wrap' }}>
                                     {row.baseContent || 'Sem conteúdo registrado nesta versão.'}
@@ -946,14 +952,14 @@ export function EditorModulePanel({ token, selectedCaseId }: EditorModulePanelPr
                                   style={{
                                     borderRadius: '12px',
                                     padding: '12px',
-                                    background: row.changed ? 'rgba(125, 211, 252, 0.08)' : 'rgba(255,255,255,0.03)',
+                                    background: row.changed ? 'rgba(34, 197, 94, 0.10)' : 'rgba(255,255,255,0.03)',
                                     border: row.changed
-                                      ? '1px solid rgba(125, 211, 252, 0.25)'
+                                      ? '1px solid rgba(34, 197, 94, 0.28)'
                                       : '1px solid rgba(255,255,255,0.06)',
                                   }}
                                 >
                                   <p className="info-meta" style={{ marginBottom: '8px' }}>
-                                    V{compareTargetVersion.version_number}
+                                    Depois • V{compareTargetVersion.version_number}
                                   </p>
                                   <p className="body-text" style={{ whiteSpace: 'pre-wrap' }}>
                                     {row.targetContent || 'Sem conteúdo registrado nesta versão.'}
