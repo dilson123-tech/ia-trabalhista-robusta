@@ -443,6 +443,14 @@ export function EditorModulePanel({ token, selectedCaseId }: EditorModulePanelPr
 
 
   function handleStartSectionEdit(section: EditableSection) {
+    if (currentVersion?.approved) {
+      setEditingSectionKey(null)
+      setEditingContent('')
+      setEditingError('Versões aprovadas não podem ser editadas diretamente. Crie uma nova versão para continuar.')
+      setEditingSuccess('')
+      return
+    }
+
     setEditingSectionKey(getSectionIdentifier(section))
     setEditingContent(section.content ?? '')
     setEditingError('')
@@ -776,11 +784,23 @@ export function EditorModulePanel({ token, selectedCaseId }: EditorModulePanelPr
 
                                         <button
                                           type="button"
-                                          className="btn btn-ghost"
+                                          className={`btn ${currentVersion.approved ? 'btn-muted' : 'btn-ghost'}`}
                                           onClick={() => handleStartSectionEdit(section)}
+                                          disabled={currentVersion.approved}
+                                          title={
+                                            currentVersion.approved
+                                              ? 'Versão aprovada: crie uma nova versão para editar este bloco.'
+                                              : 'Editar bloco'
+                                          }
                                         >
-                                          Editar bloco
+                                          {currentVersion.approved ? 'Versão aprovada' : 'Editar bloco'}
                                         </button>
+
+                                        {currentVersion.approved ? (
+                                          <p className="info-meta" style={{ marginTop: '8px' }}>
+                                            Esta versão está aprovada e bloqueada para edição direta. Crie uma nova versão para alterar este bloco.
+                                          </p>
+                                        ) : null}
                                       </>
                                     ) : (
                                       <>
