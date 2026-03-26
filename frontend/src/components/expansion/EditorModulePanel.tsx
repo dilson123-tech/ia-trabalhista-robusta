@@ -53,6 +53,11 @@ export function EditorModulePanel({ token, selectedCaseId }: EditorModulePanelPr
   const [versionSuccess, setVersionSuccess] = useState('')
   const [compareBaseVersionNumber, setCompareBaseVersionNumber] = useState<number | null>(null)
   const [compareTargetVersionNumber, setCompareTargetVersionNumber] = useState<number | null>(null)
+  const [editingSectionKey, setEditingSectionKey] = useState<string | null>(null)
+  const [editingContent, setEditingContent] = useState('')
+  const [editingError, setEditingError] = useState('')
+  const [editingSuccess, setEditingSuccess] = useState('')
+  const [saveEditLoading, setSaveEditLoading] = useState(false)
   const [newDocumentTitle, setNewDocumentTitle] = useState('')
   const [newDocumentType, setNewDocumentType] = useState('peticao_inicial')
   const [newDocumentArea, setNewDocumentArea] = useState('trabalhista')
@@ -419,6 +424,104 @@ export function EditorModulePanel({ token, selectedCaseId }: EditorModulePanelPr
     }
   }
 
+
+  function handleStartSectionEdit(section: EditableSection) {
+    setEditingSectionKey(getSectionIdentifier(section))
+    setEditingContent(section.content ?? '')
+    setEditingError('')
+    setEditingSuccess('')
+    setVersionError('')
+    setVersionSuccess('')
+  }
+
+  function handleCancelSectionEdit() {
+    setEditingSectionKey(null)
+    setEditingContent('')
+    setEditingError('')
+    setEditingSuccess('')
+  }
+
+  async function handleSaveSectionEdit(section: EditableSection) {
+    if (!token.trim() || !selectedDocument || !currentVersion) return
+
+    const sectionKey = getSectionIdentifier(section)
+    const normalizedOriginal = section.content ?? ''
+    const normalizedEdited = editingContent
+
+    if (sectionKey !== editingSectionKey) {
+      setEditingError('O bloco em edição não confere com a seleção atual.')
+      return
+    }
+
+    if (normalizedOriginal === normalizedEdited) {
+      setEditingError('Nenhuma alteração detectada para salvar.')
+      setEditingSuccess('')
+      return
+    }
+
+    setSaveEditLoading(true)
+    setEditingError('')
+    setEditingSuccess('')
+    setVersionError('')
+    setVersionSuccess('')
+
+    try {
+      const createdVersion = await createEditableDocumentVersion(token, selectedDocument.id, {
+        sections: currentVersion.sections.map((currentSection) => {
+          const currentKey = getSectionIdentifier(currentSection)
+
+          if (currentKey !== sectionKey) {
+            return {
+              key: currentSection.key,
+              title: currentSection.title,
+              content: currentSection.content,
+              source: currentSection.source,
+              status: currentSection.status,
+              metadata: currentSection.metadata ?? {},
+            }
+          }
+
+          return {
+            key: currentSection.key,
+            title: currentSection.title,
+            content: normalizedEdited,
+            source: 'manual',
+            status: 'edited',
+            metadata: {
+              ...(currentSection.metadata ?? {}),
+              edited_in_frontend: true
+            },
+          }
+        }),
+        notes: `Edição manual do bloco "${section.title}" via frontend da expansão.`,
+        metadata: {
+          ...(currentVersion.version_metadata ?? {}),
+          source: 'frontend_inline_edit',
+          based_on_version_number: currentVersion.version_number,
+          edited_section_key: sectionKey,
+        },
+        approved: false,
+      })
+
+      await refreshDocumentDetail(selectedDocument.id)
+
+      setCompareBaseVersionNumber(currentVersion.version_number)
+      setCompareTargetVersionNumber(createdVersion.version_number)
+
+      setEditingSuccess(`Bloco "${section.title}" salvo na versão ${createdVersion.version_number}.`)
+      setEditingSectionKey(null)
+      setEditingContent('')
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setEditingError(err.message)
+      } else {
+        setEditingError('Não foi possível salvar a edição do bloco.')
+      }
+    } finally {
+      setSaveEditLoading(false)
+    }
+  }
+
   if (!selectedCaseId) {
     return (
       <section className="insight-card">
@@ -530,6 +633,8 @@ export function EditorModulePanel({ token, selectedCaseId }: EditorModulePanelPr
       {createSuccess ? <p className="status-message status-message--success">{createSuccess}</p> : null}
       {versionError ? <p className="status-message status-message--error">{versionError}</p> : null}
       {versionSuccess ? <p className="status-message status-message--success">{versionSuccess}</p> : null}
+      {editingError ? <p className="status-message status-message--error">{editingError}</p> : null}
+      {editingSuccess ? <p className="status-message status-message--success">{editingSuccess}</p> : null}
 
       {loadingList ? <p className="insight-empty">Carregando documentos editáveis do caso...</p> : null}
 
@@ -636,17 +741,69 @@ export function EditorModulePanel({ token, selectedCaseId }: EditorModulePanelPr
 
                     <div style={{ marginTop: '12px' }}>
                       <strong className="info-list-title">Blocos da versão</strong>
-                      <ul className="info-list">
-                        {currentVersion.sections.length > 0 ? (
-                          currentVersion.sections.map((section, index) => (
-                            <li key={`${section.key}-${index}`}>
-                              <strong>{section.title}</strong> — {section.status || 'draft'} ({section.source || 'manual'})
-                            </li>
-                          ))
-                        ) : (
-                          <li>Nenhum bloco registrado nesta versão.</li>
-                        )}
-                      </ul>
+                        <ul className="info-list">
+                          {currentVersion.sections.length > 0 ? (
+                            currentVersion.sections.map((section, index) => {
+                              const isEditing = editingSectionKey === getSectionIdentifier(section)
+
+                              return (
+                                <li key={`${section.key}-${index}`}>
+                                  <strong>{section.title}</strong> — {section.status || 'draft'} ({section.source || 'manual'})
+
+                                  <div style={{ marginTop: '8px' }}>
+                                    {!isEditing ? (
+                                      <>
+                                        <p className="body-text" style={{ whiteSpace: 'pre-wrap', marginBottom: '8px' }}>
+                                          {section.content || 'Sem conteúdo registrado neste bloco.'}
+                                        </p>
+
+                                        <button
+                                          type="button"
+                                          className="btn btn-ghost"
+                                          onClick={() => handleStartSectionEdit(section)}
+                                        >
+                                          Editar bloco
+                                        </button>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <textarea
+                                          className="form-control"
+                                          value={editingContent}
+                                          onChange={(e) => setEditingContent(e.target.value)}
+                                          rows={8}
+                                          style={{ width: '100%', marginBottom: '8px' }}
+                                        />
+
+                                        <div className="actions-row">
+                                          <button
+                                            type="button"
+                                            className={`btn ${saveEditLoading ? 'btn-muted' : 'btn-primary'}`}
+                                            onClick={() => void handleSaveSectionEdit(section)}
+                                            disabled={saveEditLoading}
+                                          >
+                                            {saveEditLoading ? 'Salvando edição...' : 'Salvar edição'}
+                                          </button>
+
+                                          <button
+                                            type="button"
+                                            className="btn btn-ghost"
+                                            onClick={handleCancelSectionEdit}
+                                            disabled={saveEditLoading}
+                                          >
+                                            Cancelar
+                                          </button>
+                                        </div>
+                                      </>
+                                    )}
+                                  </div>
+                                </li>
+                              )
+                            })
+                          ) : (
+                            <li>Nenhum bloco registrado nesta versão.</li>
+                          )}
+                        </ul>
                     </div>
                   </>
                 ) : (
