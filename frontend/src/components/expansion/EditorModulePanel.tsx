@@ -21,6 +21,8 @@ type CompareRow = {
   key: string
   title: string
   changed: boolean
+  changeType: string
+  changeSummary: string
   baseStatus: string
   targetStatus: string
   baseSource: string
@@ -274,15 +276,30 @@ export function EditorModulePanel({ token, selectedCaseId }: EditorModulePanelPr
       const baseSource = baseSection?.source ?? '—'
       const targetSource = targetSection?.source ?? '—'
 
-      const changed =
-        normalizeText(baseContent) !== normalizeText(targetContent) ||
-        normalizeText(baseStatus) !== normalizeText(targetStatus) ||
-        normalizeText(baseSource) !== normalizeText(targetSource)
+      const contentChanged = normalizeText(baseContent) !== normalizeText(targetContent)
+      const statusChanged = normalizeText(baseStatus) !== normalizeText(targetStatus)
+      const sourceChanged = normalizeText(baseSource) !== normalizeText(targetSource)
+      const added = !baseSection && !!targetSection
+      const removed = !!baseSection && !targetSection
+
+      const changed = contentChanged || statusChanged || sourceChanged || added || removed
+
+      const changeParts: string[] = []
+      if (added) changeParts.push('Bloco adicionado')
+      if (removed) changeParts.push('Bloco removido')
+      if (contentChanged && !added && !removed) changeParts.push('Conteúdo alterado')
+      if (statusChanged) changeParts.push('Status alterado')
+      if (sourceChanged) changeParts.push('Fonte alterada')
+
+      const changeType = changeParts[0] ?? 'Sem mudança'
+      const changeSummary = changeParts.length > 0 ? changeParts.join(' • ') : 'Sem mudança detectada'
 
       return {
         key: identifier,
         title: targetSection?.title ?? baseSection?.title ?? identifier,
         changed,
+        changeType,
+        changeSummary,
         baseStatus,
         targetStatus,
         baseSource,
@@ -917,6 +934,14 @@ export function EditorModulePanel({ token, selectedCaseId }: EditorModulePanelPr
                                 <strong>{row.title}</strong>
                                 <span className="insight-badge">{row.changed ? 'Alterado' : 'Sem mudança'}</span>
                               </div>
+
+                              <p className="info-meta" style={{ marginBottom: '6px' }}>
+                                <strong>Auditoria:</strong> {row.changeType}
+                              </p>
+
+                              <p className="info-meta" style={{ marginBottom: '12px' }}>
+                                <strong>Detalhes:</strong> {row.changeSummary}
+                              </p>
 
                               <p className="info-meta" style={{ marginBottom: '12px' }}>
                                 Status: V{compareBaseVersion.version_number} {row.baseStatus} → V
