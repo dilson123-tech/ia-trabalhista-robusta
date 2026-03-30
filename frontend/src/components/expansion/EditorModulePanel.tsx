@@ -55,6 +55,7 @@ export function EditorModulePanel({ token, selectedCaseId }: EditorModulePanelPr
   const [versionActionLoading, setVersionActionLoading] = useState<'new' | 'approve' | null>(null)
   const [versionError, setVersionError] = useState('')
   const [versionSuccess, setVersionSuccess] = useState('')
+  const [exportLoading, setExportLoading] = useState<'html' | 'pdf' | null>(null)
   const [compareBaseVersionNumber, setCompareBaseVersionNumber] = useState<number | null>(null)
   const [compareTargetVersionNumber, setCompareTargetVersionNumber] = useState<number | null>(null)
   const [editingSectionKey, setEditingSectionKey] = useState<string | null>(null)
@@ -332,6 +333,7 @@ export function EditorModulePanel({ token, selectedCaseId }: EditorModulePanelPr
     if (!selectedDocumentId || !approvedVersion || !token.trim()) return
 
     try {
+      setExportLoading(format)
       setVersionError('')
       setVersionSuccess('')
 
@@ -356,6 +358,8 @@ export function EditorModulePanel({ token, selectedCaseId }: EditorModulePanelPr
       setVersionSuccess(`Exportação ${format.toUpperCase()} iniciada com sucesso.`)
     } catch (err) {
       setVersionError(err instanceof Error ? err.message : 'Não foi possível exportar o documento.')
+    } finally {
+      setExportLoading(null)
     }
   }
 
@@ -761,6 +765,25 @@ export function EditorModulePanel({ token, selectedCaseId }: EditorModulePanelPr
                   <strong>Versões registradas:</strong> {selectedDocument.versions.length}
                 </p>
 
+                <p
+                  className="info-meta"
+                  style={{
+                    marginTop: '12px',
+                    marginBottom: '12px',
+                    padding: '10px 12px',
+                    borderRadius: '12px',
+                    background: approvedVersion ? 'rgba(16, 185, 129, 0.10)' : 'rgba(148, 163, 184, 0.12)',
+                    border: approvedVersion
+                      ? '1px solid rgba(16, 185, 129, 0.30)'
+                      : '1px solid rgba(148, 163, 184, 0.24)',
+                    color: approvedVersion ? '#d1fae5' : 'rgba(226, 232, 240, 0.88)',
+                  }}
+                >
+                  {approvedVersion
+                    ? `Versão aprovada v${approvedVersion.version_number} pronta para exportação final em HTML e PDF.`
+                    : 'Exportação final liberada após aprovação formal de uma versão do documento.'}
+                </p>
+
                 <div className="actions-row" style={{ marginTop: '12px', flexWrap: 'wrap', gap: '10px' }}>
                   <button
                     type="button"
@@ -790,22 +813,26 @@ export function EditorModulePanel({ token, selectedCaseId }: EditorModulePanelPr
 
                   <button
                     type="button"
-                    className={`btn ${approvedVersion ? 'btn-ghost' : 'btn-muted'}`}
+                    className={`btn ${
+                      approvedVersion && exportLoading !== 'html' ? 'btn-ghost' : 'btn-muted'
+                    }`}
                     onClick={() => void handleExportDocument('html')}
-                    disabled={!approvedVersion}
+                    disabled={!approvedVersion || exportLoading !== null}
                     title={approvedVersion ? 'Exportar versão aprovada em HTML' : 'A exportação exige uma versão aprovada'}
                   >
-                    Exportar HTML
+                    {exportLoading === 'html' ? 'Exportando HTML...' : 'Exportar HTML'}
                   </button>
 
                   <button
                     type="button"
-                    className={`btn ${approvedVersion ? 'btn-ghost' : 'btn-muted'}`}
+                    className={`btn ${
+                      approvedVersion && exportLoading !== 'pdf' ? 'btn-ghost' : 'btn-muted'
+                    }`}
                     onClick={() => void handleExportDocument('pdf')}
-                    disabled={!approvedVersion}
+                    disabled={!approvedVersion || exportLoading !== null}
                     title={approvedVersion ? 'Exportar versão aprovada em PDF' : 'A exportação exige uma versão aprovada'}
                   >
-                    Exportar PDF
+                    {exportLoading === 'pdf' ? 'Exportando PDF...' : 'Exportar PDF'}
                   </button>
                 </div>
               </article>
