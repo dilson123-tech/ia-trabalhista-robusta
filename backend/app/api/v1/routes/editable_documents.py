@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
 from app.core.security import require_auth, require_role
@@ -13,6 +14,7 @@ from app.schemas.editable_document import (
     EditableDocumentVersionCreate,
     EditableDocumentVersionOut,
 )
+from app.services.editor_export_service import build_editor_html, generate_editor_pdf
 
 router = APIRouter(
     prefix="/editable-documents",
@@ -179,6 +181,120 @@ def get_editable_document(
         raise HTTPException(status_code=404, detail="Editable document not found")
 
     return _build_document_detail_payload(db, document)
+
+
+@router.get(
+    "/{document_id}/export/html",
+    response_class=HTMLResponse,
+    dependencies=[Depends(require_role("admin", "advogado"))],
+)
+def export_editable_document_html(
+    document_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_auth),
+):
+    document = (
+        db.query(EditableDocument)
+        .filter(
+            EditableDocument.id == document_id,
+            EditableDocument.tenant_id == current_user["tenant_id"],
+        )
+        .first()
+    )
+    if not document:
+        raise HTTPException(status_code=404, detail="Editable document not found")
+
+    approved_version = (
+        db.query(EditableDocumentVersion)
+        .filter(
+            EditableDocumentVersion.editable_document_id == document.id,
+            EditableDocumentVersion.tenant_id == current_user["tenant_id"],
+            EditableDocumentVersion.approved.is_(True),
+        )
+        .order_by(EditableDocumentVersion.version_number.desc())
+        .first()
+    )
+
+    if not approved_version:
+        raise HTTPException(
+            status_code=409,
+            detail="Editable document does not have an approved version for final export",
+        )
+
+    html = build_editor_html(
+        {
+            "title": document.title,
+            "area": document.area,
+            "document_type": document.document_type,
+        },
+        {
+            "version_number": approved_version.version_number,
+            "sections": approved_version.sections or [],
+        },
+    )
+
+    return HTMLResponse(content=html)
+
+
+@router.get(
+    "/{document_id}/export/pdf",
+    dependencies=[Depends(require_role("admin", "advogado"))],
+)
+def export_editable_document_pdf(
+    document_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_auth),
+):
+    document = (
+        db.query(EditableDocument)
+        .filter(
+            EditableDocument.id == document_id,
+            EditableDocument.tenant_id == current_user["tenant_id"],
+        )
+        .first()
+    )
+    if not document:
+        raise HTTPException(status_code=404, detail="Editable document not found")
+
+    approved_version = (
+        db.query(EditableDocumentVersion)
+        .filter(
+            EditableDocumentVersion.editable_document_id == document.id,
+            EditableDocumentVersion.tenant_id == current_user["tenant_id"],
+            EditableDocumentVersion.approved.is_(True),
+        )
+        .order_by(EditableDocumentVersion.version_number.desc())
+        .first()
+    )
+
+    if not approved_version:
+        raise HTTPException(
+            status_code=409,
+            detail="Editable document does not have an approved version for final export",
+        )
+
+    html = build_editor_html(
+        {
+            "title": document.title,
+            "area": document.area,
+            "document_type": document.document_type,
+        },
+        {
+            "version_number": approved_version.version_number,
+            "sections": approved_version.sections or [],
+        },
+    )
+
+    pdf_bytes = generate_editor_pdf(html)
+
+    from fastapi.responses import Response
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'inline; filename="editable_document_{document.id}_v{approved_version.version_number}.pdf"'
+        },
+    )
 
 
 @router.post(

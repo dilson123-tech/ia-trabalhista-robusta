@@ -39,6 +39,8 @@ function getSectionIdentifier(section: EditableSection) {
   return section.key || section.title
 }
 
+const API_BASE_URL = (import.meta.env.VITE_API_URL ?? 'http://127.0.0.1:8099/api/v1').replace(/\/$/, '')
+
 export function EditorModulePanel({ token, selectedCaseId }: EditorModulePanelProps) {
   const [documents, setDocuments] = useState<EditableDocumentItem[]>([])
   const [selectedDocumentId, setSelectedDocumentId] = useState<number | null>(null)
@@ -318,6 +320,44 @@ export function EditorModulePanel({ token, selectedCaseId }: EditorModulePanelPr
       unchanged: Math.max(compareRows.length - changed, 0),
     }
   }, [compareRows])
+
+  const approvedVersion = useMemo(() => {
+    if (!selectedDocument) return null
+    return [...selectedDocument.versions]
+      .filter((version) => version.approved)
+      .sort((a, b) => b.version_number - a.version_number)[0] ?? null
+  }, [selectedDocument])
+
+  async function handleExportDocument(format: 'html' | 'pdf') {
+    if (!selectedDocumentId || !approvedVersion || !token.trim()) return
+
+    try {
+      setVersionError('')
+      setVersionSuccess('')
+
+      const response = await fetch(
+        `${API_BASE_URL}/editable-documents/${selectedDocumentId}/export/${format}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      )
+
+      if (!response.ok) {
+        throw new Error(`Falha ao exportar documento em ${format.toUpperCase()}.`)
+      }
+
+      const blob = await response.blob()
+      const blobUrl = window.URL.createObjectURL(blob)
+      window.open(blobUrl, '_blank', 'noopener,noreferrer')
+      window.setTimeout(() => window.URL.revokeObjectURL(blobUrl), 60000)
+
+      setVersionSuccess(`Exportação ${format.toUpperCase()} iniciada com sucesso.`)
+    } catch (err) {
+      setVersionError(err instanceof Error ? err.message : 'Não foi possível exportar o documento.')
+    }
+  }
 
   async function handleCreateDocument() {
     if (!token.trim() || !selectedCaseId || !newDocumentTitle.trim()) return
@@ -721,7 +761,7 @@ export function EditorModulePanel({ token, selectedCaseId }: EditorModulePanelPr
                   <strong>Versões registradas:</strong> {selectedDocument.versions.length}
                 </p>
 
-                <div className="actions-row" style={{ marginTop: '12px' }}>
+                <div className="actions-row" style={{ marginTop: '12px', flexWrap: 'wrap', gap: '10px' }}>
                   <button
                     type="button"
                     className={`btn ${versionActionLoading || !currentVersion ? 'btn-muted' : 'btn-primary'}`}
@@ -746,6 +786,26 @@ export function EditorModulePanel({ token, selectedCaseId }: EditorModulePanelPr
                       : currentVersion?.approved
                         ? 'Versão já aprovada'
                         : 'Aprovar versão atual'}
+                  </button>
+
+                  <button
+                    type="button"
+                    className={`btn ${approvedVersion ? 'btn-ghost' : 'btn-muted'}`}
+                    onClick={() => void handleExportDocument('html')}
+                    disabled={!approvedVersion}
+                    title={approvedVersion ? 'Exportar versão aprovada em HTML' : 'A exportação exige uma versão aprovada'}
+                  >
+                    Exportar HTML
+                  </button>
+
+                  <button
+                    type="button"
+                    className={`btn ${approvedVersion ? 'btn-ghost' : 'btn-muted'}`}
+                    onClick={() => void handleExportDocument('pdf')}
+                    disabled={!approvedVersion}
+                    title={approvedVersion ? 'Exportar versão aprovada em PDF' : 'A exportação exige uma versão aprovada'}
+                  >
+                    Exportar PDF
                   </button>
                 </div>
               </article>
