@@ -21,4 +21,11 @@ class Settings(BaseSettings):
     API_V1_PREFIX: str = "/api/v1"
     DATABASE_URL: str = "postgresql+psycopg2://ia_app:ia_app_pass@127.0.0.1:55432/ia_trabalhista"
 
+    LLM_PROVIDER: str = "openai"
+    LLM_API_KEY: str = ""
+    LLM_MODEL: str = "gpt-5-mini"
+    LLM_TIMEOUT_SECONDS: int = 45
+    LLM_ANALYSIS_ENABLED: bool = False
+    LLM_BASE_URL: str | None = None
+
 settings = Settings()
