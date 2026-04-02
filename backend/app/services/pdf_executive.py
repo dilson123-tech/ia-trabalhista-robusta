@@ -254,6 +254,42 @@ def generate_executive_pdf(case_data: dict, executive_data: dict) -> bytes:
               </div>
             </div>
 
+            
+            <div class="section">
+              <h2>Posicionamento Estratégico</h2>
+              <p style="color: #111827; line-height: 1.72; font-weight: 500;">
+                {_safe(strategic.get("positioning")) or "Não disponível"}
+              </p>
+            </div>
+
+            <div class="section">
+              <h2>Estratégia Recomendada</h2>
+              <p style="color: #111827; line-height: 1.72; font-weight: 600;">
+                {_safe(strategic.get("recommended_strategy")) or "Não disponível"}
+              </p>
+            </div>
+
+            <div class="section">
+              <h2>Oportunidade de Negociação</h2>
+              <p style="color: #111827; line-height: 1.72;">
+                {_safe(strategic.get("negotiation_opportunity")) or "Não disponível"}
+              </p>
+            </div>
+
+            <div class="section">
+              <h2>Alertas de Risco</h2>
+              <p style="color: #991b1b; line-height: 1.72; font-weight: 600;">
+                {_safe(strategic.get("risk_alerts")) or "Não disponível"}
+              </p>
+            </div>
+
+            <div class="section">
+              <h2>Plano de Execução</h2>
+              <ul>
+                {"".join(f"<li>{item}</li>" for item in (strategic.get("execution_plan") or []))}
+              </ul>
+            </div>
+
             <div class="section">
               <h2>Observação Operacional</h2>
               <p style="color: #1f2937; line-height: 1.72; font-weight: 500;">Este documento possui finalidade de apoio à análise e à tomada de decisão jurídica, devendo ser validado pelo profissional responsável antes de uso externo, estratégico ou comercial.</p>

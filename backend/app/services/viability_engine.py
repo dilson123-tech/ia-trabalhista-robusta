@@ -13,82 +13,103 @@ def _normalize_text(value) -> str:
 
 def calculate_viability(analysis: Dict) -> Dict:
     """
-    Motor estratégico de viabilidade processual.
+    Motor premium de viabilidade processual.
 
-    Esta régua mede prontidão estratégica do caso com base em:
-    - risco técnico informado pela análise
-    - maturidade probatória/documental
-    - sinais favoráveis ou críticos presentes no texto da análise
+    Separa a leitura em três eixos:
+    - força jurídica do direito
+    - maturidade probatória
+    - risco processual
 
-    Não representa verdade absoluta sobre êxito judicial.
+    O objetivo é refletir melhor a realidade jurídica:
+    caso bom com prova fraca não deve virar "caso ruim",
+    mas sim "caso viável condicionado à prova".
     """
-    risk_level = str(analysis.get("risk_level", "medium")).lower()
+    summary = analysis.get("summary", "") or ""
     issues = analysis.get("issues", []) or []
     next_steps = analysis.get("next_steps", []) or []
-    summary = analysis.get("summary", "") or ""
+    risk_level = str(analysis.get("risk_level", "medium")).lower()
 
-    combined_text = " ".join(
-        [
-            _normalize_text(summary),
-            _normalize_text(issues),
-            _normalize_text(next_steps),
-        ]
-    )
+    combined = " ".join([
+        _normalize_text(summary),
+        _normalize_text(issues),
+        _normalize_text(next_steps),
+    ])
 
-    risk_score_map = {
-        "low": 78,
-        "medium": 66,
-        "high": 52,
-    }
-    score = risk_score_map.get(risk_level, 62)
-
-    issue_count = len(issues)
-
-    # Penalidade mais suave: análise boa tende a listar vários pontos,
-    # então contar issues de forma agressiva distorce o resultado.
-    if issue_count >= 8:
-        score -= 18
-    elif issue_count >= 6:
-        score -= 12
-    elif issue_count >= 4:
-        score -= 7
-    elif issue_count >= 2:
-        score -= 3
-
-    favorable_terms = [
-        "obrigação legal presumível",
-        "inadimplência",
-        "ausência de pagamento",
-        "não recebimento correto",
-        "dispensado sem justa causa",
-        "verbas rescisórias",
+    # 1) Força jurídica do direito material
+    legal_terms = [
         "fgts",
+        "verbas rescisórias",
+        "dispensado sem justa causa",
+        "não recebeu",
+        "não recebimento",
+        "ausência de pagamento",
+        "inadimplemento",
         "multa de 40%",
-        "vínculo comprovável",
-        "provas documentais",
+        "saldo de salário",
+        "13º proporcional",
+        "férias proporcionais",
+        "aviso prévio",
+        "multa rescisória",
+        "créditos trabalhistas",
+        "direito às verbas rescisórias",
     ]
-    caution_terms = [
-        "faltam elementos documentais",
-        "prazo prescricional",
+    legal_strength = sum(1 for term in legal_terms if term in combined)
+
+    # 2) Maturidade probatória
+    evidence_terms = [
+        "falta de",
+        "ausência de",
+        "não informado",
+        "não há informação",
+        "sem documentos",
+        "falta de comprovação documental",
+        "impede quantificação",
+        "impede cálculo",
+        "extratos do fgts",
+        "recibos",
+        "trct",
+        "holerites",
+        "comprovantes de pagamento",
+        "elementos probatórios",
+    ]
+    evidence_gaps = sum(1 for term in evidence_terms if term in combined)
+
+    # 3) Risco processual
+    process_risk_terms = [
         "prescrição",
-        "pagamento parcial",
+        "decadência",
         "quitação",
+        "pagamento parcial",
         "descontos",
         "homologação",
-        "impedem cálculo",
-        "avaliação plena",
-        "ausência de informação",
+        "preclusão",
+        "risco probatório",
+        "risco processual",
     ]
+    process_risk_hits = sum(1 for term in process_risk_terms if term in combined)
 
-    favorable_hits = sum(1 for term in favorable_terms if term in combined_text)
-    caution_hits = sum(1 for term in caution_terms if term in combined_text)
+    # Base por risco técnico: aqui mede complexidade/instabilidade,
+    # mas não destrói automaticamente a viabilidade.
+    risk_base_map = {
+        "low": 68,
+        "medium": 64,
+        "high": 60,
+    }
+    score = risk_base_map.get(risk_level, 62)
 
-    score += min(12, favorable_hits * 2)
-    score -= min(15, caution_hits * 2)
+    # Direito material forte empurra para cima.
+    score += min(20, legal_strength * 3)
+
+    # Lacunas probatórias reduzem, mas sem matar caso juridicamente bom.
+    score -= min(18, evidence_gaps * 2)
+
+    # Risco processual pesa mais que lacuna documental comum.
+    score -= min(16, process_risk_hits * 3)
 
     score = max(0, min(100, score))
     probability = round(score / 100, 2)
 
+    # Complexidade e tempo seguem o risco técnico.
     if risk_level == "low":
         complexity = "Baixa"
         estimated_time = "6-12 meses"
@@ -99,13 +120,17 @@ def calculate_viability(analysis: Dict) -> Dict:
         complexity = "Alta"
         estimated_time = "24+ meses"
 
-    if score >= 76:
+    # Leitura premium: separa direito forte de prova fraca.
+    if legal_strength >= 4 and evidence_gaps >= 3:
+        label = "Viável com dependência probatória"
+        recommendation = "Reforçar documentação e cálculo antes do ajuizamento"
+    elif score >= 78:
         label = "Alta viabilidade estratégica"
-        recommendation = "Prosseguir com ajuizamento, mantendo validação documental final"
-    elif score >= 61:
+        recommendation = "Prosseguir com ajuizamento e validação documental final"
+    elif score >= 62:
         label = "Viabilidade moderada"
-        recommendation = "Prosseguir com cautela, reforçando documentação e cálculo"
-    elif score >= 46:
+        recommendation = "Prosseguir com cautela, fortalecendo prova e estratégia"
+    elif score >= 48:
         label = "Viabilidade condicionada à prova"
         recommendation = "Não ajuizar sem reforço probatório mínimo e revisão estratégica"
     else:
@@ -119,4 +144,9 @@ def calculate_viability(analysis: Dict) -> Dict:
         "complexity": complexity,
         "estimated_time": estimated_time,
         "recommendation": recommendation,
+        "dimensions": {
+            "legal_strength": legal_strength,
+            "evidence_gaps": evidence_gaps,
+            "process_risk": process_risk_hits,
+        },
     }
