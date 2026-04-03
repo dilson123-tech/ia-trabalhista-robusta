@@ -169,6 +169,7 @@ def get_case(
 )
 def analyze_case_endpoint(
     case_id: int,
+    force: bool = False,
     db: Session = Depends(get_db),
     current_user = Depends(require_auth),
 ):
@@ -187,17 +188,17 @@ def analyze_case_endpoint(
         .first()
     )
 
-    if existing_analysis:
-
+    if existing_analysis and not force:
         return {
-
             "case_id": case.id,
-
             "analysis_id": existing_analysis.id,
-
             "analysis": existing_analysis.analysis,
-
+            "source": "cache",
         }
+
+    if existing_analysis and force:
+        db.delete(existing_analysis)
+        db.commit()
 
 
 

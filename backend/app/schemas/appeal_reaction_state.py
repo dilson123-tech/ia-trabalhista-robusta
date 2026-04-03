@@ -145,6 +145,20 @@ class AppealReactionSummaryOut(BaseModel):
     tenant_id: int | None = None
     decision_type: str
     decision_title: str
+    decision_summary: str | None = None
+
+    executive_headline: str = ""
+    executive_summary: str = ""
+    recommendation: str = ""
+    urgency_level: str = "moderada"
+    appeal_readiness: str = "parcial"
+
+    deadline_status: dict = Field(default_factory=dict)
+    priority_strategy: dict = Field(default_factory=dict)
+    evidence_focus: list[dict] = Field(default_factory=list)
+    risk_alerts: list[str] = Field(default_factory=list)
+    counts: dict = Field(default_factory=dict)
+
     unfavorable_points: list[dict] = Field(default_factory=list)
     deadlines: list[dict] = Field(default_factory=list)
     strategy_items: list[dict] = Field(default_factory=list)
