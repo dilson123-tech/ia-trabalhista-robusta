@@ -22,6 +22,65 @@ router = APIRouter(
 )
 
 
+def _get_or_create_case_analysis_record(
+    db: Session,
+    case: Case,
+    current_user,
+):
+    analysis_record = (
+        db.query(CaseAnalysis)
+        .filter(
+            CaseAnalysis.case_id == case.id,
+            CaseAnalysis.tenant_id == current_user["tenant_id"],
+        )
+        .first()
+    )
+
+    if analysis_record:
+        return analysis_record
+
+    analysis = analyze_case(
+        case_number=case.case_number,
+        title=case.title,
+        description=case.description,
+    )
+
+    strategic = strategic_diagnosis(analysis)
+    viability = calculate_viability(analysis)
+    decision = generate_decision(analysis, viability)
+    decision = generate_executive_summary(analysis, viability, decision)
+
+    executive_data = {
+        "viability": viability,
+        "decision": decision,
+        "strategic": strategic,
+    }
+
+    full_analysis = {
+        "technical": analysis,
+        "strategic": strategic,
+        "viability": viability,
+        "decision": decision,
+    }
+
+    analysis_record = CaseAnalysis(
+        tenant_id=current_user["tenant_id"],
+        case_id=case.id,
+        risk_level=analysis.get("risk_level", "medium"),
+        summary=analysis.get("summary", ""),
+        issues=analysis.get("issues", []),
+        next_steps=analysis.get("next_steps", []),
+        analysis=full_analysis,
+        executive_data=executive_data,
+    )
+
+    db.add(analysis_record)
+    db.commit()
+    db.refresh(analysis_record)
+
+    return analysis_record
+
+
 @router.get(
     "",
     response_model=list[CaseOut],
@@ -327,16 +386,19 @@ def get_executive_summary(
     if not case:
         raise HTTPException(status_code=404, detail="Case not found")
 
-    analysis = analyze_case(
-        case_number=case.case_number,
-        title=case.title,
-        description=case.description,
+    analysis_record = _get_or_create_case_analysis_record(
+        db=db,
+        case=case,
+        current_user=current_user,
     )
 
-    strategic = strategic_diagnosis(analysis)
-    viability = calculate_viability(analysis)
-    decision = generate_decision(analysis, viability)
-    decision = generate_executive_summary(analysis, viability, decision)
+    full_analysis = analysis_record.analysis or {}
+    executive_data = analysis_record.executive_data or {}
+
+    technical = full_analysis.get("technical", {})
+    strategic = full_analysis.get("strategic", {})
+    viability = executive_data.get("viability") or full_analysis.get("viability", {})
+    decision = executive_data.get("decision") or full_analysis.get("decision", {})
 
     return {
         "case": {
@@ -344,7 +406,7 @@ def get_executive_summary(
             "case_number": case.case_number,
             "title": case.title,
         },
-        "technical_analysis": analysis,
+        "technical_analysis": technical,
         "strategic_analysis": strategic,
         "viability": viability,
         "executive_decision": decision,
@@ -363,16 +425,18 @@ def get_executive_report(
     if not case:
         raise HTTPException(status_code=404, detail="Case not found")
 
-    analysis = analyze_case(
-        case_number=case.case_number,
-        title=case.title,
-        description=case.description,
+    analysis_record = _get_or_create_case_analysis_record(
+        db=db,
+        case=case,
+        current_user=current_user,
     )
 
-    strategic = strategic_diagnosis(analysis)
-    viability = calculate_viability(analysis)
-    decision = generate_decision(analysis, viability)
-    decision = generate_executive_summary(analysis, viability, decision)
+    full_analysis = analysis_record.analysis or {}
+    executive_data = analysis_record.executive_data or {}
+
+    technical = full_analysis.get("technical", {})
+    viability = executive_data.get("viability") or full_analysis.get("viability", {})
+    decision = executive_data.get("decision") or full_analysis.get("decision", {})
 
     html = generate_report_html(
         case={
@@ -380,7 +444,7 @@ def get_executive_report(
             "title": case.title,
             "description": case.description,
         },
-        analysis=analysis,
+        analysis=technical,
         viability=viability,
         executive_decision=decision,
     )
