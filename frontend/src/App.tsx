@@ -5,11 +5,9 @@ import { ApiError, cleanupDemoCases, createCase, getCases, getCaseAnalysis, getE
 import { ExpansionWorkspace } from './components/expansion/ExpansionWorkspace'
 import { CaseFiltersBar } from './components/CaseFiltersBar'
 import { CaseCard } from './components/CaseCard'
-import { ExecutiveSummaryPanel } from './components/ExecutiveSummaryPanel'
-import { ExecutiveReportPanel } from './components/ExecutiveReportPanel'
-import { AnalysisPanel } from './components/AnalysisPanel'
 import { DashboardTopPanel } from './components/DashboardTopPanel'
 import { LoginPanel } from './components/LoginPanel'
+import { CaseFocusPanel } from './components/CaseFocusPanel'
 
 function App() {
   const [token, setToken] = useState('')
@@ -21,6 +19,7 @@ function App() {
   const [error, setError] = useState('')
   const [loaded, setLoaded] = useState(false)
   const [selectedCaseId, setSelectedCaseId] = useState<number | null>(null)
+  const [activeFocusTab, setActiveFocusTab] = useState<'analysis' | 'summary' | 'report'>('analysis')
   const [analysisData, setAnalysisData] = useState<CaseAnalysisResponse | null>(null)
   const [analysisLoading, setAnalysisLoading] = useState(false)
   const [analysisError, setAnalysisError] = useState('')
@@ -452,112 +451,114 @@ function App() {
 
         <ExpansionWorkspace token={token} selectedCaseId={selectedCaseId} />
 
-        <AnalysisPanel
-          analysisData={analysisData}
-          analysisLoading={analysisLoading}
-          analysisError={analysisError}
-          getRiskLabel={getRiskLabel}
-        />
+        <section className="cases-layout">
+          <div className="cases-layout__list">
+            <section className="insight-card">
+              <div className="insight-head">
+                <div>
+                  <p className="insight-kicker">Carteira jurídica</p>
+                  <h2 className="insight-title">Casos do escritório</h2>
+                  <p className="insight-description">
+                    Lista operacional dos casos carregados via API da IA Trabalhista Robusta.
+                  </p>
+                </div>
+                <span className="insight-badge">Base jurídica ativa</span>
+              </div>
 
-        <ExecutiveSummaryPanel
-          executiveSummaryData={executiveSummaryData}
-          executiveSummaryLoading={executiveSummaryLoading}
-          executiveSummaryError={executiveSummaryError}
-          getRiskLabel={getRiskLabel}
-        />
+              {!loaded ? (
+                <p className="insight-empty">
+                  Informe o token e clique em “Conectar API” ou “Atualizar carteira”.
+                </p>
+              ) : null}
 
-        <ExecutiveReportPanel
-          executiveReportData={executiveReportData}
-          executiveReportLoading={executiveReportLoading}
-          executiveReportError={executiveReportError}
-          executivePdfError={executivePdfError}
-        />
+              {loaded && !loading && cases.length === 0 && !error ? (
+                <p className="insight-empty">Nenhum caso encontrado para este token.</p>
+              ) : null}
 
-        <section className="insight-card">
-          <div className="insight-head">
-            <div>
-              <p className="insight-kicker">Carteira jurídica</p>
-              <h2 className="insight-title">Casos do escritório</h2>
-              <p className="insight-description">
-                Lista operacional dos casos carregados via API da IA Trabalhista Robusta.
-              </p>
-            </div>
-            <span className="insight-badge">Base jurídica ativa</span>
+              {loaded && cases.length > 0 ? (
+                <CaseFiltersBar
+                  filteredCount={filteredCases.length}
+                  totalCount={cases.length}
+                  caseSearchTerm={caseSearchTerm}
+                  onCaseSearchTermChange={setCaseSearchTerm}
+                  caseStatusFilter={caseStatusFilter}
+                  onCaseStatusFilterChange={setCaseStatusFilter}
+                  onResetFilters={() => {
+                    setCaseSearchTerm('')
+                    setCaseStatusFilter('main')
+                  }}
+                  onCleanupDemo={() => {
+                    void handleCleanupDemo()
+                  }}
+                  cleanupDemoLoading={cleanupDemoLoading}
+                  caseActionError={caseActionError}
+                  caseActionSuccess={caseActionSuccess}
+                />
+              ) : null}
+
+              {loaded && !loading && cases.length > 0 && filteredCases.length === 0 ? (
+                <p className="insight-empty">Nenhum caso encontrado para os filtros atuais.</p>
+              ) : null}
+
+              <div
+                style={{
+                  display: 'grid',
+                  gap: '12px',
+                }}
+              >
+                {filteredCases.map((caso) => {
+                  const isArchiving = caseActionLoadingId === caso.id
+                  const isAnalyzing = analysisLoading && selectedCaseId === caso.id
+                  const isLoadingSummary = executiveSummaryLoading && selectedCaseId === caso.id
+                  const isLoadingReport = executiveReportLoading && selectedCaseId === caso.id
+                  const isLoadingPdf = executivePdfLoading && selectedCaseId === caso.id
+
+                  return (
+                    <CaseCard
+                      key={caso.id}
+                      caso={caso}
+                      selectedCaseId={selectedCaseId}
+                      getStatusLabel={getStatusLabel}
+                      isArchiving={isArchiving}
+                      isAnalyzing={isAnalyzing}
+                      isLoadingSummary={isLoadingSummary}
+                      isLoadingReport={isLoadingReport}
+                      isLoadingPdf={isLoadingPdf}
+                      analysisLoading={analysisLoading}
+                      executiveSummaryLoading={executiveSummaryLoading}
+                      executiveReportLoading={executiveReportLoading}
+                      executivePdfLoading={executivePdfLoading}
+                      onArchive={(caseId) => {
+                        void handleArchiveCase(caseId)
+                      }}
+                      onAnalyze={handleAnalyzeCase}
+                      onLoadExecutiveSummary={handleLoadExecutiveSummary}
+                      onLoadExecutiveReport={handleLoadExecutiveReport}
+                      onOpenExecutivePdf={handleOpenExecutivePdf}
+                    />
+                  )
+                })}
+              </div>
+            </section>
           </div>
 
-          {!loaded ? (
-            <p className="insight-empty">
-              Informe o token e clique em “Conectar API” ou “Atualizar carteira”.
-            </p>
-          ) : null}
-
-          {loaded && !loading && cases.length === 0 && !error ? (
-            <p className="insight-empty">Nenhum caso encontrado para este token.</p>
-          ) : null}
-
-          {loaded && cases.length > 0 ? (
-            <CaseFiltersBar
-              filteredCount={filteredCases.length}
-              totalCount={cases.length}
-              caseSearchTerm={caseSearchTerm}
-              onCaseSearchTermChange={setCaseSearchTerm}
-              caseStatusFilter={caseStatusFilter}
-              onCaseStatusFilterChange={setCaseStatusFilter}
-              onResetFilters={() => {
-                setCaseSearchTerm('')
-                setCaseStatusFilter('main')
-              }}
-              onCleanupDemo={() => {
-                void handleCleanupDemo()
-              }}
-              cleanupDemoLoading={cleanupDemoLoading}
-              caseActionError={caseActionError}
-              caseActionSuccess={caseActionSuccess}
+          <div className="cases-layout__focus">
+            <CaseFocusPanel
+              selectedCaseId={selectedCaseId}
+              activeTab={activeFocusTab}
+              onTabChange={setActiveFocusTab}
+              analysisData={analysisData}
+              analysisLoading={analysisLoading}
+              analysisError={analysisError}
+              executiveSummaryData={executiveSummaryData}
+              executiveSummaryLoading={executiveSummaryLoading}
+              executiveSummaryError={executiveSummaryError}
+              executiveReportData={executiveReportData}
+              executiveReportLoading={executiveReportLoading}
+              executiveReportError={executiveReportError}
+              executivePdfError={executivePdfError}
+              getRiskLabel={getRiskLabel}
             />
-          ) : null}
-
-          {loaded && !loading && cases.length > 0 && filteredCases.length === 0 ? (
-            <p className="insight-empty">Nenhum caso encontrado para os filtros atuais.</p>
-          ) : null}
-
-          <div
-            style={{
-              display: 'grid',
-              gap: '12px',
-            }}
-          >
-            {filteredCases.map((caso) => {
-              const isArchiving = caseActionLoadingId === caso.id
-              const isAnalyzing = analysisLoading && selectedCaseId === caso.id
-              const isLoadingSummary = executiveSummaryLoading && selectedCaseId === caso.id
-              const isLoadingReport = executiveReportLoading && selectedCaseId === caso.id
-              const isLoadingPdf = executivePdfLoading && selectedCaseId === caso.id
-
-              return (
-                <CaseCard
-                  key={caso.id}
-                  caso={caso}
-                  selectedCaseId={selectedCaseId}
-                  getStatusLabel={getStatusLabel}
-                  isArchiving={isArchiving}
-                  isAnalyzing={isAnalyzing}
-                  isLoadingSummary={isLoadingSummary}
-                  isLoadingReport={isLoadingReport}
-                  isLoadingPdf={isLoadingPdf}
-                  analysisLoading={analysisLoading}
-                  executiveSummaryLoading={executiveSummaryLoading}
-                  executiveReportLoading={executiveReportLoading}
-                  executivePdfLoading={executivePdfLoading}
-                  onArchive={(caseId) => {
-                    void handleArchiveCase(caseId)
-                  }}
-                  onAnalyze={handleAnalyzeCase}
-                  onLoadExecutiveSummary={handleLoadExecutiveSummary}
-                  onLoadExecutiveReport={handleLoadExecutiveReport}
-                  onOpenExecutivePdf={handleOpenExecutivePdf}
-                />
-              )
-            })}
           </div>
         </section>
       </section>
