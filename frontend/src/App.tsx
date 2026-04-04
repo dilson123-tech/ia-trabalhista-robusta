@@ -3,6 +3,11 @@ import { useState, type KeyboardEvent } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { ApiError, cleanupDemoCases, createCase, getCases, getCaseAnalysis, getExecutiveSummary, getExecutiveReport, getExecutivePdf, login, updateCaseStatus, type CaseItem, type CaseAnalysisResponse, type ExecutiveSummaryResponse, type ExecutiveReportResponse } from './services/api'
 import { ExpansionWorkspace } from './components/expansion/ExpansionWorkspace'
+import { CaseFiltersBar } from './components/CaseFiltersBar'
+import { CaseCard } from './components/CaseCard'
+import { DashboardTopPanel } from './components/DashboardTopPanel'
+import { LoginPanel } from './components/LoginPanel'
+import { CaseFocusPanel } from './components/CaseFocusPanel'
 
 function App() {
   const [token, setToken] = useState('')
@@ -14,6 +19,7 @@ function App() {
   const [error, setError] = useState('')
   const [loaded, setLoaded] = useState(false)
   const [selectedCaseId, setSelectedCaseId] = useState<number | null>(null)
+  const [activeFocusTab, setActiveFocusTab] = useState<'analysis' | 'summary' | 'report'>('analysis')
   const [analysisData, setAnalysisData] = useState<CaseAnalysisResponse | null>(null)
   const [analysisLoading, setAnalysisLoading] = useState(false)
   const [analysisError, setAnalysisError] = useState('')
@@ -382,1206 +388,181 @@ function App() {
     }
   }
 
-  if (isLoginRoute) {
+    if (isLoginRoute) {
     return (
-      <main className="app-shell">
-        <section className="app-container">
-          <section className="hero-panel">
-            <div className="hero-card">
-              <p className="hero-kicker">IA Trabalhista Robusta</p>
-              <h1 className="hero-heading">Acesso ao sistema</h1>
-              <p className="hero-description">
-                Entre com usuário e senha para acessar o painel do advogado, a carteira de casos
-                e os fluxos executivos da plataforma.
-              </p>
-
-              <div className="hero-actions">
-                <button
-                  className="btn btn-ghost"
-                  type="button"
-                  onClick={() => navigate('/')}
-                >
-                  Voltar ao painel
-                </button>
-              </div>
-            </div>
-
-            <aside className="technical-card" key={loginFormKey}>
-              <div className="technical-topbar">
-                <div>
-                  <h2 className="technical-title">Login oficial</h2>
-                  <p className="technical-description">
-                    Entrada dedicada para autenticação do frontend, separada do hero principal
-                    para deixar a experiência mais limpa e com cara de produto SaaS.
-                  </p>
-                </div>
-
-                <span className={`connection-badge ${token.trim() ? 'connection-badge--ok' : 'connection-badge--pending'}`}>
-                  {token.trim() ? 'Sessão pronta' : 'Sessão inativa'}
-                </span>
-              </div>
-
-              <div className="form-grid token-field">
-                <input
-                  className="login-decoy"
-                  type="text"
-                  tabIndex={-1}
-                  autoComplete="username"
-                  aria-hidden="true"
-                />
-
-                <input
-                  className="login-decoy"
-                  type="password"
-                  tabIndex={-1}
-                  autoComplete="current-password"
-                  aria-hidden="true"
-                />
-
-                <input
-                  className="form-control"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  onFocus={() => setLoginFieldsUnlocked(true)}
-                  readOnly={!loginFieldsUnlocked}
-                  placeholder="Usuário"
-                  autoComplete="off"
-                  autoCapitalize="none"
-                  spellCheck={false}
-                  name={`login-user-${loginFormKey}`}
-                    onKeyDown={handleLoginKeyDown}
-                />
-
-                <div className="password-field">
-                  <input
-                    className="form-control"
-                    type={showToken ? 'text' : 'password'}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    onFocus={() => setLoginFieldsUnlocked(true)}
-                    readOnly={!loginFieldsUnlocked}
-                    placeholder="Senha"
-                    autoComplete="new-password"
-                    name={`login-password-${loginFormKey}`}
-                      onKeyDown={handleLoginKeyDown}
-                  />
-                  <button
-                    className="password-toggle-icon"
-                    type="button"
-                    onClick={() => setShowToken((prev) => !prev)}
-                    disabled={!password.trim()}
-                    aria-label={showToken ? 'Ocultar senha' : 'Mostrar senha'}
-                    title={showToken ? 'Ocultar senha' : 'Mostrar senha'}
-                  >
-                    {showToken ? (
-                      <svg viewBox="0 0 24 24" aria-hidden="true">
-                        <path d="M3 3l18 18" />
-                        <path d="M10.58 10.58a2 2 0 1 0 2.84 2.84" />
-                        <path d="M9.88 5.09A10.94 10.94 0 0 1 12 4c5 0 9.27 3.11 11 8-.9 2.54-2.66 4.61-4.94 5.94" />
-                        <path d="M6.1 6.1C3.8 7.45 2.04 9.5 1 12c1.73 4.89 6 8 11 8 1.73 0 3.37-.37 4.84-1.03" />
-                      </svg>
-                    ) : (
-                      <svg viewBox="0 0 24 24" aria-hidden="true">
-                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z" />
-                        <circle cx="12" cy="12" r="3" />
-                      </svg>
-                    )}
-                  </button>
-                </div>
-              </div>
-
-              <div className="actions-row">
-                <button
-                  className={`btn ${authLoading || !username.trim() || !password.trim() ? 'btn-muted' : 'btn-primary'}`}
-                  type="button"
-                  onClick={handleLogin}
-                  disabled={authLoading || !username.trim() || !password.trim()}
-                >
-                  {authLoading ? 'Entrando...' : 'Entrar no sistema'}
-                </button>
-
-                <button
-                  className="btn btn-ghost"
-                  type="button"
-                  onClick={() => {
-                    setShowToken(false)
-                    setUsername('')
-                    setPassword('')
-                    setError('')
-                  }}
-                >
-                  Limpar
-                </button>
-
-                {token.trim() ? (
-                  <button
-                    className="btn btn-secondary"
-                    type="button"
-                    onClick={() => navigate('/')}
-                  >
-                    Ir para o painel
-                  </button>
-                ) : null}
-              </div>
-
-              {error ? (
-                <p className="status-message status-message--error">{error}</p>
-              ) : null}
-            </aside>
-          </section>
-        </section>
-      </main>
+      <LoginPanel
+        token={token}
+        loginFormKey={loginFormKey}
+        username={username}
+        password={password}
+        showToken={showToken}
+        authLoading={authLoading}
+        error={error}
+        loginFieldsUnlocked={loginFieldsUnlocked}
+        onGoToPanel={() => navigate('/')}
+        onUsernameChange={setUsername}
+        onPasswordChange={setPassword}
+        onUnlockFields={() => setLoginFieldsUnlocked(true)}
+        onToggleShowToken={() => setShowToken((prev) => !prev)}
+        onLogin={handleLogin}
+        onLoginKeyDown={handleLoginKeyDown}
+        onClear={() => {
+          setShowToken(false)
+          setUsername('')
+          setPassword('')
+          setError('')
+        }}
+      />
     )
   }
 
   return (
     <main className="app-shell">
       <section className="app-container">
-        <section className="hero-panel">
-          <div className="hero-card">
-            <p className="hero-kicker">Plataforma estratégica trabalhista</p>
-            <h1 className="hero-heading">Painel do Advogado</h1>
-            <p className="hero-description">
-              Centralize análise jurídica, leitura de risco, resumos executivos e relatórios estratégicos
-              em um ambiente com visão clara para decisão, operação e apresentação ao cliente.
-            </p>
-
-            <div className="hero-actions">
-              <button
-                className={`btn ${showNewCaseForm ? 'btn-secondary' : 'btn-primary'}`}
-                type="button"
-                onClick={() => {
-                  setShowNewCaseForm((prev) => !prev)
-                  setNewCaseError('')
-                  setNewCaseSuccess('')
-                }}
-              >
-                {showNewCaseForm ? 'Ocultar formulário' : '+ Novo Caso'}
-              </button>
-
-              <button
-                className="btn btn-ghost"
-                type="button"
-                onClick={handleLoadCases}
-                disabled={loading || !token.trim()}
-              >
-                {loading ? 'Carregando casos...' : 'Atualizar carteira'}
-              </button>
-            </div>
-          </div>
-
-            <aside className="technical-card technical-card--connected">
-              <div className="technical-topbar">
-                <div>
-                  <h2 className="technical-title">Sessão ativa</h2>
-                  <p className="technical-description">
-                    Backend autenticado e carteira pronta para operação no painel.
-                  </p>
-                </div>
-
-                <span className="connection-badge connection-badge--ok">
-                  API conectada
-                </span>
-              </div>
-
-              <div className="actions-row">
-                <button
-                  className="btn btn-ghost"
-                  type="button"
-                  onClick={() => {
-                    clearSession()
-                    navigate('/login')
-                  }}
-                >
-                  Trocar acesso
-                </button>
-              </div>
-
-              {error ? (
-                <p className="status-message status-message--error">{error}</p>
-              ) : null}
-            </aside>
-        </section>
-
-        {showNewCaseForm ? (
-          <section className="section-card">
-            <div className="section-head">
-              <h2 className="section-heading">Novo Caso</h2>
-              <p className="section-description">
-                Cadastre um novo processo com dados reais para alimentar a esteira analítica e executiva.
-              </p>
-            </div>
-
-            <div className="form-grid">
-              <input
-                className="form-control"
-                value={newCaseForm.case_number}
-                onChange={(e) => handleNewCaseFieldChange('case_number', e.target.value)}
-                placeholder="Número do processo"
-              />
-
-              <input
-                className="form-control"
-                value={newCaseForm.title}
-                onChange={(e) => handleNewCaseFieldChange('title', e.target.value)}
-                placeholder="Título do caso"
-              />
-
-              <textarea
-                className="form-control form-control--textarea"
-                value={newCaseForm.description}
-                onChange={(e) => handleNewCaseFieldChange('description', e.target.value)}
-                placeholder="Descrição do caso"
-              />
-
-              <select
-                className="form-control"
-                value={newCaseForm.status}
-                onChange={(e) => handleNewCaseFieldChange('status', e.target.value)}
-              >
-                <option value="draft">Rascunho</option>
-                <option value="active">Ativo</option>
-                <option value="review">Em revisão</option>
-              </select>
-
-              <div className="actions-row">
-                <button
-                  className={`btn ${
-                    newCaseLoading ||
-                    !token.trim() ||
-                    !newCaseForm.case_number.trim() ||
-                    !newCaseForm.title.trim()
-                      ? 'btn-muted'
-                      : 'btn-primary'
-                  }`}
-                  type="button"
-                  onClick={handleCreateNewCase}
-                  disabled={
-                    newCaseLoading ||
-                    !token.trim() ||
-                    !newCaseForm.case_number.trim() ||
-                    !newCaseForm.title.trim()
-                  }
-                >
-                  {newCaseLoading ? 'Criando caso...' : 'Cadastrar caso'}
-                </button>
-
-                <button
-                  className="btn btn-secondary"
-                  type="button"
-                  onClick={() => {
-                    setShowNewCaseForm(false)
-                    setNewCaseError('')
-                    setNewCaseSuccess('')
-                  }}
-                >
-                  Cancelar
-                </button>
-              </div>
-
-              {!token.trim() ? (
-                <p className="status-message status-message--warning">
-                  Informe um token válido antes de criar um caso.
-                </p>
-              ) : null}
-
-              {newCaseError ? (
-                <p className="status-message status-message--error">{newCaseError}</p>
-              ) : null}
-
-              {newCaseSuccess ? (
-                <p className="status-message status-message--success">{newCaseSuccess}</p>
-              ) : null}
-            </div>
-          </section>
-        ) : null}
-
-        <section className="metrics-grid metrics-grid--hero">
-          {[
-            ['Casos carregados', String(cases.length), 'metric-card metric-card--highlight', 'metric-value metric-value--gold'],
-            ['Backend', 'Online', 'metric-card', 'metric-value'],
-            ['Modo', loaded ? 'Real' : 'Demo', 'metric-card', 'metric-value'],
-            ['Sessão', token.trim() ? 'Ativa' : 'Pendente', 'metric-card', 'metric-value'],
-          ].map(([label, value, cardClass, valueClass]) => (
-            <article key={label} className={cardClass}>
-              <p className="metric-label">{label}</p>
-              <h2 className={valueClass}>{value}</h2>
-            </article>
-          ))}
-        </section>
+        <DashboardTopPanel
+          showNewCaseForm={showNewCaseForm}
+          onToggleNewCaseForm={() => {
+            setShowNewCaseForm((prev) => !prev)
+            setNewCaseError('')
+            setNewCaseSuccess('')
+          }}
+          onLoadCases={handleLoadCases}
+          loading={loading}
+          token={token}
+          onClearSessionAndGoToLogin={() => {
+            clearSession()
+            navigate('/login')
+          }}
+          error={error}
+          newCaseForm={newCaseForm}
+          onNewCaseFieldChange={handleNewCaseFieldChange}
+          newCaseLoading={newCaseLoading}
+          onCreateNewCase={handleCreateNewCase}
+          onCancelNewCase={() => {
+            setShowNewCaseForm(false)
+            setNewCaseError('')
+            setNewCaseSuccess('')
+          }}
+          newCaseError={newCaseError}
+          newCaseSuccess={newCaseSuccess}
+          casesCount={cases.length}
+          loaded={loaded}
+        />
 
         <ExpansionWorkspace token={token} selectedCaseId={selectedCaseId} />
 
-        <section className="insight-card">
-          <div className="insight-head">
-            <div>
-              <p className="insight-kicker">Diagnóstico técnico</p>
-              <h2 className="insight-title">Resultado da análise jurídica</h2>
-              <p className="insight-description">
-                Retorno analítico da IA para apoiar decisão, estratégia e priorização do caso selecionado.
-              </p>
-            </div>
-            <span className="insight-badge">Leitura técnica em tempo real</span>
-          </div>
-
-          {analysisError ? (
-            <p className="status-message status-message--error">{analysisError}</p>
-          ) : null}
-
-          {!analysisData && !analysisLoading ? (
-            <p className="insight-empty">
-              Clique em “Analisar caso” em um dos cards para carregar o diagnóstico estratégico.
-            </p>
-          ) : null}
-
-          {analysisLoading ? (
-            <p className="insight-empty">Analisando caso selecionado...</p>
-          ) : null}
-
-          {analysisData ? (
-            <div className="content-stack">
-              <article className="info-card">
-                <p className="info-meta">
-                  Caso analisado: {analysisData.case_id} | Análise: {analysisData.analysis_id}
-                </p>
-
-                <p className="info-text">
-                  <strong>Resumo técnico:</strong>{' '}
-                  {analysisData.analysis?.technical?.summary || 'Resumo não disponível.'}
-                </p>
-
-                <p className="info-text">
-                  <strong>Nível de risco:</strong>{' '}
-                  {getRiskLabel(analysisData.analysis?.technical?.risk_level)}
-                </p>
-
-                <div style={{ marginBottom: '12px' }}>
-                  <strong className="info-list-title">Pontos de atenção</strong>
-                  <ul className="info-list">
-                    {(analysisData.analysis?.technical?.issues || []).length > 0 ? (
-                      (analysisData.analysis?.technical?.issues || []).map((item, index) => (
-                        <li key={index}>{item}</li>
-                      ))
-                    ) : (
-                      <li>Nenhum ponto crítico informado.</li>
-                    )}
-                  </ul>
-                </div>
-
+        <section className="cases-layout">
+          <div className="cases-layout__list">
+            <section className="insight-card">
+              <div className="insight-head">
                 <div>
-                  <strong className="info-list-title">Próximos passos</strong>
-                  <ul className="info-list">
-                    {(analysisData.analysis?.technical?.next_steps || []).length > 0 ? (
-                      (analysisData.analysis?.technical?.next_steps || []).map((item, index) => (
-                        <li key={index}>{item}</li>
-                      ))
-                    ) : (
-                      <li>Nenhum próximo passo informado.</li>
-                    )}
-                  </ul>
+                  <p className="insight-kicker">Carteira jurídica</p>
+                  <h2 className="insight-title">Casos do escritório</h2>
+                  <p className="insight-description">
+                    Lista operacional dos casos carregados via API da IA Trabalhista Robusta.
+                  </p>
                 </div>
-              </article>
-            </div>
-          ) : null}
-        </section>
-
-        <section className="insight-card">
-          <div className="insight-head">
-            <div>
-              <p className="insight-kicker">Resumo executivo</p>
-              <h2 className="insight-title">Resumo Executivo</h2>
-              <p className="insight-description">
-                Versão consolidada do caso para leitura rápida, comunicação interna e alinhamento com gestão.
-              </p>
-            </div>
-            <span className="insight-badge">Visão executiva</span>
-          </div>
-
-          {executiveSummaryError ? (
-            <p className="status-message status-message--error">{executiveSummaryError}</p>
-          ) : null}
-
-          {!executiveSummaryData && !executiveSummaryLoading ? (
-            <p className="insight-empty">
-              Clique em “Resumo Executivo” em um dos casos para carregar o resumo executivo.
-            </p>
-          ) : null}
-
-          {executiveSummaryLoading ? (
-            <p className="insight-empty">Carregando resumo executivo...</p>
-          ) : null}
-
-          {executiveSummaryData ? (
-            <article className="info-card">
-              <p className="info-meta">
-                Caso: {executiveSummaryData.case.title} | Nº {executiveSummaryData.case.case_number}
-              </p>
-
-              <p className="info-text">
-                <strong>Status final:</strong>{' '}
-                {executiveSummaryData.executive_decision?.final_status || executiveSummaryData.viability?.label || 'Não informado'}
-              </p>
-
-              <p className="info-text">
-                <strong>Probabilidade estimada:</strong>{' '}
-                {typeof executiveSummaryData.executive_decision?.probability_percent === 'number'
-                  ? `${executiveSummaryData.executive_decision.probability_percent}%`
-                  : typeof executiveSummaryData.viability?.probability === 'number'
-                    ? `${Math.round(executiveSummaryData.viability.probability * 100)}%`
-                    : 'Não informado'}
-              </p>
-
-              <p className="info-text">
-                <strong>Resumo executivo:</strong>{' '}
-                {executiveSummaryData.executive_decision?.executive_summary || executiveSummaryData.technical_analysis?.summary || 'Resumo não disponível.'}
-              </p>
-
-              <p className="info-text">
-                <strong>Recomendação:</strong>{' '}
-                {executiveSummaryData.viability?.recommendation || executiveSummaryData.strategic_analysis?.recommended_strategy || 'Não informada'}
-              </p>
-
-              <div style={{ marginBottom: '12px' }}>
-                <strong className="info-list-title">Indicadores estratégicos</strong>
-                <ul className="info-list">
-                  <li>Risco técnico: {getRiskLabel(executiveSummaryData.technical_analysis?.risk_level)}</li>
-                  <li>Risco financeiro: {executiveSummaryData.strategic_analysis?.financial_risk || 'Não informado'}</li>
-                  <li>Complexidade: {executiveSummaryData.viability?.complexity || executiveSummaryData.strategic_analysis?.complexity || 'Não informada'}</li>
-                  <li>Tempo estimado: {executiveSummaryData.executive_decision?.estimated_time || executiveSummaryData.viability?.estimated_time || 'Não informado'}</li>
-                  <li>
-                    Score:{' '}
-                    {typeof executiveSummaryData.viability?.score === 'number'
-                      ? `${executiveSummaryData.viability.score}/100`
-                      : typeof executiveSummaryData.executive_decision?.score === 'number'
-                        ? `${executiveSummaryData.executive_decision.score}/100`
-                        : 'Não informado'}
-                  </li>
-                </ul>
+                <span className="insight-badge">Base jurídica ativa</span>
               </div>
 
-              <div style={{ marginBottom: '12px' }}>
-                <strong className="info-list-title">Pontos críticos</strong>
-                <ul className="info-list">
-                  {(executiveSummaryData.strategic_analysis?.critical_points || executiveSummaryData.technical_analysis?.issues || []).length > 0 ? (
-                    (executiveSummaryData.strategic_analysis?.critical_points || executiveSummaryData.technical_analysis?.issues || []).map((item, index) => (
-                      <li key={index}>{item}</li>
-                    ))
-                  ) : (
-                    <li>Nenhum ponto crítico informado.</li>
-                  )}
-                </ul>
-              </div>
-
-              <div style={{ marginBottom: '12px' }}>
-                <strong className="info-list-title">Pontos fortes</strong>
-                <ul className="info-list">
-                  {(executiveSummaryData.strategic_analysis?.strong_points || []).length > 0 ? (
-                    (executiveSummaryData.strategic_analysis?.strong_points || []).map((item, index) => (
-                      <li key={index}>{item}</li>
-                    ))
-                  ) : (
-                    <li>Nenhum ponto forte destacado.</li>
-                  )}
-                </ul>
-              </div>
-
-              <div>
-                <strong className="info-list-title">Próximos passos</strong>
-                <ul className="info-list">
-                  {(executiveSummaryData.technical_analysis?.next_steps || []).length > 0 ? (
-                    (executiveSummaryData.technical_analysis?.next_steps || []).map((item, index) => (
-                      <li key={index}>{item}</li>
-                    ))
-                  ) : (
-                    <li>Nenhum próximo passo informado.</li>
-                  )}
-                </ul>
-              </div>
-            </article>
-          ) : null}
-        </section>
-
-        <section className="insight-card">
-          <div className="insight-head">
-            <div>
-              <p className="insight-kicker">Relatório executivo</p>
-              <h2 className="insight-title">Relatório Executivo</h2>
-              <p className="insight-description">
-                Documento executivo para apresentação estruturada, leitura aprofundada e comunicação estratégica.
-              </p>
-            </div>
-            <span className="insight-badge">Relatório analítico</span>
-          </div>
-
-          {executiveReportError ? (
-            <p className="status-message status-message--error">{executiveReportError}</p>
-          ) : null}
-
-          {executivePdfError ? (
-            <p className="status-message status-message--error">{executivePdfError}</p>
-          ) : null}
-
-          {!executiveReportData && !executiveReportLoading ? (
-            <p className="insight-empty">
-              Clique em “Relatório Executivo” em um dos casos para carregar o relatório executivo.
-            </p>
-          ) : null}
-
-          {executiveReportLoading ? (
-            <p className="insight-empty">Carregando relatório executivo...</p>
-          ) : null}
-
-          {executiveReportData ? (
-            <article
-              style={{
-                background: 'linear-gradient(180deg, #0f172a 0%, #0b1220 100%)',
-                border: '1px solid #2a3655',
-                borderRadius: '18px',
-                padding: '20px',
-                boxShadow: '0 10px 30px rgba(0, 0, 0, 0.28)',
-              }}
-            >
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  gap: '12px',
-                  marginBottom: '16px',
-                  flexWrap: 'wrap',
-                }}
-              >
-                <p
-                  style={{
-                    margin: 0,
-                    color: '#cbd5e1',
-                    fontSize: '14px',
-                    fontWeight: 600,
-                    letterSpacing: '0.2px',
-                  }}
-                >
-                  Caso analisado: #{executiveReportData.case_id}
+              {!loaded ? (
+                <p className="insight-empty">
+                  Informe o token e clique em “Conectar API” ou “Atualizar carteira”.
                 </p>
+              ) : null}
 
-                <span className="insight-badge">
-                  Relatório executivo real
-                </span>
-              </div>
+              {loaded && !loading && cases.length === 0 && !error ? (
+                <p className="insight-empty">Nenhum caso encontrado para este token.</p>
+              ) : null}
 
-              <div
-                style={{
-                  background: '#0a0f1c',
-                  border: '1px solid #24304f',
-                  borderRadius: '14px',
-                  padding: '22px',
-                  color: '#dbe4f0',
-                  overflowX: 'auto',
-                  lineHeight: 1.7,
-                  fontSize: '15px',
-                }}
-              >
-                <style>
-                  {`
-                    .executive-report-html,
-                    .executive-report-html * {
-                      color: #cfd9e8 !important;
-                      box-sizing: border-box;
-                    }
-
-                    .executive-report-html {
-                      background: #0a0f1c !important;
-                    }
-
-                    .executive-report-html h1,
-                    .executive-report-html h2,
-                    .executive-report-html h3,
-                    .executive-report-html h4 {
-                      color: #eaf2ff !important;
-                      margin-top: 0;
-                      margin-bottom: 12px;
-                      line-height: 1.25;
-                      background: transparent !important;
-                    }
-
-                    .executive-report-html h1 {
-                      font-size: 28px;
-                      margin-bottom: 18px;
-                      padding-bottom: 10px;
-                      border-bottom: 1px solid #2b456b;
-                    }
-
-                    .executive-report-html h2 {
-                      font-size: 22px;
-                      margin-top: 28px;
-                      padding-left: 12px;
-                      border-left: 4px solid #6fd6b2;
-                    }
-
-                    .executive-report-html h3 {
-                      font-size: 18px;
-                      margin-top: 22px;
-                      color: #cfe1ff !important;
-                    }
-
-                    .executive-report-html p,
-                    .executive-report-html span,
-                    .executive-report-html div,
-                    .executive-report-html li,
-                    .executive-report-html small {
-                      color: #b8c7da !important;
-                      background: transparent !important;
-                    }
-
-                    .executive-report-html p {
-                      margin: 0 0 14px;
-                    }
-
-                    .executive-report-html ul,
-                    .executive-report-html ol {
-                      margin: 0 0 16px 0;
-                      padding-left: 22px;
-                      color: #b8c7da !important;
-                      background: transparent !important;
-                    }
-
-                    .executive-report-html li {
-                      margin-bottom: 8px;
-                    }
-
-                    .executive-report-html strong,
-                    .executive-report-html b {
-                      color: #eaf2ff !important;
-                    }
-
-                    .executive-report-html section,
-                    .executive-report-html article,
-                    .executive-report-html header {
-                      background: transparent !important;
-                    }
-
-                    .executive-report-html table {
-                      width: 100%;
-                      border-collapse: collapse;
-                      margin: 18px 0;
-                      background: #0f172a !important;
-                      border: 1px solid #2b456b;
-                      border-radius: 12px;
-                      overflow: hidden;
-                    }
-
-                    .executive-report-html th,
-                    .executive-report-html td {
-                      border: 1px solid #2b456b;
-                      padding: 12px;
-                      text-align: left;
-                      color: #c7d4e6 !important;
-                      background: #0f172a !important;
-                    }
-
-                    .executive-report-html th {
-                      background: #10203a !important;
-                      color: #eaf2ff !important;
-                      font-weight: 700;
-                    }
-
-                    .executive-report-html tr:nth-child(even) td {
-                      background: #0d1d36 !important;
-                    }
-
-                    .executive-report-html blockquote {
-                      margin: 18px 0;
-                      padding: 14px 16px;
-                      border-left: 4px solid #60a5fa;
-                      background: rgba(96, 165, 250, 0.05) !important;
-                      color: #cfe1ff !important;
-                      border-radius: 10px;
-                    }
-
-                    .executive-report-html hr {
-                      border: none;
-                      border-top: 1px solid #24304f;
-                      margin: 24px 0;
-                    }
-
-                    .executive-report-html code {
-                      background: #111827 !important;
-                      border: 1px solid #2b456b;
-                      color: #f6d979 !important;
-                      padding: 2px 6px;
-                      border-radius: 6px;
-                      font-size: 13px;
-                    }
-
-                    .executive-report-html [style*="background"],
-                    .executive-report-html [style*="background-color"] {
-                      background: transparent !important;
-                    }
-
-                    .executive-report-html [style*="color: white"],
-                    .executive-report-html [style*="color:#fff"],
-                    .executive-report-html [style*="color: #fff"],
-                    .executive-report-html [style*="color:#ffffff"],
-                    .executive-report-html [style*="color: #ffffff"],
-                    .executive-report-html [style*="color: black"],
-                    .executive-report-html [style*="color:#000"],
-                    .executive-report-html [style*="color: #000"],
-                    .executive-report-html [style*="color:#000000"],
-                    .executive-report-html [style*="color: #000000"] {
-                      color: #cfd9e8 !important;
-                    }
-
-                    .executive-report-html > div,
-                    .executive-report-html > section,
-                    .executive-report-html > article {
-                      background: transparent !important;
-                    }
-                  `}
-                </style>
-
-                <div
-                  className="executive-report-html"
-                  dangerouslySetInnerHTML={{ __html: executiveReportData.report_html }}
+              {loaded && cases.length > 0 ? (
+                <CaseFiltersBar
+                  filteredCount={filteredCases.length}
+                  totalCount={cases.length}
+                  caseSearchTerm={caseSearchTerm}
+                  onCaseSearchTermChange={setCaseSearchTerm}
+                  caseStatusFilter={caseStatusFilter}
+                  onCaseStatusFilterChange={setCaseStatusFilter}
+                  onResetFilters={() => {
+                    setCaseSearchTerm('')
+                    setCaseStatusFilter('main')
+                  }}
+                  onCleanupDemo={() => {
+                    void handleCleanupDemo()
+                  }}
+                  cleanupDemoLoading={cleanupDemoLoading}
+                  caseActionError={caseActionError}
+                  caseActionSuccess={caseActionSuccess}
                 />
-              </div>
-            </article>
-          ) : null}
-        </section>
+              ) : null}
 
-        <section className="insight-card">
-          <div className="insight-head">
-            <div>
-              <p className="insight-kicker">Carteira jurídica</p>
-              <h2 className="insight-title">Casos do escritório</h2>
-              <p className="insight-description">
-                Lista operacional dos casos carregados via API da IA Trabalhista Robusta.
-              </p>
-            </div>
-            <span className="insight-badge">Base jurídica ativa</span>
-          </div>
+              {loaded && !loading && cases.length > 0 && filteredCases.length === 0 ? (
+                <p className="insight-empty">Nenhum caso encontrado para os filtros atuais.</p>
+              ) : null}
 
-          {!loaded ? (
-            <p className="insight-empty">
-              Informe o token e clique em “Conectar API” ou “Atualizar carteira”.
-            </p>
-          ) : null}
-
-          {loaded && !loading && cases.length === 0 && !error ? (
-            <p className="insight-empty">Nenhum caso encontrado para este token.</p>
-          ) : null}
-
-          {loaded && cases.length > 0 ? (
-            <div
-              style={{
-                display: 'grid',
-                gap: '12px',
-                marginBottom: '18px',
-              }}
-            >
               <div
                 style={{
                   display: 'grid',
                   gap: '12px',
-                  padding: '14px',
-                  borderRadius: '16px',
-                  border: '1px solid rgba(212, 175, 55, 0.14)',
-                  background: 'linear-gradient(180deg, rgba(16,24,39,0.82) 0%, rgba(15,23,42,0.96) 100%)',
-                  boxShadow: '0 16px 36px rgba(0,0,0,0.18)',
                 }}
               >
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    gap: '12px',
-                    alignItems: 'center',
-                    flexWrap: 'wrap',
-                  }}
-                >
-                  <div>
-                    <p
-                      style={{
-                        margin: '0 0 4px',
-                        color: '#f3c969',
-                        fontSize: '12px',
-                        fontWeight: 800,
-                        letterSpacing: '0.08em',
-                        textTransform: 'uppercase',
+                {filteredCases.map((caso) => {
+                  const isArchiving = caseActionLoadingId === caso.id
+                  const isAnalyzing = analysisLoading && selectedCaseId === caso.id
+                  const isLoadingSummary = executiveSummaryLoading && selectedCaseId === caso.id
+                  const isLoadingReport = executiveReportLoading && selectedCaseId === caso.id
+                  const isLoadingPdf = executivePdfLoading && selectedCaseId === caso.id
+
+                  return (
+                    <CaseCard
+                      key={caso.id}
+                      caso={caso}
+                      selectedCaseId={selectedCaseId}
+                      getStatusLabel={getStatusLabel}
+                      isArchiving={isArchiving}
+                      isAnalyzing={isAnalyzing}
+                      isLoadingSummary={isLoadingSummary}
+                      isLoadingReport={isLoadingReport}
+                      isLoadingPdf={isLoadingPdf}
+                      analysisLoading={analysisLoading}
+                      executiveSummaryLoading={executiveSummaryLoading}
+                      executiveReportLoading={executiveReportLoading}
+                      executivePdfLoading={executivePdfLoading}
+                      onArchive={(caseId) => {
+                        void handleArchiveCase(caseId)
                       }}
-                    >
-                      Filtros da carteira
-                    </p>
-
-                    <p
-                      style={{
-                        margin: 0,
-                        color: '#9fb0cc',
-                        fontSize: '13px',
-                      }}
-                    >
-                      Exibindo {filteredCases.length} de {cases.length} caso(s) carregado(s).
-                    </p>
-                  </div>
-
-                  <span
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      borderRadius: '999px',
-                      padding: '7px 12px',
-                      background: 'rgba(27,39,64,0.95)',
-                      border: '1px solid rgba(212,175,55,0.18)',
-                      color: '#d7e1f0',
-                      fontSize: '12px',
-                      fontWeight: 700,
-                    }}
-                  >
-                    Base operacional ativa
-                  </span>
-                </div>
-
-                <div
-                  style={{
-                    display: 'flex',
-                    gap: '12px',
-                    flexWrap: 'wrap',
-                    alignItems: 'center',
-                  }}
-                >
-                  <input
-                    className="form-control"
-                    style={{
-                      maxWidth: '320px',
-                      background: '#0f1a2e',
-                      border: '1px solid #2a395a',
-                      color: '#e5edf8',
-                    }}
-                    value={caseSearchTerm}
-                    onChange={(e) => setCaseSearchTerm(e.target.value)}
-                    placeholder="Buscar por número ou título"
-                  />
-
-                  <select
-                    className="form-control"
-                    style={{
-                      maxWidth: '220px',
-                      background: '#0f1a2e',
-                      border: '1px solid #2a395a',
-                      color: '#e5edf8',
-                    }}
-                    value={caseStatusFilter}
-                    onChange={(e) => setCaseStatusFilter(e.target.value)}
-                  >
-                    <option value="main">Carteira principal</option>
-                    <option value="all">Todos os status</option>
-                    <option value="draft">Rascunhos</option>
-                    <option value="active">Ativos</option>
-                    <option value="review">Em revisão</option>
-                    <option value="archived">Arquivados</option>
-                  </select>
-
-                  <button
-                    className="btn btn-ghost"
-                    type="button"
-                    style={{
-                      borderColor: '#32435f',
-                      color: '#d8e2f0',
-                      background: '#162033',
-                    }}
-                    onClick={() => {
-                      setCaseSearchTerm('')
-                      setCaseStatusFilter('main')
-                    }}
-                  >
-                    Limpar filtros
-                  </button>
-
-                  <button
-                    className="btn btn-ghost"
-                    type="button"
-                    style={{
-                      borderColor: 'rgba(212,175,55,0.22)',
-                      color: cleanupDemoLoading ? '#9aa7bb' : '#f3c969',
-                      background: cleanupDemoLoading ? '#1a2332' : '#182235',
-                    }}
-                    onClick={() => void handleCleanupDemo()}
-                    disabled={cleanupDemoLoading}
-                  >
-                    {cleanupDemoLoading ? 'Limpando demonstração...' : 'Limpar demonstração'}
-                  </button>
-                </div>
-
-                {caseActionError ? (
-                  <p
-                    className="status-message status-message--error"
-                    style={{
-                      margin: 0,
-                      borderRadius: '12px',
-                    }}
-                  >
-                    {caseActionError}
-                  </p>
-                ) : null}
-
-                {caseActionSuccess ? (
-                  <p
-                    className="status-message status-message--success"
-                    style={{
-                      margin: 0,
-                      borderRadius: '12px',
-                    }}
-                  >
-                    {caseActionSuccess}
-                  </p>
-                ) : null}
+                      onAnalyze={handleAnalyzeCase}
+                      onLoadExecutiveSummary={handleLoadExecutiveSummary}
+                      onLoadExecutiveReport={handleLoadExecutiveReport}
+                      onOpenExecutivePdf={handleOpenExecutivePdf}
+                    />
+                  )
+                })}
               </div>
-            </div>
-          ) : null}
+            </section>
+          </div>
 
-          {loaded && !loading && cases.length > 0 && filteredCases.length === 0 ? (
-            <p className="insight-empty">Nenhum caso encontrado para os filtros atuais.</p>
-          ) : null}
-
-          <div
-            style={{
-              display: 'grid',
-              gap: '12px',
-            }}
-          >
-            {filteredCases.map((caso) => {
-              const isArchiving = caseActionLoadingId === caso.id
-              const isAnalyzing = analysisLoading && selectedCaseId === caso.id
-              const isLoadingSummary = executiveSummaryLoading && selectedCaseId === caso.id
-              const isLoadingReport = executiveReportLoading && selectedCaseId === caso.id
-              const isLoadingPdf = executivePdfLoading && selectedCaseId === caso.id
-
-              return (
-                <article
-                  key={caso.id}
-                  style={{
-                    background:
-                      selectedCaseId === caso.id
-                        ? 'linear-gradient(180deg, rgba(20,33,61,0.96) 0%, rgba(12,23,45,0.98) 100%)'
-                        : '#0f172a',
-                    border: selectedCaseId === caso.id ? '1px solid #d4af37' : '1px solid #24304f',
-                    borderRadius: '16px',
-                    padding: '18px 18px 16px',
-                    boxShadow:
-                      selectedCaseId === caso.id
-                        ? '0 0 0 1px rgba(212,175,55,0.12), 0 18px 40px rgba(0,0,0,0.24)'
-                        : '0 10px 24px rgba(0,0,0,0.18)',
-                  }}
-                >
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      gap: '12px',
-                      alignItems: 'flex-start',
-                      flexWrap: 'wrap',
-                      marginBottom: '10px',
-                    }}
-                  >
-                    <div style={{ minWidth: 0, flex: '1 1 480px' }}>
-                      <strong
-                        style={{
-                          display: 'block',
-                          marginBottom: '6px',
-                          fontSize: '20px',
-                          lineHeight: 1.2,
-                          color: '#f8fafc',
-                        }}
-                      >
-                        {caso.title}
-                      </strong>
-
-                      <p
-                        style={{
-                          margin: '0 0 10px',
-                          color: '#f3c969',
-                          fontSize: '13px',
-                          fontWeight: 800,
-                          letterSpacing: '0.08em',
-                          textTransform: 'uppercase',
-                        }}
-                      >
-                        {caso.case_number}
-                      </p>
-
-                      <p
-                        style={{
-                          margin: 0,
-                          color: '#d6deeb',
-                          fontSize: '14px',
-                          lineHeight: 1.55,
-                          maxWidth: '920px',
-                        }}
-                      >
-                        {caso.description}
-                      </p>
-                    </div>
-
-                    <span
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        background: '#1b2740',
-                        color: '#f3c969',
-                        border: '1px solid rgba(212,175,55,0.28)',
-                        borderRadius: '999px',
-                        padding: '7px 12px',
-                        fontSize: '12px',
-                        fontWeight: 700,
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      {getStatusLabel(caso.status)}
-                    </span>
-                  </div>
-
-                  <div
-                    style={{
-                      display: 'flex',
-                      gap: '14px',
-                      flexWrap: 'wrap',
-                      alignItems: 'center',
-                      marginBottom: '14px',
-                      paddingTop: '10px',
-                      borderTop: '1px solid rgba(212,175,55,0.12)',
-                    }}
-                  >
-                    <span style={{ color: '#93a4c3', fontSize: '12px' }}>
-                      <strong style={{ color: '#cdd8ea' }}>ID:</strong> {caso.id}
-                    </span>
-
-                    <span style={{ color: '#93a4c3', fontSize: '12px' }}>
-                      <strong style={{ color: '#cdd8ea' }}>Tenant:</strong> {caso.tenant_id}
-                    </span>
-
-                    {selectedCaseId === caso.id ? (
-                      <span
-                        style={{
-                          color: '#f3c969',
-                          fontSize: '12px',
-                          fontWeight: 700,
-                          letterSpacing: '0.02em',
-                        }}
-                      >
-                        Caso em foco
-                      </span>
-                    ) : null}
-                  </div>
-
-                  <div
-                    style={{
-                      display: 'flex',
-                      gap: '10px',
-                      flexWrap: 'wrap',
-                      alignItems: 'center',
-                    }}
-                  >
-                    {caso.status !== 'archived' ? (
-                      <button
-                        type="button"
-                        onClick={() => void handleArchiveCase(caso.id)}
-                        disabled={isArchiving}
-                        style={{
-                          background: isArchiving ? '#4b5565' : '#182235',
-                          color: '#f3c969',
-                          border: '1px solid rgba(212,175,55,0.28)',
-                          borderRadius: '10px',
-                          padding: '9px 14px',
-                          fontWeight: 700,
-                          cursor: isArchiving ? 'not-allowed' : 'pointer',
-                          opacity: 0.92,
-                        }}
-                      >
-                        {isArchiving ? 'Arquivando...' : 'Arquivar'}
-                      </button>
-                    ) : null}
-
-                    <button
-                      type="button"
-                      onClick={() => handleAnalyzeCase(caso.id)}
-                      disabled={analysisLoading}
-                      style={{
-                        background: isAnalyzing ? '#4b5565' : '#d4af37',
-                        color: '#111827',
-                        border: 'none',
-                        borderRadius: '10px',
-                        padding: '9px 14px',
-                        fontWeight: 800,
-                        cursor: analysisLoading ? 'not-allowed' : 'pointer',
-                        boxShadow: isAnalyzing ? 'none' : '0 12px 28px rgba(212,175,55,0.28)',
-                        transform: 'translateY(0)',
-                      }}
-                    >
-                      {isAnalyzing ? 'Analisando...' : 'Analisar caso'}
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => handleLoadExecutiveSummary(caso.id)}
-                      disabled={executiveSummaryLoading}
-                      style={{
-                        background: isLoadingSummary ? '#4b5565' : '#13233f',
-                        color: '#cfe0ff',
-                        border: '1px solid rgba(125,211,252,0.22)',
-                        borderRadius: '10px',
-                        padding: '9px 14px',
-                        fontWeight: 700,
-                        cursor: executiveSummaryLoading ? 'not-allowed' : 'pointer',
-                        opacity: 0.92,
-                      }}
-                    >
-                      {isLoadingSummary ? 'Carregando resumo...' : 'Resumo Executivo'}
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => handleLoadExecutiveReport(caso.id)}
-                      disabled={executiveReportLoading}
-                      style={{
-                        background: isLoadingReport ? '#4b5565' : '#132a22',
-                        color: '#c9f7da',
-                        border: '1px solid rgba(134,239,172,0.22)',
-                        borderRadius: '10px',
-                        padding: '9px 14px',
-                        fontWeight: 700,
-                        cursor: executiveReportLoading ? 'not-allowed' : 'pointer',
-                        opacity: 0.92,
-                      }}
-                    >
-                      {isLoadingReport ? 'Carregando relatório...' : 'Relatório Executivo'}
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => handleOpenExecutivePdf(caso.id)}
-                      disabled={executivePdfLoading}
-                      style={{
-                        background: isLoadingPdf ? '#4b5565' : '#2a1720',
-                        color: '#ffd5de',
-                        border: '1px solid rgba(252,165,165,0.22)',
-                        borderRadius: '10px',
-                        padding: '9px 14px',
-                        fontWeight: 700,
-                        cursor: executivePdfLoading ? 'not-allowed' : 'pointer',
-                        opacity: 0.92,
-                      }}
-                    >
-                      {isLoadingPdf ? 'Abrindo PDF...' : 'PDF Executivo'}
-                    </button>
-                  </div>
-                </article>
-              )
-            })}
+          <div className="cases-layout__focus">
+            <CaseFocusPanel
+              selectedCaseId={selectedCaseId}
+              activeTab={activeFocusTab}
+              onTabChange={setActiveFocusTab}
+              analysisData={analysisData}
+              analysisLoading={analysisLoading}
+              analysisError={analysisError}
+              executiveSummaryData={executiveSummaryData}
+              executiveSummaryLoading={executiveSummaryLoading}
+              executiveSummaryError={executiveSummaryError}
+              executiveReportData={executiveReportData}
+              executiveReportLoading={executiveReportLoading}
+              executiveReportError={executiveReportError}
+              executivePdfError={executivePdfError}
+              getRiskLabel={getRiskLabel}
+            />
           </div>
         </section>
       </section>
     </main>
   )
 }
-
 export default App
