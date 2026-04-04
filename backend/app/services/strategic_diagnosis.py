@@ -11,6 +11,34 @@ def _normalize_text(value) -> str:
     return str(value).lower()
 
 
+def _normalize_issue_list(values) -> list[str]:
+    if not values:
+        return []
+    if isinstance(values, list):
+        return [str(item).lower() for item in values]
+    return [str(values).lower()]
+
+
+def _has_substantive_issue_term(issues, term: str) -> bool:
+    blocked_context_terms = [
+        "consequências processuais",
+        "condenação futura",
+        "liquidação",
+        "cálculos",
+        "quantificação",
+        "reflexos",
+        "honorários",
+        "custas",
+    ]
+    for issue in _normalize_issue_list(issues):
+        if term not in issue:
+            continue
+        if any(blocked in issue for blocked in blocked_context_terms):
+            continue
+        return True
+    return False
+
+
 def strategic_diagnosis(analysis: Dict) -> Dict:
     """
     Camada estratégica premium.
@@ -29,10 +57,14 @@ def strategic_diagnosis(analysis: Dict) -> Dict:
     next_steps = analysis.get("next_steps", []) or []
     risk_level = str(analysis.get("risk_level", "medium")).lower()
 
+    summary_text = _normalize_text(summary)
+    issues_text = _normalize_text(issues)
+    next_steps_text = _normalize_text(next_steps)
+
     combined = " ".join([
-        _normalize_text(summary),
-        _normalize_text(issues),
-        _normalize_text(next_steps),
+        summary_text,
+        issues_text,
+        next_steps_text,
     ])
 
     strong_legal_terms = [
@@ -83,7 +115,26 @@ def strategic_diagnosis(analysis: Dict) -> Dict:
         "pagamento imediato",
     ]
 
-    legal_strength = sum(1 for term in strong_legal_terms if term in combined)
+    context_sensitive_terms = {
+        "fgts",
+        "verbas rescisórias",
+        "dispensado sem justa causa",
+        "multa de 40%",
+        "multa do art. 477",
+        "aviso prévio",
+        "13º proporcional",
+        "férias proporcionais",
+        "créditos trabalhistas",
+    }
+
+    legal_strength = 0
+    for term in strong_legal_terms:
+        if term in context_sensitive_terms:
+            if _has_substantive_issue_term(issues, term):
+                legal_strength += 1
+        elif term in issues_text:
+            legal_strength += 1
+
     proof_gaps = sum(1 for term in proof_gap_terms if term in combined)
     process_risk_hits = sum(1 for term in process_risk_terms if term in combined)
     negotiation_hits = sum(1 for term in negotiation_terms if term in combined)
@@ -110,11 +161,11 @@ def strategic_diagnosis(analysis: Dict) -> Dict:
     strong_points = []
     if legal_strength >= 1:
         strong_points.append("Há indícios jurídicos concretos de pretensão material relevante")
-    if "fgts" in combined:
+    if _has_substantive_issue_term(issues, "fgts"):
         strong_points.append("O eixo de FGTS aparece como frente objetiva de cobrança e recomposição")
-    if "verbas rescisórias" in combined:
+    if _has_substantive_issue_term(issues, "verbas rescisórias"):
         strong_points.append("A discussão de verbas rescisórias tende a favorecer abordagem de cobrança estruturada")
-    if "dispensado sem justa causa" in combined:
+    if _has_substantive_issue_term(issues, "dispensado sem justa causa"):
         strong_points.append("A narrativa de dispensa sem justa causa fortalece a coerência dos pedidos rescisórios")
     if not strong_points:
         strong_points.append("Há necessidade de consolidação técnica dos fundamentos antes da tomada de decisão")

@@ -11,6 +11,36 @@ def _normalize_text(value) -> str:
     return str(value).lower()
 
 
+def _normalize_issue_list(values) -> list[str]:
+    if not values:
+        return []
+    if isinstance(values, list):
+        return [str(item).lower() for item in values]
+    return [str(values).lower()]
+
+
+def _has_substantive_issue_term(issues, term: str) -> bool:
+    blocked_context_terms = [
+        "liquidação",
+        "cálculos",
+        "quantificação",
+        "reflexos",
+        "honorários",
+        "custas",
+        "eventual procedência",
+        "eventual reforma",
+        "necessidade de cálculos",
+        "apuração quantitativa",
+    ]
+    for issue in _normalize_issue_list(issues):
+        if term not in issue:
+            continue
+        if any(blocked in issue for blocked in blocked_context_terms):
+            continue
+        return True
+    return False
+
+
 def calculate_viability(analysis: Dict) -> Dict:
     """
     Motor premium de viabilidade processual.
@@ -29,10 +59,14 @@ def calculate_viability(analysis: Dict) -> Dict:
     next_steps = analysis.get("next_steps", []) or []
     risk_level = str(analysis.get("risk_level", "medium")).lower()
 
+    summary_text = _normalize_text(summary)
+    issues_text = _normalize_text(issues)
+    next_steps_text = _normalize_text(next_steps)
+
     combined = " ".join([
-        _normalize_text(summary),
-        _normalize_text(issues),
-        _normalize_text(next_steps),
+        summary_text,
+        issues_text,
+        next_steps_text,
     ])
 
     # 1) Força jurídica do direito material
@@ -53,7 +87,27 @@ def calculate_viability(analysis: Dict) -> Dict:
         "créditos trabalhistas",
         "direito às verbas rescisórias",
     ]
-    legal_strength = sum(1 for term in legal_terms if term in combined)
+    context_sensitive_terms = {
+        "fgts",
+        "verbas rescisórias",
+        "dispensado sem justa causa",
+        "multa de 40%",
+        "saldo de salário",
+        "13º proporcional",
+        "férias proporcionais",
+        "aviso prévio",
+        "multa rescisória",
+        "créditos trabalhistas",
+        "direito às verbas rescisórias",
+    }
+
+    legal_strength = 0
+    for term in legal_terms:
+        if term in context_sensitive_terms:
+            if _has_substantive_issue_term(issues, term):
+                legal_strength += 1
+        elif term in issues_text:
+            legal_strength += 1
 
     # 2) Maturidade probatória
     evidence_terms = [
