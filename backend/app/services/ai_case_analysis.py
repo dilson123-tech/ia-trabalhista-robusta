@@ -6,6 +6,71 @@ from app.core.settings import settings
 from app.services.llm_client import LLMClientError, request_structured_analysis
 
 
+def _combined_analysis_text(summary: str, issues: list[str], next_steps: list[str]) -> str:
+    return " ".join([summary, *issues, *next_steps]).lower()
+
+
+def _coerce_risk_level(summary: str, issues: list[str], next_steps: list[str], risk_level: str) -> str:
+    combined = _combined_analysis_text(summary, issues, next_steps)
+
+    high_fragility_terms = [
+        "ausência de prova documental",
+        "falta de prova documental",
+        "fragilidade probatória",
+        "ônus da prova não cumprido",
+        "ônus da prova nao cumprido",
+        "sentença de improcedência baseada na ausência de prova",
+        "sentenca de improcedencia baseada na ausencia de prova",
+        "improcedência por ausência de prova",
+        "improcedencia por ausencia de prova",
+        "ausência de testemunhas",
+        "ausencia de testemunhas",
+        "falta de datas",
+        "faltam datas",
+        "não há datas",
+        "nao ha datas",
+        "não há valores detalhados",
+        "nao ha valores detalhados",
+        "impossibilidade de fundamentar reflexos",
+        "dependência probatória",
+        "dependencia probatoria",
+    ]
+
+    medium_fragility_terms = [
+        "risco prescricional",
+        "prescrição",
+        "prescricao",
+        "impossibilidade de cálculo",
+        "impossibilidade de calculo",
+        "impede apuração",
+        "impede apuracao",
+        "impede cálculo",
+        "impede calculo",
+        "sem documentos",
+        "sem testemunhas",
+        "prova testemunhal",
+        "produção de prova",
+        "producao de prova",
+        "liquidação",
+        "liquidacao",
+    ]
+
+    high_hits = sum(1 for term in high_fragility_terms if term in combined)
+    medium_hits = sum(1 for term in medium_fragility_terms if term in combined)
+
+    if risk_level == "low":
+        if high_hits >= 3:
+            return "high"
+        if high_hits >= 2 or medium_hits >= 2:
+            return "medium"
+
+    if risk_level == "medium":
+        if high_hits >= 4 or (high_hits >= 2 and medium_hits >= 3):
+            return "high"
+
+    return risk_level
+
+
 def _fallback_analysis(case_number: str, title: str, description: str | None) -> dict[str, Any]:
     text = f"{title} {description or ''}".lower()
 
@@ -110,9 +175,16 @@ def _normalize_analysis(payload: dict[str, Any], case_number: str) -> dict[str, 
     if len(normalized_steps) < 2:
         raise LLMClientError("next_steps insuficiente retornado pelo modelo")
 
+    coerced_risk_level = _coerce_risk_level(
+        summary=summary,
+        issues=normalized_issues,
+        next_steps=normalized_steps,
+        risk_level=risk_level,
+    )
+
     return {
         "summary": summary,
-        "risk_level": risk_level,
+        "risk_level": coerced_risk_level,
         "issues": normalized_issues,
         "next_steps": normalized_steps,
         "analysis_source": "llm",
