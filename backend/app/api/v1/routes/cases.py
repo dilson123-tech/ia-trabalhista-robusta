@@ -342,23 +342,21 @@ def generate_case_report(
     db: Session = Depends(get_db),
     current_user = Depends(require_auth),
 ):
-    # Busca case respeitando tenant
     case = scoped_query(db, Case, current_user).filter(Case.id == case_id).first()
     if not case:
         raise HTTPException(status_code=404, detail="Case not found")
 
-    # Busca análise salva
-    analysis_record = (
-        db.query(CaseAnalysis)
-        .filter(
-            CaseAnalysis.case_id == case.id,
-            CaseAnalysis.tenant_id == current_user["tenant_id"],
-        )
-        .first()
+    analysis_record = _get_or_create_case_analysis_record(
+        db=db,
+        case=case,
+        current_user=current_user,
     )
 
-    if not analysis_record:
-        raise HTTPException(status_code=404, detail="Analysis not found")
+    full_analysis = analysis_record.analysis or {}
+    executive_data = analysis_record.executive_data or {}
+
+    technical = full_analysis.get("technical", {})
+    viability = executive_data.get("viability") or full_analysis.get("viability", {})
 
     html = generate_report_html(
         case={
@@ -366,8 +364,8 @@ def generate_case_report(
             "title": case.title,
             "description": case.description,
         },
-        analysis=analysis_record.analysis,
-        viability=calculate_viability(analysis_record.analysis),
+        analysis=technical,
+        viability=viability,
     )
 
     return {"report_html": html}
