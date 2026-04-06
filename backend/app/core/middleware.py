@@ -33,20 +33,20 @@ def _get_excludes() -> set[str]:
         return set(s.strip() for s in val.split(",") if s.strip())
     return set(_DEFAULT_EXCLUDE)
 
-def _extract_identity(request: Request) -> Tuple[str, str]:
+def _extract_identity(request: Request) -> Tuple[str, str, int | None]:
     auth = request.headers.get("authorization") or request.headers.get("Authorization") or ""
     if not auth.lower().startswith("bearer "):
-        return "", ""
+        return "", "", None
     token = auth.split(" ", 1)[1].strip()
     if not token:
-        return "", ""
+        return "", "", None
 
     # tenta decodificar JWT (se PyJWT estiver instalado e tiver secret)
     try:
         import jwt  # type: ignore
         secret = getattr(settings, "JWT_SECRET", "") or getattr(settings, "AUTH_JWT_SECRET", "")
         if not secret:
-            return "", ""
+            return "", "", None
         payload = jwt.decode(
             token,
             secret,
@@ -55,9 +55,14 @@ def _extract_identity(request: Request) -> Tuple[str, str]:
         )
         sub = payload.get("sub") or ""
         role = payload.get("role") or ""
-        return str(sub), str(role)
+        tenant_id = payload.get("tenant_id")
+        try:
+            tenant_id = int(tenant_id) if tenant_id is not None else None
+        except (TypeError, ValueError):
+            tenant_id = None
+        return str(sub), str(role), tenant_id
     except Exception:
-        return "", ""
+        return "", "", None
 
 def _write_audit(
     request_id: str,
@@ -66,12 +71,17 @@ def _write_audit(
     status_code: int,
     username: str,
     role: str,
+    tenant_id: int | None,
     process_time_ms: float,
 ) -> None:
+    if tenant_id is None:
+        return
+
     db = SessionLocal()
     try:
         db.add(
             AuditLog(
+                tenant_id=tenant_id,
                 request_id=request_id,
                 method=method,
                 path=path,
@@ -118,7 +128,7 @@ class RequestAuditMiddleware(BaseHTTPMiddleware):
 
             # audit best-effort
             if path not in excludes:
-                username, role = _extract_identity(request)
+                username, role, tenant_id = _extract_identity(request)
                 await anyio.to_thread.run_sync(
                     _write_audit,
                     request_id,
@@ -127,6 +137,7 @@ class RequestAuditMiddleware(BaseHTTPMiddleware):
                     int(status_code),
                     username,
                     role,
+                    tenant_id,
                     float(elapsed_ms),
                 )
 
