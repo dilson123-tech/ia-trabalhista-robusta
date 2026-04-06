@@ -325,7 +325,7 @@ def analyze_case_endpoint(
         "case_id": case.id,
         "analysis_id": record.id,
         "analysis": record.analysis,
-        "viability": viability,
+        "source": "fresh",
     }
 
 

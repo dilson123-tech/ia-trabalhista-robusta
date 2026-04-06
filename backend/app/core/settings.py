@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     LLM_PROVIDER: str = "openai"
     LLM_API_KEY: str = ""
     LLM_MODEL: str = "gpt-5-mini"
-    LLM_TIMEOUT_SECONDS: int = 45
+    LLM_TIMEOUT_SECONDS: int = 90
     LLM_ANALYSIS_ENABLED: bool = False
     LLM_BASE_URL: str | None = None
 

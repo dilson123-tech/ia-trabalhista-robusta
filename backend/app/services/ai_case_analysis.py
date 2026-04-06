@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+from datetime import date
+import logging
 from typing import Any
 
 from app.core.settings import settings
 from app.services.llm_client import LLMClientError, request_structured_analysis
+
+logger = logging.getLogger(__name__)
 
 
 def _combined_analysis_text(summary: str, issues: list[str], next_steps: list[str]) -> str:
@@ -114,39 +118,44 @@ def _fallback_analysis(case_number: str, title: str, description: str | None) ->
 
 
 def _build_prompt(case_number: str, title: str, description: str | None) -> str:
+    today = date.today().isoformat()
     return f"""
-Você é um advogado trabalhista sênior no Brasil, especializado em análise estratégica pré-processual e processual.
+  Você é um advogado trabalhista sênior no Brasil, especializado em análise estratégica pré-processual e processual.
 
-Analise o caso abaixo com rigor técnico. Use apenas os fatos fornecidos. Não invente fatos.
-Se houver falta de informação, deixe isso claro no resumo, nos pontos relevantes e nos próximos passos.
+  Analise o caso abaixo com rigor técnico. Use apenas os fatos fornecidos. Não invente fatos.
+  Se houver falta de informação, deixe isso claro no resumo, nos pontos relevantes e nos próximos passos.
+  Considere como data atual da análise: {today}.
 
-CASO:
-- Número/identificador: {case_number}
-- Título: {title}
-- Descrição: {description or "Sem descrição fornecida."}
+  CASO:
+  - Número/identificador: {case_number}
+  - Título: {title}
+  - Descrição: {description or "Sem descrição fornecida."}
 
-Retorne exclusivamente um JSON válido, sem markdown, sem comentários e sem texto fora do JSON.
+  Retorne exclusivamente um JSON válido, sem markdown, sem comentários e sem texto fora do JSON.
 
-Formato obrigatório:
-{{
-  "summary": "resumo técnico objetivo em português",
-  "risk_level": "low|medium|high",
-  "issues": ["lista objetiva de pontos jurídicos relevantes"],
-  "next_steps": ["lista objetiva de próximos passos recomendados"]
-}}
+  Formato obrigatório:
+  {{
+    "summary": "resumo técnico objetivo em português",
+    "risk_level": "low|medium|high",
+    "issues": ["lista objetiva de pontos jurídicos relevantes"],
+    "next_steps": ["lista objetiva de próximos passos recomendados"]
+  }}
 
-Regras obrigatórias:
-- "risk_level" deve ser exatamente "low", "medium" ou "high".
-- "issues" deve ter de 2 a 6 itens.
-- "next_steps" deve ter de 2 a 5 itens.
-- O conteúdo deve variar conforme os fatos do caso.
-- O resumo deve indicar, quando cabível, se há direito material aparentemente forte, dependência probatória, risco prescricional ou necessidade de cálculo.
-- Não usar linguagem vaga como "pode haver algo" sem explicar o motivo técnico.
-- Não inventar documentos, datas, testemunhas ou fatos não descritos.
-- Quando a narrativa indicar verbas rescisórias, FGTS, aviso prévio, 13º, férias ou multa, tratar isso com precisão jurídica.
-- Quando faltarem datas, documentos ou valores, isso deve aparecer como limitação objetiva da análise.
-""".strip()
-
+  Regras obrigatórias:
+  - "risk_level" deve ser exatamente "low", "medium" ou "high".
+  - "issues" deve ter de 2 a 6 itens.
+  - "next_steps" deve ter de 2 a 5 itens.
+  - O conteúdo deve variar conforme os fatos do caso.
+  - O resumo deve indicar, quando cabível, se há direito material aparentemente forte, dependência probatória, risco prescricional ou necessidade de cálculo.
+  - Não usar linguagem vaga como "pode haver algo" sem explicar o motivo técnico.
+  - Não inventar documentos, datas, testemunhas ou fatos não descritos.
+  - Quando a narrativa indicar verbas rescisórias, FGTS, aviso prévio, 13º, férias ou multa, tratar isso com precisão jurídica.
+  - Quando faltarem datas, documentos ou valores, isso deve aparecer como limitação objetiva da análise.
+  - Se a própria narrativa permitir calcular que um prazo relevante já expirou em relação à data atual da análise, deixe isso explícito como fato ou risco jurídico atual, e não como recomendação prospectiva para agir antes de uma data já vencida.
+  - Não sugerir "ajuizar até" ou "propor antes de" uma data que já esteja no passado em relação à data atual da análise.
+  - Em casos trabalhistas, diferenciar corretamente prescrição de decadência; não usar "decadência" quando o tema jurídico aplicável for prescrição bienal.
+  - Quando o prazo bienal trabalhista já tiver aparentemente transcorrido e não houver informação de ajuizamento prévio ou causa interruptiva/suspensiva, registrar expressamente a possibilidade concreta de prescrição consumada, preservando a ressalva sobre fatos ausentes.
+  """.strip()
 
 def _normalize_analysis(payload: dict[str, Any], case_number: str) -> dict[str, Any]:
     summary = str(payload.get("summary") or "").strip()
@@ -203,5 +212,6 @@ def analyze_case(case_number: str, title: str, description: str | None) -> dict[
     try:
         payload = request_structured_analysis(prompt)
         return _normalize_analysis(payload, case_number=case_number)
-    except Exception:
+    except Exception as exc:
+        logger.exception("ai_case_analysis fallback acionado para case_number=%s: %s", case_number, exc)
         return _fallback_analysis(case_number=case_number, title=title, description=description)
