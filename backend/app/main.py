@@ -9,7 +9,6 @@ import time
 from app.core.middleware import install_middleware
 from app.core.settings import settings
 from app.core.logging import setup_logging
-from app.core.middleware import RequestContextMiddleware
 from app.api.v1.router import api_router
 
 setup_logging(settings.LOG_LEVEL)
@@ -82,7 +81,6 @@ async def admin_audit_middleware(request: Request, call_next):
             rid,
         )
 
-app.add_middleware(RequestContextMiddleware)
 
 # health “raiz” (ops rápido)
 @app.get("/health", tags=["ops"])
