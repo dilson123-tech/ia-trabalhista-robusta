@@ -357,6 +357,7 @@ def generate_case_report(
 
     technical = full_analysis.get("technical", {})
     viability = executive_data.get("viability") or full_analysis.get("viability", {})
+    decision = executive_data.get("decision") or full_analysis.get("decision", {})
 
     html = generate_report_html(
         case={
@@ -366,6 +367,7 @@ def generate_case_report(
         },
         analysis=technical,
         viability=viability,
+        executive_decision=decision,
     )
 
     return {"report_html": html}
