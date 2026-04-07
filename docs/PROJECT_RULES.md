@@ -18,3 +18,24 @@ IA ajuda a organizar e rascunhar; advogado revisa e assina.
 - Rotas críticas com smoke tests.
 - Erros retornam JSON e geram log com request_id.
 - Controle de acesso (RBAC) consistente.
+
+## Semântica oficial do campo `source` em `parties_succession_service`
+
+### Regra oficial
+O comportamento atual do campo `source` no fluxo de `case_party_states` / `parties_succession_service` é considerado **contrato arquitetural válido** e **não caracteriza bug funcional**.
+
+### Interpretação por camada
+1. **Metadata persistida do vínculo**
+   - representa a origem do dado enviado no payload ou da operação persistida
+
+2. **Eventos e snapshots**
+   - representam a origem da camada de domínio/processamento
+   - portanto, `source = "parties_succession_service"` em events e snapshots é comportamento intencional
+
+### Decisão operacional
+- não reabrir backend estável por cosmética semântica
+- não tratar essa diferença de significado como regressão funcional
+- qualquer redesign futuro de nomenclatura/contrato deve ser tratado em microciclo separado, com decisão explícita de arquitetura
+
+### Status
+Regra documentada para encerramento da auditoria final do bloco backend de `case_party_states`.
