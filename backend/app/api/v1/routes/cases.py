@@ -493,15 +493,32 @@ def generate_executive_pdf_route(
     executive_data = analysis.executive_data if analysis else {}
     decision_data = executive_data.get("decision", {}) if isinstance(executive_data, dict) else {}
     strategic_data = executive_data.get("strategic", {}) if isinstance(executive_data, dict) else {}
+    viability_data = executive_data.get("viability", {}) if isinstance(executive_data, dict) else {}
+
+    insufficient_payload = (
+        isinstance(viability_data, dict)
+        and isinstance(decision_data, dict)
+        and isinstance(strategic_data, dict)
+        and (viability_data.get("dimensions") or {}).get("insufficient_data") is True
+        and decision_data.get("final_status") == "DADOS INSUFICIENTES"
+        and decision_data.get("probability_percent") is None
+    )
 
     needs_refresh = (
         not analysis
         or not isinstance(executive_data, dict)
         or not isinstance(decision_data, dict)
         or not isinstance(strategic_data, dict)
+        or not isinstance(viability_data, dict)
         or not decision_data.get("executive_summary")
-        or decision_data.get("probability_percent") is None
-        or not strategic_data.get("financial_risk")
+        or (
+            decision_data.get("probability_percent") is None
+            and not insufficient_payload
+        )
+        or (
+            not strategic_data.get("financial_risk")
+            and not insufficient_payload
+        )
     )
 
     if needs_refresh:
@@ -549,12 +566,18 @@ def generate_executive_pdf_route(
             db.refresh(record)
             analysis = record
 
+    executive_payload = dict(analysis.executive_data or {})
+    technical_payload = {}
+    if isinstance(analysis.analysis, dict):
+        technical_payload = analysis.analysis.get("technical", {}) or {}
+    executive_payload["technical"] = technical_payload
+
     pdf_bytes = generate_executive_pdf(
         case_data={
             "case_number": case.case_number,
             "title": case.title,
         },
-        executive_data=analysis.executive_data or {},
+        executive_data=executive_payload,
     )
 
     return Response(
