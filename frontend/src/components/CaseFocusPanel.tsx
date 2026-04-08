@@ -93,7 +93,7 @@ export function CaseFocusPanel({
             {getRiskLabel(analysisData.analysis?.technical?.risk_level)}
           </p>
 
-          <div style={{ marginBottom: '12px' }}>
+          <div className="focus-block">
             <strong className="info-list-title">Pontos de atenção</strong>
             <ul className="info-list">
               {(analysisData.analysis?.technical?.issues || []).length > 0 ? (
@@ -106,7 +106,7 @@ export function CaseFocusPanel({
             </ul>
           </div>
 
-          <div>
+          <div className="focus-block">
             <strong className="info-list-title">Próximos passos</strong>
             <ul className="info-list">
               {(analysisData.analysis?.technical?.next_steps || []).length > 0 ? (
@@ -166,7 +166,7 @@ export function CaseFocusPanel({
           {executiveSummaryData.viability?.recommendation || executiveSummaryData.strategic_analysis?.recommended_strategy || 'Não informada'}
         </p>
 
-        <div style={{ marginBottom: '12px' }}>
+        <div className="focus-block">
           <strong className="info-list-title">Indicadores estratégicos</strong>
           <ul className="info-list">
             <li>Risco técnico: {getRiskLabel(executiveSummaryData.technical_analysis?.risk_level)}</li>
@@ -184,7 +184,7 @@ export function CaseFocusPanel({
           </ul>
         </div>
 
-        <div style={{ marginBottom: '12px' }}>
+        <div className="focus-block">
           <strong className="info-list-title">Pontos críticos</strong>
           <ul className="info-list">
             {(executiveSummaryData.strategic_analysis?.critical_points || executiveSummaryData.technical_analysis?.issues || []).length > 0 ? (
@@ -197,7 +197,7 @@ export function CaseFocusPanel({
           </ul>
         </div>
 
-        <div style={{ marginBottom: '12px' }}>
+        <div className="focus-block">
           <strong className="info-list-title">Pontos fortes</strong>
           <ul className="info-list">
             {(executiveSummaryData.strategic_analysis?.strong_points || []).length > 0 ? (
@@ -210,7 +210,7 @@ export function CaseFocusPanel({
           </ul>
         </div>
 
-        <div>
+        <div className="focus-block">
           <strong className="info-list-title">Próximos passos</strong>
           <ul className="info-list">
             {(executiveSummaryData.technical_analysis?.next_steps || []).length > 0 ? (
@@ -244,19 +244,8 @@ export function CaseFocusPanel({
     }
 
     return (
-      <article
-        style={{
-          background: '#0a0f1c',
-          border: '1px solid #24304f',
-          borderRadius: '14px',
-          padding: '22px',
-          color: '#dbe4f0',
-          overflowX: 'auto',
-          lineHeight: 1.7,
-          fontSize: '15px',
-        }}
-      >
-        <p className="info-meta" style={{ marginBottom: '14px' }}>
+      <article className="executive-report-frame">
+        <p className="info-meta focus-block">
           Caso analisado: #{executiveReportData.case_id}
         </p>
 
@@ -441,15 +430,7 @@ export function CaseFocusPanel({
   }
 
   return (
-    <div
-      style={{
-        position: 'sticky',
-        top: '20px',
-        display: 'grid',
-        gap: '12px',
-        alignSelf: 'start',
-      }}
-    >
+    <div className="focus-panel-shell">
       <section className="insight-card">
         <div className="insight-head">
           <div>
@@ -464,19 +445,8 @@ export function CaseFocusPanel({
           </span>
         </div>
 
-        <div
-          style={{
-            display: 'grid',
-            gap: '14px',
-          }}
-        >
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-              gap: '10px',
-            }}
-          >
+        <div className="focus-panel-content">
+          <div className="insight-tabs">
             {(['analysis', 'summary', 'report'] as FocusTab[]).map((tab) => {
               const isActive = activeTab === tab
               return (
@@ -484,19 +454,7 @@ export function CaseFocusPanel({
                   key={tab}
                   type="button"
                   onClick={() => onTabChange(tab)}
-                  style={{
-                    background: isActive ? '#d4af37' : '#13233f',
-                    color: isActive ? '#111827' : '#dbe7f6',
-                    border: isActive ? 'none' : '1px solid rgba(125,211,252,0.18)',
-                    borderRadius: '12px',
-                    minHeight: '48px',
-                    padding: '10px 14px',
-                    fontWeight: 800,
-                    fontSize: '13px',
-                    lineHeight: 1.2,
-                    cursor: 'pointer',
-                    boxShadow: isActive ? '0 12px 28px rgba(212,175,55,0.24)' : 'none',
-                  }}
+                  className={`insight-tab ${isActive ? 'insight-tab--active' : ''}`}
                 >
                   {tabLabels[tab]}
                 </button>
@@ -504,48 +462,11 @@ export function CaseFocusPanel({
             })}
           </div>
 
-          <div
-            style={{
-              borderRadius: '16px',
-              border: '1px solid rgba(212,175,55,0.16)',
-              background: 'linear-gradient(180deg, rgba(12,20,38,0.96) 0%, rgba(10,16,30,0.98) 100%)',
-              padding: '18px',
-              boxShadow: '0 18px 40px rgba(0,0,0,0.22)',
-            }}
-          >
-            <div style={{ marginBottom: '14px' }}>
-              <p
-                style={{
-                  margin: '0 0 6px',
-                  color: '#f3c969',
-                  fontSize: '11px',
-                  fontWeight: 800,
-                  letterSpacing: '0.08em',
-                  textTransform: 'uppercase',
-                }}
-              >
-                {tabLabels[activeTab]}
-              </p>
-              <h3
-                style={{
-                  margin: '0 0 6px',
-                  color: '#f8fafc',
-                  fontSize: '24px',
-                  lineHeight: 1.15,
-                }}
-              >
-                {panelTitles[activeTab]}
-              </h3>
-              <p
-                style={{
-                  margin: 0,
-                  color: '#aebed8',
-                  fontSize: '14px',
-                  lineHeight: 1.6,
-                }}
-              >
-                {panelDescriptions[activeTab]}
-              </p>
+          <div className="focus-panel-body">
+            <div className="focus-section-head">
+              <p className="focus-section-kicker">{tabLabels[activeTab]}</p>
+              <h3 className="focus-section-title">{panelTitles[activeTab]}</h3>
+              <p className="focus-section-description">{panelDescriptions[activeTab]}</p>
             </div>
 
             {renderActiveContent()}
