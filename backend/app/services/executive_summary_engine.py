@@ -21,6 +21,7 @@ def _complexity_label(value: str) -> str:
         "alta": "Alta",
         "média": "Média",
         "media": "Média",
+        "preliminar": "Preliminar",
     }
     return mapping.get((value or "").lower(), value.capitalize() if value else "Indefinida")
 
@@ -33,8 +34,45 @@ def _status_phrase(final_status: str) -> str:
         "MODERADA": "caso com viabilidade moderada",
         "MODERADA COM RISCO": "caso com viabilidade moderada e risco relevante",
         "ARRISCADA": "caso com risco relevante",
+        "DADOS INSUFICIENTES": "caso com dados insuficientes para prognóstico confiável",
     }
     return mapping.get(normalized, "caso em avaliação estratégica")
+
+
+def _is_insufficient_data(analysis: Dict, viability: Dict, decision: Dict) -> bool:
+    viability_dimensions = viability.get("dimensions") or {}
+    viability_label = str(viability.get("label", "") or "").strip().lower()
+    final_status = str(decision.get("final_status", "") or "").strip().upper()
+    analysis_issues = " ".join(analysis.get("issues", []) or []).lower()
+
+    if viability_dimensions.get("insufficient_data") is True:
+        return True
+    if viability.get("probability") is None or viability.get("score") is None:
+        return True
+    if "dados insuficientes" in viability_label:
+        return True
+    if final_status == "DADOS INSUFICIENTES":
+        return True
+
+    insufficient_markers = (
+        "dados insuficientes",
+        "insuficiência de dados",
+        "insuficiencia de dados",
+        "sem vínculo",
+        "sem vinculo",
+        "sem datas",
+        "ausência de datas",
+        "ausencia de datas",
+        "sem documentos",
+        "ausência de documentos",
+        "ausencia de documentos",
+        "sem base para calcular",
+        "sem base para aferir",
+        "sem base jurídica",
+        "sem base juridica",
+        "sem base factual",
+    )
+    return any(marker in analysis_issues for marker in insufficient_markers)
 
 
 def generate_executive_summary(
@@ -46,17 +84,35 @@ def generate_executive_summary(
     Consolida análise técnica + viabilidade + decisão final
     e gera um resumo executivo curto, direto e comercial.
     """
+    risk_level = _risk_label(analysis.get("risk_level", "medium"))
+    final_status = decision.get("final_status", "INDEFINIDO")
+    confidence = decision.get("confidence_level")
+    recommendation = viability.get("recommendation", "Sem recomendação estratégica definida.")
+
+    if _is_insufficient_data(analysis, viability, decision):
+        complexity = _complexity_label(viability.get("complexity", "Indefinida por insuficiência de dados"))
+        estimated_time = viability.get("estimated_time", "Indisponível por insuficiência de dados")
+        executive_text = (
+            "Caso com dados insuficientes para prognóstico confiável. "
+            f"Nível de risco: {risk_level}. "
+            f"Complexidade: {complexity}. "
+            f"Tempo estimado: {estimated_time}. "
+            f"Direcionamento: {recommendation}."
+        )
+        return {
+            "executive_summary": executive_text,
+            "final_status": "DADOS INSUFICIENTES",
+            "confidence_level": None,
+            "probability_percent": None,
+            "score": None,
+            "complexity": complexity,
+            "estimated_time": estimated_time,
+        }
 
     score = viability.get("score", 0)
     probability = viability.get("probability", 0) or 0
     complexity = _complexity_label(viability.get("complexity", "Indefinida"))
     estimated_time = viability.get("estimated_time", "Indefinido")
-    recommendation = viability.get("recommendation", "Sem recomendação estratégica definida.")
-
-    final_status = decision.get("final_status", "INDEFINIDO")
-    confidence = decision.get("confidence_level", 0)
-
-    risk_level = _risk_label(analysis.get("risk_level", "medium"))
     status_phrase = _status_phrase(final_status)
     probability_percent = int(float(probability) * 100)
 
