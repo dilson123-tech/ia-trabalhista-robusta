@@ -81,6 +81,15 @@ def _get_or_create_case_analysis_record(
     return analysis_record
 
 
+
+def _ensure_case_not_archived(case: Case):
+    if getattr(case, "status", None) == "archived":
+        raise HTTPException(
+            status_code=409,
+            detail="Archived cases cannot run analysis or executive actions",
+        )
+
+
 @router.get(
     "",
     response_model=list[CaseOut],
@@ -236,6 +245,7 @@ def analyze_case_endpoint(
     if not case:
         raise HTTPException(status_code=404, detail="Case not found")
 
+    _ensure_case_not_archived(case)
 
     # Verifica se já existe análise para esse case + tenant (idempotência)
     existing_analysis = (
@@ -346,6 +356,8 @@ def generate_case_report(
     if not case:
         raise HTTPException(status_code=404, detail="Case not found")
 
+    _ensure_case_not_archived(case)
+
     analysis_record = _get_or_create_case_analysis_record(
         db=db,
         case=case,
@@ -386,6 +398,8 @@ def get_executive_summary(
     if not case:
         raise HTTPException(status_code=404, detail="Case not found")
 
+    _ensure_case_not_archived(case)
+
     analysis_record = _get_or_create_case_analysis_record(
         db=db,
         case=case,
@@ -424,6 +438,8 @@ def get_executive_report(
 
     if not case:
         raise HTTPException(status_code=404, detail="Case not found")
+
+    _ensure_case_not_archived(case)
 
     analysis_record = _get_or_create_case_analysis_record(
         db=db,
@@ -469,6 +485,8 @@ def generate_executive_pdf_route(
     if not case:
         raise HTTPException(status_code=404, detail="Case não encontrado")
 
+    _ensure_case_not_archived(case)
+
     analysis = (
         scoped_query(db, CaseAnalysis, current_user)
         .filter(CaseAnalysis.case_id == case.id)
@@ -493,15 +511,32 @@ def generate_executive_pdf_route(
     executive_data = analysis.executive_data if analysis else {}
     decision_data = executive_data.get("decision", {}) if isinstance(executive_data, dict) else {}
     strategic_data = executive_data.get("strategic", {}) if isinstance(executive_data, dict) else {}
+    viability_data = executive_data.get("viability", {}) if isinstance(executive_data, dict) else {}
+
+    insufficient_payload = (
+        isinstance(viability_data, dict)
+        and isinstance(decision_data, dict)
+        and isinstance(strategic_data, dict)
+        and (viability_data.get("dimensions") or {}).get("insufficient_data") is True
+        and decision_data.get("final_status") == "DADOS INSUFICIENTES"
+        and decision_data.get("probability_percent") is None
+    )
 
     needs_refresh = (
         not analysis
         or not isinstance(executive_data, dict)
         or not isinstance(decision_data, dict)
         or not isinstance(strategic_data, dict)
+        or not isinstance(viability_data, dict)
         or not decision_data.get("executive_summary")
-        or decision_data.get("probability_percent") is None
-        or not strategic_data.get("financial_risk")
+        or (
+            decision_data.get("probability_percent") is None
+            and not insufficient_payload
+        )
+        or (
+            not strategic_data.get("financial_risk")
+            and not insufficient_payload
+        )
     )
 
     if needs_refresh:
@@ -549,12 +584,18 @@ def generate_executive_pdf_route(
             db.refresh(record)
             analysis = record
 
+    executive_payload = dict(analysis.executive_data or {})
+    technical_payload = {}
+    if isinstance(analysis.analysis, dict):
+        technical_payload = analysis.analysis.get("technical", {}) or {}
+    executive_payload["technical"] = technical_payload
+
     pdf_bytes = generate_executive_pdf(
         case_data={
             "case_number": case.case_number,
             "title": case.title,
         },
-        executive_data=analysis.executive_data or {},
+        executive_data=executive_payload,
     )
 
     return Response(

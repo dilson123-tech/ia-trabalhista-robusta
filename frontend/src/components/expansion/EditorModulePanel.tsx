@@ -3,11 +3,38 @@ import {
   ApiError,
   createEditableDocument,
   createEditableDocumentVersion,
+  deleteEditableDocument,
   getEditableDocument,
   listEditableDocumentsForCase,
   type EditableDocumentDetail,
   type EditableDocumentItem,
 } from '../../services/api'
+
+const getSectionPlaceholder = (sectionKey: string | null | undefined): string => {
+  switch (sectionKey) {
+    case 'resumo_fatico':
+      return 'Descreva os fatos relevantes, as partes envolvidas, datas, jornada, acontecimentos principais e o problema central do caso.'
+    case 'fundamentacao':
+      return 'Indique a base legal, artigos aplicáveis, teses, jurisprudência e o enquadramento jurídico dos fatos.'
+    case 'pedidos':
+      return 'Liste os requerimentos objetivos: condenações, reflexos, verbas, justiça gratuita, honorários e demais providências.'
+    default:
+      return 'Escreva o conteúdo deste bloco com objetividade, clareza e coerência jurídica.'
+  }
+}
+
+const getSectionHelpText = (sectionKey: string | null | undefined): string => {
+  switch (sectionKey) {
+    case 'resumo_fatico':
+      return 'Aqui entra a narrativa objetiva do caso: quem, quando, o que aconteceu e qual é o núcleo do problema.'
+    case 'fundamentacao':
+      return 'Aqui entra o raciocínio jurídico: por que os fatos narrados geram direito, com base legal e técnica.'
+    case 'pedidos':
+      return 'Aqui entra exatamente o que será requerido ao final da peça, de forma direta e organizada.'
+    default:
+      return 'Use este espaço para redigir o bloco com clareza, lógica e linguagem jurídica consistente.'
+  }
+}
 
 type EditorModulePanelProps = {
   token: string
@@ -56,6 +83,7 @@ export function EditorModulePanel({ token, selectedCaseId }: EditorModulePanelPr
   const [versionError, setVersionError] = useState('')
   const [versionSuccess, setVersionSuccess] = useState('')
   const [exportLoading, setExportLoading] = useState<'html' | 'pdf' | null>(null)
+  const [deleteLoading, setDeleteLoading] = useState(false)
   const [compareBaseVersionNumber, setCompareBaseVersionNumber] = useState<number | null>(null)
   const [compareTargetVersionNumber, setCompareTargetVersionNumber] = useState<number | null>(null)
   const [editingSectionKey, setEditingSectionKey] = useState<string | null>(null)
@@ -103,6 +131,56 @@ export function EditorModulePanel({ token, selectedCaseId }: EditorModulePanelPr
     setSelectedDocument(detail)
     upsertDocumentInList(detail)
     return detail
+  }
+
+  async function handleDeleteDocument() {
+    if (!token.trim() || !selectedDocumentId) return
+    if (!selectedCaseId) return
+
+    const confirmed = window.confirm(
+      'Tem certeza que deseja excluir este documento editável e todas as versões vinculadas? Esta ação não pode ser desfeita.',
+    )
+
+    if (!confirmed) return
+
+    const documentId = selectedDocumentId
+
+    setDeleteLoading(true)
+    setError('')
+    setVersionError('')
+    setVersionSuccess('')
+    setEditingError('')
+    setEditingSuccess('')
+
+    try {
+      await deleteEditableDocument(token, documentId)
+
+      const updatedDocuments = await listEditableDocumentsForCase(token, selectedCaseId)
+
+      setDocuments(updatedDocuments)
+      setSelectedDocument(null)
+      setEditingSectionKey(null)
+      setEditingContent('')
+      setCompareBaseVersionNumber(null)
+      setCompareTargetVersionNumber(null)
+
+      setSelectedDocumentId((current) => {
+        if (current && current !== documentId && updatedDocuments.some((doc) => doc.id === current)) {
+          return current
+        }
+        return updatedDocuments.length > 0 ? updatedDocuments[0].id : null
+      })
+
+      setVersionSuccess('Documento editável excluído com sucesso.')
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setVersionError(err.message)
+      } else {
+        setVersionError('Não foi possível excluir o documento editável.')
+      }
+    } finally {
+      setDeleteLoading(false)
+    }
   }
 
   useEffect(() => {
@@ -625,7 +703,17 @@ export function EditorModulePanel({ token, selectedCaseId }: EditorModulePanelPr
         <span className="insight-badge">Caso em foco: #{selectedCaseId}</span>
       </div>
 
-      <div className="actions-row" style={{ marginBottom: '16px' }}>
+      <div className="actions-row" style={{ marginBottom: '16px' }}>                    <button
+                      type="button"
+                      className={`btn ${deleteLoading ? 'btn-muted' : 'btn-secondary'}`}
+                      onClick={() => void handleDeleteDocument()}
+                      disabled={deleteLoading}
+                      title="Excluir documento editável e todas as versões vinculadas"
+                    >
+                      {deleteLoading ? 'Excluindo documento...' : 'Excluir documento'}
+                    </button>
+
+
         <button
           type="button"
           className={`btn ${showCreateForm ? 'btn-secondary' : 'btn-primary'}`}
@@ -905,9 +993,13 @@ export function EditorModulePanel({ token, selectedCaseId }: EditorModulePanelPr
                                           className="form-control"
                                           value={editingContent}
                                           onChange={(e) => setEditingContent(e.target.value)}
+                                          placeholder={getSectionPlaceholder(editingSectionKey)}
                                           rows={8}
                                           style={{ width: '100%', marginBottom: '8px' }}
                                         />
+                                        <p className="info-meta" style={{ marginBottom: '8px' }}>
+                                          {getSectionHelpText(editingSectionKey)}
+                                        </p>
 
                                         <div className="actions-row">
                                           <button

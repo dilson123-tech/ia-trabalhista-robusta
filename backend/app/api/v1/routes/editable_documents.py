@@ -183,6 +183,45 @@ def get_editable_document(
     return _build_document_detail_payload(db, document)
 
 
+@router.delete(
+    "/{document_id}",
+    dependencies=[Depends(require_role("admin", "advogado"))],
+)
+def delete_editable_document(
+    document_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_auth),
+):
+    document = (
+        db.query(EditableDocument)
+        .filter(
+            EditableDocument.id == document_id,
+            EditableDocument.tenant_id == current_user["tenant_id"],
+        )
+        .first()
+    )
+    if not document:
+        raise HTTPException(status_code=404, detail="Editable document not found")
+
+    versions_count = (
+        db.query(EditableDocumentVersion)
+        .filter(
+            EditableDocumentVersion.editable_document_id == document.id,
+            EditableDocumentVersion.tenant_id == current_user["tenant_id"],
+        )
+        .count()
+    )
+
+    db.delete(document)
+    db.commit()
+
+    return {
+        "deleted_document_id": document_id,
+        "deleted_versions_count": versions_count,
+        "detail": "Editable document deleted successfully",
+    }
+
+
 @router.get(
     "/{document_id}/export/html",
     response_class=HTMLResponse,

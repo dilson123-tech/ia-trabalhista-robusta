@@ -142,54 +142,93 @@ def calculate_viability(analysis: Dict) -> Dict:
     ]
     process_risk_hits = sum(1 for term in process_risk_terms if term in combined)
 
-    # Base por risco técnico: aqui mede complexidade/instabilidade,
-    # mas não destrói automaticamente a viabilidade.
-    risk_base_map = {
-        "low": 68,
-        "medium": 64,
-        "high": 60,
-    }
-    score = risk_base_map.get(risk_level, 62)
+    insufficient_data_markers = (
+        "dados insuficientes",
+        "insuficiência de dados",
+        "insuficiencia de dados",
+        "sem vínculo",
+        "sem vinculo",
+        "sem vínculo empregatício",
+        "sem vinculo empregaticio",
+        "sem datas",
+        "ausência de datas",
+        "ausencia de datas",
+        "sem documentos",
+        "ausência de documentos",
+        "ausencia de documentos",
+        "falta de documentos",
+        "sem base para calcular",
+        "sem base para aferir",
+        "sem base jurídica",
+        "sem base juridica",
+        "sem base factual",
+    )
 
-    # Direito material forte empurra para cima.
-    score += min(20, legal_strength * 3)
+    insufficient_marker_hits = sum(1 for marker in insufficient_data_markers if marker in combined)
+    insufficient_data = (
+        evidence_gaps >= 4
+        or (legal_strength == 0 and evidence_gaps >= 2)
+        or insufficient_marker_hits >= 2
+    )
 
-    # Lacunas probatórias reduzem, mas sem matar caso juridicamente bom.
-    score -= min(18, evidence_gaps * 2)
-
-    # Risco processual pesa mais que lacuna documental comum.
-    score -= min(16, process_risk_hits * 3)
-
-    score = max(0, min(100, score))
-    probability = round(score / 100, 2)
-
-    # Complexidade e tempo seguem o risco técnico.
-    if risk_level == "low":
-        complexity = "Baixa"
-        estimated_time = "6-12 meses"
-    elif risk_level == "medium":
-        complexity = "Média"
-        estimated_time = "12-24 meses"
+    if insufficient_data:
+        score = None
+        probability = None
+        label = "Dados insuficientes para estimativa"
+        complexity = "Indefinida por insuficiência de dados"
+        estimated_time = "Indisponível por insuficiência de dados"
+        recommendation = (
+            "Complementar fatos, documentos, datas e base mínima de prova antes de qualquer estimativa de viabilidade."
+        )
     else:
-        complexity = "Alta"
-        estimated_time = "24+ meses"
+        # Base por risco técnico: aqui mede complexidade/instabilidade,
+        # mas não destrói automaticamente a viabilidade.
+        risk_base_map = {
+            "low": 68,
+            "medium": 64,
+            "high": 60,
+        }
+        score = risk_base_map.get(risk_level, 62)
 
-    # Leitura premium: separa direito forte de prova fraca.
-    if legal_strength >= 4 and evidence_gaps >= 3:
-        label = "Viável com dependência probatória"
-        recommendation = "Reforçar documentação e cálculo antes do ajuizamento"
-    elif score >= 78:
-        label = "Alta viabilidade estratégica"
-        recommendation = "Prosseguir com ajuizamento e validação documental final"
-    elif score >= 62:
-        label = "Viabilidade moderada"
-        recommendation = "Prosseguir com cautela, fortalecendo prova e estratégia"
-    elif score >= 48:
-        label = "Viabilidade condicionada à prova"
-        recommendation = "Não ajuizar sem reforço probatório mínimo e revisão estratégica"
-    else:
-        label = "Baixa prontidão estratégica"
-        recommendation = "Segurar ajuizamento e priorizar obtenção de provas e saneamento de riscos"
+        # Direito material forte empurra para cima.
+        score += min(20, legal_strength * 3)
+
+        # Lacunas probatórias reduzem, mas sem matar caso juridicamente bom.
+        score -= min(18, evidence_gaps * 2)
+
+        # Risco processual pesa mais que lacuna documental comum.
+        score -= min(16, process_risk_hits * 3)
+
+        score = max(0, min(100, score))
+        probability = round(score / 100, 2)
+
+        # Complexidade e tempo seguem o risco técnico.
+        if risk_level == "low":
+            complexity = "Baixa"
+            estimated_time = "6-12 meses"
+        elif risk_level == "medium":
+            complexity = "Média"
+            estimated_time = "12-24 meses"
+        else:
+            complexity = "Alta"
+            estimated_time = "24+ meses"
+
+        # Leitura premium: separa direito forte de prova fraca.
+        if legal_strength >= 4 and evidence_gaps >= 3:
+            label = "Viável com dependência probatória"
+            recommendation = "Reforçar documentação e cálculo antes do ajuizamento"
+        elif score >= 78:
+            label = "Alta viabilidade estratégica"
+            recommendation = "Prosseguir com ajuizamento e validação documental final"
+        elif score >= 62:
+            label = "Viabilidade moderada"
+            recommendation = "Prosseguir com cautela, fortalecendo prova e estratégia"
+        elif score >= 48:
+            label = "Viabilidade condicionada à prova"
+            recommendation = "Não ajuizar sem reforço probatório mínimo e revisão estratégica"
+        else:
+            label = "Baixa prontidão estratégica"
+            recommendation = "Segurar ajuizamento e priorizar obtenção de provas e saneamento de riscos"
 
     return {
         "score": score,
@@ -202,5 +241,6 @@ def calculate_viability(analysis: Dict) -> Dict:
             "legal_strength": legal_strength,
             "evidence_gaps": evidence_gaps,
             "process_risk": process_risk_hits,
+            "insufficient_data": insufficient_data,
         },
     }

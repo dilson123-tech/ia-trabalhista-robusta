@@ -365,6 +365,28 @@ export async function getEditableDocument(
   return response.json()
 }
 
+export async function deleteEditableDocument(
+  token: string,
+  documentId: number,
+): Promise<{
+  deleted_document_id: number
+  deleted_versions_count: number
+  detail: string
+}> {
+  const response = await fetch(`${API_URL}/editable-documents/${documentId}`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+
+  if (!response.ok) {
+    await parseError(response, "Erro ao excluir documento editável")
+  }
+
+  return response.json()
+}
+
 export async function createEditableDocument(
   token: string,
   payload: EditableDocumentCreatePayload,

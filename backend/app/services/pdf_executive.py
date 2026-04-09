@@ -22,11 +22,13 @@ def _risk_label(value) -> str:
 
 
 def _probability_pct(executive_data: dict) -> str:
-    probability = executive_data.get("viability", {}).get("probability", 0) or 0
+    probability = executive_data.get("viability", {}).get("probability", None)
+    if probability is None:
+        return "Não informado"
     try:
         return f"{float(probability) * 100:.0f}%"
     except Exception:
-        return "0%"
+        return "Não informado"
 
 
 def _pdf_via_fpdf2(case_data: dict, executive_data: dict) -> bytes:
@@ -43,10 +45,11 @@ def _pdf_via_fpdf2(case_data: dict, executive_data: dict) -> bytes:
     summary = _safe(decision.get("executive_summary")) or "(sem resumo executivo)"
     probability_pct = _probability_pct(executive_data)
     final_status = _safe(decision.get("final_status")) or "Indefinido"
-    risk_level = _risk_label(strategic.get("financial_risk") or strategic.get("risk_level"))
+    risk_level = _risk_label(executive_data.get("technical", {}).get("risk_level") or strategic.get("risk_level") or strategic.get("financial_risk"))
     complexity = _safe(viability.get("complexity")) or "Indefinida"
     estimated_time = _safe(viability.get("estimated_time")) or "Indefinido"
     recommendation = _safe(viability.get("recommendation")) or "Sem recomendação"
+    score_label = "Não informado" if viability.get("score") is None else f'{viability.get("score")}/100'
 
     pdf = FPDF(format="A4")
     pdf.set_auto_page_break(auto=True, margin=15)
@@ -79,6 +82,7 @@ def _pdf_via_fpdf2(case_data: dict, executive_data: dict) -> bytes:
     pdf.set_font("Helvetica", "", 11)
     pdf.cell(0, 7, f"Classificacao final: {final_status}", ln=True)
     pdf.cell(0, 7, f"Probabilidade estimada: {probability_pct}", ln=True)
+    pdf.cell(0, 7, f"Score: {score_label}", ln=True)
     pdf.cell(0, 7, f"Nivel de risco: {risk_level}", ln=True)
     pdf.cell(0, 7, f"Complexidade: {complexity}", ln=True)
     pdf.cell(0, 7, f"Tempo estimado: {estimated_time}", ln=True)
@@ -237,7 +241,11 @@ def generate_executive_pdf(case_data: dict, executive_data: dict) -> bytes:
                 </div>
                 <div class="card">
                   <span class="label">Nível de risco</span>
-                  <span class="value">{_risk_label(strategic.get("financial_risk") or strategic.get("risk_level"))}</span>
+                  <span class="value">{_risk_label(executive_data.get("technical", {}).get("risk_level") or strategic.get("risk_level") or strategic.get("financial_risk"))}</span>
+                </div>
+                <div class="card">
+                  <span class="label">Score</span>
+                  <span class="value">{"Não informado" if viability.get("score") is None else str(viability.get("score")) + "/100"}</span>
                 </div>
                 <div class="card">
                   <span class="label">Complexidade</span>

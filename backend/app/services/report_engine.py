@@ -18,11 +18,15 @@ def generate_report_html(case: Dict, analysis: Dict, viability: Dict, executive_
     issues = analysis.get("issues") or []
     next_steps = analysis.get("next_steps") or []
 
-    probability = viability.get("probability", 0) or 0
+    probability = viability.get("probability", None)
     try:
-        probability_pct = f"{float(probability) * 100:.0f}%"
+        probability_pct = (
+            "Não informado"
+            if probability is None
+            else f"{float(probability) * 100:.0f}%"
+        )
     except Exception:
-        probability_pct = "0%"
+        probability_pct = "Não informado"
 
     issues_html = "".join(f"<li>{item}</li>" for item in issues) or "<li>Nenhum ponto crítico identificado.</li>"
     next_steps_html = "".join(f"<li>{item}</li>" for item in next_steps) or "<li>Sem próximos passos sugeridos.</li>"
@@ -156,7 +160,7 @@ def generate_report_html(case: Dict, analysis: Dict, viability: Dict, executive_
                 <div class=\"grid\">
                     <div class=\"card\">
                         <span class=\"label\">Score</span>
-                        <span class=\"value\">{viability.get("score", 0)}/100</span>
+                        <span class=\"value\">{("Não informado" if viability.get("score") is None else str(viability.get("score")) + "/100")}</span>
                     </div>
                     <div class=\"card\">
                         <span class=\"label\">Probabilidade estimada</span>

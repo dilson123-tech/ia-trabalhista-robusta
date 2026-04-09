@@ -1,12 +1,43 @@
 from typing import Dict
 
 
+def _is_insufficient_data(viability: Dict, analysis: Dict) -> bool:
+    viability_dimensions = viability.get("dimensions") or {}
+    viability_label = str(viability.get("label", "") or "").strip().lower()
+    analysis_issues = " ".join(analysis.get("issues", []) or []).lower()
+
+    if viability_dimensions.get("insufficient_data") is True:
+        return True
+    if viability.get("probability") is None or viability.get("score") is None:
+        return True
+    if "dados insuficientes" in viability_label:
+        return True
+
+    insufficient_markers = (
+        "dados insuficientes",
+        "insuficiência de dados",
+        "insuficiencia de dados",
+        "sem vínculo",
+        "sem vinculo",
+        "sem datas",
+        "ausência de datas",
+        "ausencia de datas",
+        "sem documentos",
+        "ausência de documentos",
+        "ausencia de documentos",
+        "sem base para calcular",
+        "sem base para aferir",
+        "sem base jurídica",
+        "sem base juridica",
+        "sem base factual",
+    )
+    return any(marker in analysis_issues for marker in insufficient_markers)
+
+
 def build_executive_summary(viability: Dict, analysis: Dict) -> str:
     """
     Gera resumo executivo curto, direto e vendável.
     """
-    label = str(viability.get("label", "") or "").lower()
-    probability = int((viability.get("probability", 0) or 0) * 100)
     recommendation = str(viability.get("recommendation", "") or "").strip()
 
     risk = str(analysis.get("risk_level", "indefinido") or "indefinido").strip().lower()
@@ -20,6 +51,17 @@ def build_executive_summary(viability: Dict, analysis: Dict) -> str:
         "alto": "alto",
     }
     risk_label = risk_label_map.get(risk, risk)
+
+    if _is_insufficient_data(viability, analysis):
+        direction = recommendation or "complementar fatos, documentos e recorte jurídico antes de qualquer conclusão"
+        return (
+            "Caso com dados insuficientes para prognóstico confiável. "
+            f"Nível de risco atual: {risk_label}. "
+            f"Direcionamento: {direction}."
+        )
+
+    label = str(viability.get("label", "") or "").lower()
+    probability = int(float(viability.get("probability", 0) or 0) * 100)
 
     if "alta viabilidade" in label:
         status = "caso altamente favorável"
@@ -48,12 +90,23 @@ def generate_decision(analysis: Dict, viability: Dict) -> Dict:
     Consolida análise técnica + viabilidade estratégica
     e gera decisão executiva final em linguagem premium.
     """
-    score = float(viability.get("score", 0) or 0)
-    probability = float(viability.get("probability", 0) or 0)
-    label = str(viability.get("label", "") or "").strip().lower()
     recommendation = str(viability.get("recommendation", "") or "").strip()
     complexity = str(viability.get("complexity", "") or "").strip()
     estimated_time = str(viability.get("estimated_time", "") or "").strip()
+
+    if _is_insufficient_data(viability, analysis):
+        return {
+            "final_status": "DADOS INSUFICIENTES",
+            "confidence_level": None,
+            "executive_recommendation": recommendation or "Complementar dados antes de qualquer conclusão executiva",
+            "estimated_complexity": complexity or "Indefinida por insuficiência de dados",
+            "estimated_time": estimated_time or "Indisponível por insuficiência de dados",
+            "executive_summary": build_executive_summary(viability, analysis),
+        }
+
+    score = float(viability.get("score", 0) or 0)
+    probability = float(viability.get("probability", 0) or 0)
+    label = str(viability.get("label", "") or "").strip().lower()
 
     if "alta viabilidade" in label:
         final_status = "FAVORÁVEL"

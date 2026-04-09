@@ -18,6 +18,7 @@ type CaseCardProps = {
   onLoadExecutiveSummary: (caseId: number) => void
   onLoadExecutiveReport: (caseId: number) => void
   onOpenExecutivePdf: (caseId: number) => void
+  onSelectCase: (caseId: number) => void
 }
 
 export function CaseCard({
@@ -38,8 +39,10 @@ export function CaseCard({
   onLoadExecutiveSummary,
   onLoadExecutiveReport,
   onOpenExecutivePdf,
+  onSelectCase,
 }: CaseCardProps) {
   const isSelected = selectedCaseId === caso.id
+  const isArchived = caso.status === 'archived'
 
   return (
     <article className={`case-card ${isSelected ? 'case-card--selected' : ''}`}>
@@ -68,52 +71,62 @@ export function CaseCard({
       </div>
 
       <div className="case-card__actions">
-        {caso.status !== 'archived' ? (
+        {!isArchived ? (
+          <>
+            <button
+              type="button"
+              onClick={() => onArchive(caso.id)}
+              disabled={isArchiving}
+              className="case-card__action case-card__action--archive"
+            >
+              {isArchiving ? 'Arquivando...' : 'Arquivar'}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onAnalyze(caso.id)}
+              disabled={analysisLoading}
+              className="case-card__action case-card__action--analysis"
+            >
+              {isAnalyzing ? 'Analisando...' : 'Analisar caso'}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onLoadExecutiveSummary(caso.id)}
+              disabled={executiveSummaryLoading}
+              className="case-card__action case-card__action--summary"
+            >
+              {isLoadingSummary ? 'Carregando resumo...' : 'Resumo Executivo'}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onLoadExecutiveReport(caso.id)}
+              disabled={executiveReportLoading}
+              className="case-card__action case-card__action--report"
+            >
+              {isLoadingReport ? 'Carregando relatório...' : 'Relatório Executivo'}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onOpenExecutivePdf(caso.id)}
+              disabled={executivePdfLoading}
+              className="case-card__action case-card__action--pdf"
+            >
+              {isLoadingPdf ? 'Abrindo PDF...' : 'PDF Executivo'}
+            </button>
+          </>
+        ) : (
           <button
             type="button"
-            onClick={() => onArchive(caso.id)}
-            disabled={isArchiving}
-            className="case-card__action case-card__action--archive"
+            onClick={() => onSelectCase(caso.id)}
+            className="case-card__action case-card__action--analysis"
           >
-            {isArchiving ? 'Arquivando...' : 'Arquivar'}
+            Abrir caso
           </button>
-        ) : null}
-
-        <button
-          type="button"
-          onClick={() => onAnalyze(caso.id)}
-          disabled={analysisLoading}
-          className="case-card__action case-card__action--analysis"
-        >
-          {isAnalyzing ? 'Analisando...' : 'Analisar caso'}
-        </button>
-
-        <button
-          type="button"
-          onClick={() => onLoadExecutiveSummary(caso.id)}
-          disabled={executiveSummaryLoading}
-          className="case-card__action case-card__action--summary"
-        >
-          {isLoadingSummary ? 'Carregando resumo...' : 'Resumo Executivo'}
-        </button>
-
-        <button
-          type="button"
-          onClick={() => onLoadExecutiveReport(caso.id)}
-          disabled={executiveReportLoading}
-          className="case-card__action case-card__action--report"
-        >
-          {isLoadingReport ? 'Carregando relatório...' : 'Relatório Executivo'}
-        </button>
-
-        <button
-          type="button"
-          onClick={() => onOpenExecutivePdf(caso.id)}
-          disabled={executivePdfLoading}
-          className="case-card__action case-card__action--pdf"
-        >
-          {isLoadingPdf ? 'Abrindo PDF...' : 'PDF Executivo'}
-        </button>
+        )}
       </div>
     </article>
   )
