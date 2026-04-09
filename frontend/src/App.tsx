@@ -348,6 +348,7 @@ function App() {
       setCases((prev) =>
         sortCasesForDisplay(prev.map((caso) => (caso.id === caseId ? updatedCase : caso))),
       )
+      setSelectedCaseId(caseId)
       setCaseActionSuccess(`Caso "${updatedCase.title}" arquivado com sucesso.`)
     } catch (err) {
       const fallback = handleApiFailure(err, 'Não foi possível arquivar o caso selecionado.')
@@ -535,6 +536,9 @@ function App() {
                       onLoadExecutiveSummary={handleLoadExecutiveSummary}
                       onLoadExecutiveReport={handleLoadExecutiveReport}
                       onOpenExecutivePdf={handleOpenExecutivePdf}
+                      onSelectCase={(caseId) => {
+                        setSelectedCaseId(caseId)
+                      }}
                     />
                   )
                 })}

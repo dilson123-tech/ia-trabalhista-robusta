@@ -81,6 +81,15 @@ def _get_or_create_case_analysis_record(
     return analysis_record
 
 
+
+def _ensure_case_not_archived(case: Case):
+    if getattr(case, "status", None) == "archived":
+        raise HTTPException(
+            status_code=409,
+            detail="Archived cases cannot run analysis or executive actions",
+        )
+
+
 @router.get(
     "",
     response_model=list[CaseOut],
@@ -236,6 +245,7 @@ def analyze_case_endpoint(
     if not case:
         raise HTTPException(status_code=404, detail="Case not found")
 
+    _ensure_case_not_archived(case)
 
     # Verifica se já existe análise para esse case + tenant (idempotência)
     existing_analysis = (
@@ -346,6 +356,8 @@ def generate_case_report(
     if not case:
         raise HTTPException(status_code=404, detail="Case not found")
 
+    _ensure_case_not_archived(case)
+
     analysis_record = _get_or_create_case_analysis_record(
         db=db,
         case=case,
@@ -386,6 +398,8 @@ def get_executive_summary(
     if not case:
         raise HTTPException(status_code=404, detail="Case not found")
 
+    _ensure_case_not_archived(case)
+
     analysis_record = _get_or_create_case_analysis_record(
         db=db,
         case=case,
@@ -424,6 +438,8 @@ def get_executive_report(
 
     if not case:
         raise HTTPException(status_code=404, detail="Case not found")
+
+    _ensure_case_not_archived(case)
 
     analysis_record = _get_or_create_case_analysis_record(
         db=db,
@@ -468,6 +484,8 @@ def generate_executive_pdf_route(
     case = scoped_query(db, Case, current_user).filter(Case.id == case_id).first()
     if not case:
         raise HTTPException(status_code=404, detail="Case não encontrado")
+
+    _ensure_case_not_archived(case)
 
     analysis = (
         scoped_query(db, CaseAnalysis, current_user)

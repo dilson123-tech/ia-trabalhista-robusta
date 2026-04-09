@@ -109,7 +109,7 @@ export function DashboardTopPanel({
           <div className="section-head">
             <h2 className="section-heading">Novo Caso</h2>
             <p className="section-description">
-              Cadastre um novo processo com dados reais para alimentar a esteira analítica e executiva.
+              Cadastre um novo caso com número do processo ou referência interna para alimentar a esteira analítica e executiva.
             </p>
           </div>
 
@@ -118,7 +118,7 @@ export function DashboardTopPanel({
               className="form-control"
               value={newCaseForm.case_number}
               onChange={(e) => onNewCaseFieldChange('case_number', e.target.value)}
-              placeholder="Número do processo"
+              placeholder="Número do processo / referência do caso"
             />
 
             <input
