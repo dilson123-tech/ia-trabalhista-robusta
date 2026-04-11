@@ -38,6 +38,8 @@ export type CaseItem = {
   case_number: string
   title: string
   description: string
+  legal_area: string
+  action_type?: string
   status: string
   tenant_id: number
   created_at: string
@@ -48,6 +50,8 @@ export type CaseCreatePayload = {
   case_number: string
   title: string
   description?: string
+  legal_area?: string
+  action_type?: string
   status?: string
 }
 
@@ -158,6 +162,18 @@ export type ExecutiveSummaryResponse = {
     score?: number
     complexity?: string
     estimated_time?: string
+  }
+  analysis_foundations?: {
+    normative_basis?: string[]
+    factual_elements_considered?: string[]
+    probative_gaps?: string[]
+    disclaimer?: string
+    analysis_context?: {
+      legal_area?: string
+      final_status?: string
+      probability_percent?: number
+      viability_label?: string
+    }
   }
 }
 
@@ -423,6 +439,25 @@ export async function createEditableDocumentVersion(
 
   if (!response.ok) {
     await parseError(response, "Erro ao criar nova versão do documento")
+  }
+
+  return response.json()
+}
+
+
+export async function generateAssistedDraft(
+  token: string,
+  documentId: number,
+): Promise<EditableDocumentDetail> {
+  const response = await fetch(`${API_URL}/editable-documents/${documentId}/generate-assisted-draft`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+
+  if (!response.ok) {
+    await parseError(response, "Erro ao gerar peça assistida a partir da análise")
   }
 
   return response.json()

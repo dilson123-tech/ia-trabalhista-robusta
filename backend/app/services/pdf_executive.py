@@ -56,7 +56,7 @@ def _pdf_via_fpdf2(case_data: dict, executive_data: dict) -> bytes:
     pdf.add_page()
 
     pdf.set_font("Helvetica", "B", 16)
-    pdf.cell(0, 10, "IA Trabalhista Robusta", ln=True)
+    pdf.cell(0, 10, "Plataforma Jurídica Multiárea", ln=True)
 
     pdf.set_font("Helvetica", "", 12)
     pdf.cell(0, 8, "Relatorio Executivo Juridico", ln=True)
@@ -100,7 +100,7 @@ def _pdf_via_fpdf2(case_data: dict, executive_data: dict) -> bytes:
 
     pdf.ln(5)
     pdf.set_font("Helvetica", "", 9)
-    pdf.multi_cell(0, 5, "Documento gerado automaticamente pelo sistema IA Trabalhista Robusta.")
+    pdf.multi_cell(0, 5, "Documento gerado automaticamente pelo sistema Plataforma Jurídica Multiárea.")
 
     return bytes(pdf.output(dest="S"))
 
@@ -205,7 +205,7 @@ def generate_executive_pdf(case_data: dict, executive_data: dict) -> bytes:
         </head>
         <body>
           <div class="container">
-            <div class="eyebrow">IA Trabalhista Robusta</div>
+            <div class="eyebrow">Plataforma Jurídica Multiárea</div>
             <h1>Relatório Executivo Jurídico</h1>
             <p class="muted">Gerado em: {generated_at}</p>
 
@@ -304,7 +304,7 @@ def generate_executive_pdf(case_data: dict, executive_data: dict) -> bytes:
             </div>
 
             <div class="footer">
-              Documento gerado automaticamente pelo sistema IA Trabalhista Robusta.
+              Documento gerado automaticamente pelo sistema Plataforma Jurídica Multiárea.
             </div>
           </div>
         </body>

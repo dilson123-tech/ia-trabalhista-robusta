@@ -2,6 +2,8 @@ type NewCaseFormState = {
   case_number: string
   title: string
   description: string
+  legal_area: string
+  action_type: string
   status: string
 }
 
@@ -15,7 +17,7 @@ type DashboardTopPanelProps = {
   error: string
   newCaseForm: NewCaseFormState
   onNewCaseFieldChange: (
-    field: 'case_number' | 'title' | 'description' | 'status',
+    field: 'case_number' | 'title' | 'description' | 'legal_area' | 'action_type' | 'status',
     value: string,
   ) => void
   newCaseLoading: boolean
@@ -49,7 +51,7 @@ export function DashboardTopPanel({
     <>
       <section className="hero-panel">
         <div className="hero-card">
-          <p className="hero-kicker">Plataforma estratégica trabalhista</p>
+          <p className="hero-kicker">Plataforma jurídica estratégica multiárea</p>
           <h1 className="hero-heading">Painel do Advogado</h1>
           <p className="hero-description">
             Centralize análise jurídica, leitura de risco, resumos executivos e relatórios estratégicos
@@ -133,6 +135,32 @@ export function DashboardTopPanel({
               value={newCaseForm.description}
               onChange={(e) => onNewCaseFieldChange('description', e.target.value)}
               placeholder="Descrição do caso"
+            />
+
+            <select
+              className="form-control"
+              value={newCaseForm.legal_area}
+              onChange={(e) => onNewCaseFieldChange('legal_area', e.target.value)}
+            >
+              <option value="trabalhista">Trabalhista</option>
+              <option value="civel">Cível</option>
+              <option value="civil_ambiental">Civil/Ambiental</option>
+              <option value="criminal">Criminal</option>
+              <option value="consumidor">Consumidor</option>
+              <option value="familia">Família</option>
+              <option value="previdenciario">Previdenciário</option>
+              <option value="empresarial">Empresarial</option>
+              <option value="tributario">Tributário</option>
+              <option value="administrativo">Administrativo</option>
+              <option value="imobiliario">Imobiliário</option>
+              <option value="outro">Outro</option>
+            </select>
+
+            <input
+              className="form-control"
+              value={newCaseForm.action_type}
+              onChange={(e) => onNewCaseFieldChange('action_type', e.target.value)}
+              placeholder="Tipo de ação (opcional)"
             />
 
             <select

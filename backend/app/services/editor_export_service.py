@@ -117,7 +117,7 @@ def build_editor_html(document: dict, version: dict) -> str:
         <body>
             <main class="doc-shell">
                 <header class="doc-header">
-                    <div class="doc-kicker">IA Trabalhista Robusta</div>
+                    <div class="doc-kicker">Plataforma Jurídica Multiárea</div>
                     <h1>{title}</h1>
                     <div class="doc-meta">
                         Área: {area} · Tipo: {document_type} · Versão aprovada: {version_number}

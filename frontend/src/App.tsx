@@ -92,6 +92,8 @@ function App() {
     case_number: '',
     title: '',
     description: '',
+    legal_area: 'trabalhista',
+    action_type: '',
     status: 'draft',
   })
 
@@ -295,7 +297,10 @@ function App() {
     }
   }
 
-  function handleNewCaseFieldChange(field: 'case_number' | 'title' | 'description' | 'status', value: string) {
+  function handleNewCaseFieldChange(
+    field: 'case_number' | 'title' | 'description' | 'legal_area' | 'action_type' | 'status',
+    value: string,
+  ) {
     setNewCaseForm((prev) => ({
       ...prev,
       [field]: value,
@@ -312,6 +317,8 @@ function App() {
         case_number: newCaseForm.case_number.trim(),
         title: newCaseForm.title.trim(),
         description: newCaseForm.description.trim() || undefined,
+        legal_area: newCaseForm.legal_area,
+        action_type: newCaseForm.action_type.trim() || undefined,
         status: newCaseForm.status,
       })
 
@@ -324,6 +331,8 @@ function App() {
         case_number: '',
         title: '',
         description: '',
+        legal_area: 'trabalhista',
+        action_type: '',
         status: 'draft',
       })
       setNewCaseSuccess(`Caso "${createdCase.title}" criado com sucesso.`)
@@ -460,7 +469,7 @@ function App() {
                   <p className="insight-kicker">Carteira jurídica</p>
                   <h2 className="insight-title">Casos do escritório</h2>
                   <p className="insight-description">
-                    Lista operacional dos casos carregados via API da IA Trabalhista Robusta.
+                    Lista operacional dos casos carregados via API da Plataforma Jurídica Multiárea.
                   </p>
                 </div>
                 <span className="insight-badge">Base jurídica ativa</span>

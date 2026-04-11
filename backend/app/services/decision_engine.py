@@ -6,17 +6,30 @@ def _is_insufficient_data(viability: Dict, analysis: Dict) -> bool:
     viability_label = str(viability.get("label", "") or "").strip().lower()
     analysis_issues = " ".join(analysis.get("issues", []) or []).lower()
 
+    probability = viability.get("probability")
+    score = viability.get("score")
+
     if viability_dimensions.get("insufficient_data") is True:
         return True
-    if viability.get("probability") is None or viability.get("score") is None:
+    if probability is None or score is None:
         return True
     if "dados insuficientes" in viability_label:
         return True
 
-    insufficient_markers = (
+    hard_markers = (
         "dados insuficientes",
         "insuficiência de dados",
         "insuficiencia de dados",
+        "sem base para calcular",
+        "sem base para aferir",
+        "sem base jurídica",
+        "sem base juridica",
+        "sem base factual",
+    )
+    if any(marker in analysis_issues for marker in hard_markers):
+        return True
+
+    soft_markers = (
         "sem vínculo",
         "sem vinculo",
         "sem datas",
@@ -25,13 +38,13 @@ def _is_insufficient_data(viability: Dict, analysis: Dict) -> bool:
         "sem documentos",
         "ausência de documentos",
         "ausencia de documentos",
-        "sem base para calcular",
-        "sem base para aferir",
-        "sem base jurídica",
-        "sem base juridica",
-        "sem base factual",
     )
-    return any(marker in analysis_issues for marker in insufficient_markers)
+    soft_hits = sum(1 for marker in soft_markers if marker in analysis_issues)
+
+    if soft_hits >= 2 and float(score or 0) < 55:
+        return True
+
+    return False
 
 
 def build_executive_summary(viability: Dict, analysis: Dict) -> str:
@@ -98,8 +111,11 @@ def generate_decision(analysis: Dict, viability: Dict) -> Dict:
         return {
             "final_status": "DADOS INSUFICIENTES",
             "confidence_level": None,
+            "probability_percent": None,
+            "score": None,
             "executive_recommendation": recommendation or "Complementar dados antes de qualquer conclusão executiva",
             "estimated_complexity": complexity or "Indefinida por insuficiência de dados",
+            "complexity": complexity or "Indefinida por insuficiência de dados",
             "estimated_time": estimated_time or "Indisponível por insuficiência de dados",
             "executive_summary": build_executive_summary(viability, analysis),
         }
@@ -129,12 +145,16 @@ def generate_decision(analysis: Dict, viability: Dict) -> Dict:
             final_status = "ARRISCADA"
 
     confidence_level = round(probability * 100, 1)
+    probability_percent = int(round(probability * 100))
 
     return {
         "final_status": final_status,
         "confidence_level": confidence_level,
+        "probability_percent": probability_percent,
+        "score": round(score, 2),
         "executive_recommendation": recommendation or "Sem recomendação executiva definida",
         "estimated_complexity": complexity or "Indefinida",
+        "complexity": complexity or "Indefinida",
         "estimated_time": estimated_time or "Indefinido",
         "executive_summary": build_executive_summary(viability, analysis),
     }

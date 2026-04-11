@@ -13,6 +13,7 @@ from app.services.strategic_diagnosis import strategic_diagnosis
 from app.services.decision_engine import generate_decision
 from app.services.pdf_executive import generate_executive_pdf
 from app.services.executive_summary_engine import generate_executive_summary
+from app.services.analysis_foundations import build_analysis_foundations
 from app.services import analyze_case
 from app.services.usage import register_usage
 from app.services.plan_enforcement import enforce_plan_limits, PlanAction
@@ -40,10 +41,18 @@ def _get_or_create_case_analysis_record(
         return analysis_record
 
     analysis = analyze_case(
-        case_number=case.case_number,
-        title=case.title,
-        description=case.description,
-    )
+
+          case_number=case.case_number,
+
+          title=case.title,
+
+          description=case.description,
+
+          legal_area=case.legal_area,
+
+          action_type=case.action_type,
+
+      )
 
     strategic = strategic_diagnosis(analysis)
     viability = calculate_viability(analysis)
@@ -137,6 +146,8 @@ def create_case(
         "case_number": case.case_number,
         "title": case.title,
         "description": case.description,
+        "legal_area": case.legal_area,
+        "action_type": case.action_type,
         "status": case.status,
         "created_at": case.created_at,
         "updated_at": case.updated_at,
@@ -273,13 +284,17 @@ def analyze_case_endpoint(
 
     analysis = analyze_case(
 
-        case_number=case.case_number,
+          case_number=case.case_number,
 
-        title=case.title,
+          title=case.title,
 
-        description=case.description,
+          description=case.description,
 
-    )
+          legal_area=case.legal_area,
+
+          action_type=case.action_type,
+
+      )
 
 
 
@@ -414,6 +429,20 @@ def get_executive_summary(
     viability = executive_data.get("viability") or full_analysis.get("viability", {})
     decision = executive_data.get("decision") or full_analysis.get("decision", {})
 
+    foundations = build_analysis_foundations(
+        case={
+            "id": case.id,
+            "case_number": case.case_number,
+            "title": case.title,
+            "description": case.description,
+            "legal_area": getattr(case, "legal_area", None),
+            "action_type": getattr(case, "action_type", None),
+        },
+        technical=technical,
+        viability=viability,
+        decision=decision,
+    )
+
     return {
         "case": {
             "id": case.id,
@@ -424,6 +453,7 @@ def get_executive_summary(
         "strategic_analysis": strategic,
         "viability": viability,
         "executive_decision": decision,
+        "analysis_foundations": foundations,
     }
 
 @router.get("/{case_id}/executive-report")
@@ -497,10 +527,12 @@ def generate_executive_pdf_route(
 
     def _build_executive_payload():
         analysis_data = analyze_case(
-            case_number=case.case_number,
-            title=case.title,
-            description=case.description,
-        )
+              case_number=case.case_number,
+              title=case.title,
+              description=case.description,
+              legal_area=case.legal_area,
+              action_type=case.action_type,
+          )
 
         strategic = strategic_diagnosis(analysis_data)
         viability = calculate_viability(analysis_data)

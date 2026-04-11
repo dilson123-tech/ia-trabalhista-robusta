@@ -45,19 +45,32 @@ def _is_insufficient_data(analysis: Dict, viability: Dict, decision: Dict) -> bo
     final_status = str(decision.get("final_status", "") or "").strip().upper()
     analysis_issues = " ".join(analysis.get("issues", []) or []).lower()
 
+    probability = viability.get("probability")
+    score = viability.get("score")
+
     if viability_dimensions.get("insufficient_data") is True:
         return True
-    if viability.get("probability") is None or viability.get("score") is None:
+    if probability is None or score is None:
         return True
     if "dados insuficientes" in viability_label:
         return True
     if final_status == "DADOS INSUFICIENTES":
         return True
 
-    insufficient_markers = (
+    hard_markers = (
         "dados insuficientes",
         "insuficiência de dados",
         "insuficiencia de dados",
+        "sem base para calcular",
+        "sem base para aferir",
+        "sem base jurídica",
+        "sem base juridica",
+        "sem base factual",
+    )
+    if any(marker in analysis_issues for marker in hard_markers):
+        return True
+
+    soft_markers = (
         "sem vínculo",
         "sem vinculo",
         "sem datas",
@@ -66,13 +79,13 @@ def _is_insufficient_data(analysis: Dict, viability: Dict, decision: Dict) -> bo
         "sem documentos",
         "ausência de documentos",
         "ausencia de documentos",
-        "sem base para calcular",
-        "sem base para aferir",
-        "sem base jurídica",
-        "sem base juridica",
-        "sem base factual",
     )
-    return any(marker in analysis_issues for marker in insufficient_markers)
+    soft_hits = sum(1 for marker in soft_markers if marker in analysis_issues)
+
+    if soft_hits >= 2 and float(score or 0) < 55:
+        return True
+
+    return False
 
 
 def generate_executive_summary(
@@ -114,7 +127,7 @@ def generate_executive_summary(
     complexity = _complexity_label(viability.get("complexity", "Indefinida"))
     estimated_time = viability.get("estimated_time", "Indefinido")
     status_phrase = _status_phrase(final_status)
-    probability_percent = int(float(probability) * 100)
+    probability_percent = int(round(float(probability) * 100))
 
     executive_text = (
         f"{status_phrase.capitalize()}, com probabilidade estimada de êxito em {probability_percent}%. "

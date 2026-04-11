@@ -42,7 +42,7 @@ export function LoginPanel({
       <section className="app-container">
         <section className="hero-panel">
           <div className="hero-card">
-            <p className="hero-kicker">IA Trabalhista Robusta</p>
+            <p className="hero-kicker">Plataforma Jurídica Multiárea</p>
             <h1 className="hero-heading">Acesso ao sistema</h1>
             <p className="hero-description">
               Entre com usuário e senha para acessar o painel do advogado, a carteira de casos
