@@ -48,9 +48,9 @@ def _get_or_create_case_analysis_record(
 
           description=case.description,
 
-          legal_area=case.legal_area,
+          legal_area=getattr(case, "legal_area", None),
 
-          action_type=case.action_type,
+          action_type=getattr(case, "action_type", None),
 
       )
 
@@ -146,8 +146,8 @@ def create_case(
         "case_number": case.case_number,
         "title": case.title,
         "description": case.description,
-        "legal_area": case.legal_area,
-        "action_type": case.action_type,
+        "legal_area": getattr(case, "legal_area", None),
+        "action_type": getattr(case, "action_type", None),
         "status": case.status,
         "created_at": case.created_at,
         "updated_at": case.updated_at,
@@ -290,9 +290,9 @@ def analyze_case_endpoint(
 
           description=case.description,
 
-          legal_area=case.legal_area,
+          legal_area=getattr(case, "legal_area", None),
 
-          action_type=case.action_type,
+          action_type=getattr(case, "action_type", None),
 
       )
 
@@ -557,8 +557,8 @@ def generate_executive_pdf_route(
                 case_number=case.case_number,
                 title=case.title,
                 description=case.description,
-                legal_area=case.legal_area,
-                action_type=case.action_type,
+                legal_area=getattr(case, "legal_area", None),
+                action_type=getattr(case, "action_type", None),
             )
 
         existing_exec = analysis.executive_data if analysis and isinstance(analysis.executive_data, dict) else {}
