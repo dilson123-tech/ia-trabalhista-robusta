@@ -194,6 +194,18 @@ export async function getExecutiveSummary(token: string, caseId: number): Promis
 export type ExecutiveReportResponse = {
   case_id: number
   executive_decision?: Record<string, unknown>
+  analysis_foundations?: {
+    normative_basis?: string[]
+    factual_elements_considered?: string[]
+    probative_gaps?: string[]
+    disclaimer?: string
+    analysis_context?: {
+      legal_area?: string
+      final_status?: string
+      probability_percent?: number
+      viability_label?: string
+    }
+  }
   report_html: string
 }
 
