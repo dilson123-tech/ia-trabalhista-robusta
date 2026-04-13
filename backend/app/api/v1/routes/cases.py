@@ -13,6 +13,7 @@ from app.services.strategic_diagnosis import strategic_diagnosis
 from app.services.decision_engine import generate_decision
 from app.services.pdf_executive import generate_executive_pdf
 from app.services.executive_summary_engine import generate_executive_summary
+from app.services.analysis_foundations import build_analysis_foundations
 from app.services import analyze_case
 from app.services.usage import register_usage
 from app.services.plan_enforcement import enforce_plan_limits, PlanAction
@@ -40,10 +41,18 @@ def _get_or_create_case_analysis_record(
         return analysis_record
 
     analysis = analyze_case(
-        case_number=case.case_number,
-        title=case.title,
-        description=case.description,
-    )
+
+          case_number=case.case_number,
+
+          title=case.title,
+
+          description=case.description,
+
+          legal_area=getattr(case, "legal_area", None),
+
+          action_type=getattr(case, "action_type", None),
+
+      )
 
     strategic = strategic_diagnosis(analysis)
     viability = calculate_viability(analysis)
@@ -137,6 +146,8 @@ def create_case(
         "case_number": case.case_number,
         "title": case.title,
         "description": case.description,
+        "legal_area": getattr(case, "legal_area", None),
+        "action_type": getattr(case, "action_type", None),
         "status": case.status,
         "created_at": case.created_at,
         "updated_at": case.updated_at,
@@ -273,13 +284,17 @@ def analyze_case_endpoint(
 
     analysis = analyze_case(
 
-        case_number=case.case_number,
+          case_number=case.case_number,
 
-        title=case.title,
+          title=case.title,
 
-        description=case.description,
+          description=case.description,
 
-    )
+          legal_area=getattr(case, "legal_area", None),
+
+          action_type=getattr(case, "action_type", None),
+
+      )
 
 
 
@@ -414,6 +429,20 @@ def get_executive_summary(
     viability = executive_data.get("viability") or full_analysis.get("viability", {})
     decision = executive_data.get("decision") or full_analysis.get("decision", {})
 
+    foundations = build_analysis_foundations(
+        case={
+            "id": case.id,
+            "case_number": case.case_number,
+            "title": case.title,
+            "description": case.description,
+            "legal_area": getattr(case, "legal_area", None),
+            "action_type": getattr(case, "action_type", None),
+        },
+        technical=technical,
+        viability=viability,
+        decision=decision,
+    )
+
     return {
         "case": {
             "id": case.id,
@@ -424,6 +453,7 @@ def get_executive_summary(
         "strategic_analysis": strategic,
         "viability": viability,
         "executive_decision": decision,
+        "analysis_foundations": foundations,
     }
 
 @router.get("/{case_id}/executive-report")
@@ -454,6 +484,20 @@ def get_executive_report(
     viability = executive_data.get("viability") or full_analysis.get("viability", {})
     decision = executive_data.get("decision") or full_analysis.get("decision", {})
 
+    foundations = build_analysis_foundations(
+        case={
+            "id": case.id,
+            "case_number": case.case_number,
+            "title": case.title,
+            "description": case.description,
+            "legal_area": getattr(case, "legal_area", None),
+            "action_type": getattr(case, "action_type", None),
+        },
+        technical=technical,
+        viability=viability,
+        decision=decision,
+    )
+
     html = generate_report_html(
         case={
             "case_number": case.case_number,
@@ -468,6 +512,7 @@ def get_executive_report(
     return {
         "case_id": case.id,
         "executive_decision": decision,
+        "analysis_foundations": foundations,
         "report_html": html,
     }
 
@@ -496,16 +541,47 @@ def generate_executive_pdf_route(
 
 
     def _build_executive_payload():
-        analysis_data = analyze_case(
-            case_number=case.case_number,
-            title=case.title,
-            description=case.description,
-        )
+        stored_analysis = analysis.analysis if analysis and isinstance(analysis.analysis, dict) else {}
+        analysis_data = stored_analysis.get("technical", {}) if isinstance(stored_analysis, dict) else {}
 
-        strategic = strategic_diagnosis(analysis_data)
-        viability = calculate_viability(analysis_data)
-        decision = generate_decision(analysis_data, viability)
-        decision = generate_executive_summary(analysis_data, viability, decision)
+        if not isinstance(analysis_data, dict) or not analysis_data.get("summary"):
+            analysis_data = {
+                "summary": analysis.summary if analysis else "",
+                "risk_level": analysis.risk_level if analysis else "medium",
+                "issues": analysis.issues if analysis else [],
+                "next_steps": analysis.next_steps if analysis else [],
+            }
+
+        if not isinstance(analysis_data, dict) or not analysis_data.get("summary"):
+            analysis_data = analyze_case(
+                case_number=case.case_number,
+                title=case.title,
+                description=case.description,
+                legal_area=getattr(case, "legal_area", None),
+                action_type=getattr(case, "action_type", None),
+            )
+
+        existing_exec = analysis.executive_data if analysis and isinstance(analysis.executive_data, dict) else {}
+        existing_viability = existing_exec.get("viability", {}) if isinstance(existing_exec, dict) else {}
+        existing_strategic = existing_exec.get("strategic", {}) if isinstance(existing_exec, dict) else {}
+        existing_decision = existing_exec.get("decision", {}) if isinstance(existing_exec, dict) else {}
+
+        viability = existing_viability if (
+            isinstance(existing_viability, dict)
+            and existing_viability.get("probability") is not None
+            and existing_viability.get("score") is not None
+        ) else calculate_viability(analysis_data)
+
+        strategic = existing_strategic if (
+            isinstance(existing_strategic, dict)
+            and existing_strategic.get("financial_risk")
+        ) else strategic_diagnosis(analysis_data)
+
+        decision_seed = generate_decision(analysis_data, viability)
+        if isinstance(existing_decision, dict):
+            decision_seed = {**existing_decision, **decision_seed}
+
+        decision = generate_executive_summary(analysis_data, viability, decision_seed)
         return analysis_data, strategic, viability, decision
 
     executive_data = analysis.executive_data if analysis else {}
@@ -584,11 +660,19 @@ def generate_executive_pdf_route(
             db.refresh(record)
             analysis = record
 
-    executive_payload = dict(analysis.executive_data or {})
-    technical_payload = {}
-    if isinstance(analysis.analysis, dict):
-        technical_payload = analysis.analysis.get("technical", {}) or {}
-    executive_payload["technical"] = technical_payload
+    if needs_refresh:
+        executive_payload = {
+            "viability": viability,
+            "decision": decision,
+            "strategic": strategic,
+            "technical": analysis_data,
+        }
+    else:
+        executive_payload = dict(analysis.executive_data or {})
+        technical_payload = {}
+        if isinstance(analysis.analysis, dict):
+            technical_payload = analysis.analysis.get("technical", {}) or {}
+        executive_payload["technical"] = technical_payload
 
     pdf_bytes = generate_executive_pdf(
         case_data={

@@ -167,7 +167,52 @@ export function CaseFocusPanel({
         </p>
 
         <div className="focus-block">
-          <strong className="info-list-title">Indicadores estratégicos</strong>
+          
+            <strong className="info-list-title">Base normativa considerada</strong>
+            <ul className="info-list">
+              {(executiveSummaryData.analysis_foundations?.normative_basis || []).length > 0 ? (
+                (executiveSummaryData.analysis_foundations?.normative_basis || []).map((item, index) => (
+                  <li key={index}>{item}</li>
+                ))
+              ) : (
+                <li>Base normativa não informada.</li>
+              )}
+            </ul>
+          </div>
+
+          <div className="focus-block">
+            <strong className="info-list-title">Elementos fáticos considerados</strong>
+            <ul className="info-list">
+              {(executiveSummaryData.analysis_foundations?.factual_elements_considered || []).length > 0 ? (
+                (executiveSummaryData.analysis_foundations?.factual_elements_considered || []).map((item, index) => (
+                  <li key={index}>{item}</li>
+                ))
+              ) : (
+                <li>Elementos fáticos não informados.</li>
+              )}
+            </ul>
+          </div>
+
+          <div className="focus-block">
+            <strong className="info-list-title">Lacunas probatórias que impactam a conclusão</strong>
+            <ul className="info-list">
+              {(executiveSummaryData.analysis_foundations?.probative_gaps || []).length > 0 ? (
+                (executiveSummaryData.analysis_foundations?.probative_gaps || []).map((item, index) => (
+                  <li key={index}>{item}</li>
+                ))
+              ) : (
+                <li>Nenhuma lacuna probatória destacada.</li>
+              )}
+            </ul>
+          </div>
+
+          <p className="info-text">
+            <strong>Critério de confiança:</strong>{' '}
+            {executiveSummaryData.analysis_foundations?.disclaimer || 'Critério de confiança não informado.'}
+          </p>
+
+          <div className="focus-block">
+            <strong className="info-list-title">Indicadores estratégicos</strong>
           <ul className="info-list">
             <li>Risco técnico: {getRiskLabel(executiveSummaryData.technical_analysis?.risk_level)}</li>
             <li>Risco financeiro: {executiveSummaryData.strategic_analysis?.financial_risk || 'Não informado'}</li>

@@ -7,7 +7,7 @@ ROOT_DIR = Path(__file__).resolve().parents[3]
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=str(ROOT_DIR / ".env"), env_file_encoding="utf-8", extra="ignore")
 
-    APP_NAME: str = "IA Trabalhista Robusta"
+    APP_NAME: str = "Plataforma Jurídica Multiárea"
     APP_ENV: str = "dev"
     LOG_LEVEL: str = "INFO"
     AUDIT_EXCLUDE_PATHS: str = "/api/v1/health,/docs,/openapi.json"

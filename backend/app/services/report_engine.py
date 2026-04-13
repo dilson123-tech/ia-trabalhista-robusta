@@ -127,7 +127,7 @@ def generate_report_html(case: Dict, analysis: Dict, viability: Dict, executive_
     </head>
     <body>
         <div class=\"container\">
-            <div class=\"eyebrow\">IA Trabalhista Robusta</div>
+            <div class=\"eyebrow\">Plataforma Jurídica Multiárea</div>
             <h1>Relatório Executivo do Caso</h1>
             <p class=\"muted\">Gerado em: {generated_at}</p>
 
@@ -201,7 +201,7 @@ def generate_report_html(case: Dict, analysis: Dict, viability: Dict, executive_
             </div>
 
             <div class=\"footer\">
-                Documento gerado automaticamente pelo sistema IA Trabalhista Robusta.
+                Documento gerado automaticamente pelo sistema Plataforma Jurídica Multiárea.
             </div>
         </div>
     </body>

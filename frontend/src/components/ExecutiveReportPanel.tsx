@@ -79,6 +79,74 @@ export function ExecutiveReportPanel({
             <span className="insight-badge">Relatório executivo real</span>
           </div>
 
+          {(executiveReportData.analysis_foundations?.normative_basis?.length ||
+            executiveReportData.analysis_foundations?.factual_elements_considered?.length ||
+            executiveReportData.analysis_foundations?.probative_gaps?.length ||
+            executiveReportData.analysis_foundations?.analysis_context ||
+            executiveReportData.analysis_foundations?.disclaimer) ? (
+            <div
+              style={{
+                marginBottom: '16px',
+                padding: '16px',
+                borderRadius: '14px',
+                border: '1px solid #24304f',
+                background: '#0a0f1c',
+                color: '#dbe4f0',
+              }}
+            >
+              <h3 style={{ marginTop: 0, marginBottom: '12px', color: '#eaf2ff' }}>Base de confiança da análise</h3>
+
+              {(executiveReportData.analysis_foundations?.normative_basis || []).length > 0 ? (
+                <>
+                  <p style={{ margin: '0 0 8px', fontWeight: 700, color: '#cfe1ff' }}>Base normativa considerada</p>
+                  <ul style={{ marginTop: 0, marginBottom: '12px', paddingLeft: '20px' }}>
+                    {(executiveReportData.analysis_foundations?.normative_basis || []).map((item, index) => (
+                      <li key={`normative-${index}`}>{item}</li>
+                    ))}
+                  </ul>
+                </>
+              ) : null}
+
+              {(executiveReportData.analysis_foundations?.factual_elements_considered || []).length > 0 ? (
+                <>
+                  <p style={{ margin: '0 0 8px', fontWeight: 700, color: '#cfe1ff' }}>Elementos fáticos considerados</p>
+                  <ul style={{ marginTop: 0, marginBottom: '12px', paddingLeft: '20px' }}>
+                    {(executiveReportData.analysis_foundations?.factual_elements_considered || []).map((item, index) => (
+                      <li key={`facts-${index}`}>{item}</li>
+                    ))}
+                  </ul>
+                </>
+              ) : null}
+
+              {(executiveReportData.analysis_foundations?.probative_gaps || []).length > 0 ? (
+                <>
+                  <p style={{ margin: '0 0 8px', fontWeight: 700, color: '#cfe1ff' }}>Lacunas probatórias</p>
+                  <ul style={{ marginTop: 0, marginBottom: '12px', paddingLeft: '20px' }}>
+                    {(executiveReportData.analysis_foundations?.probative_gaps || []).map((item, index) => (
+                      <li key={`gaps-${index}`}>{item}</li>
+                    ))}
+                  </ul>
+                </>
+              ) : null}
+
+              {executiveReportData.analysis_foundations?.analysis_context ? (
+                <p style={{ margin: '0 0 10px', color: '#b8c7da' }}>
+                  <strong style={{ color: '#eaf2ff' }}>Critério de confiança:</strong>{' '}
+                  Área {executiveReportData.analysis_foundations.analysis_context.legal_area || 'não informada'} •
+                  status {executiveReportData.analysis_foundations.analysis_context.final_status || 'não informado'} •
+                  probabilidade {executiveReportData.analysis_foundations.analysis_context.probability_percent ?? 'não informada'}% •
+                  viabilidade {executiveReportData.analysis_foundations.analysis_context.viability_label || 'não informada'}
+                </p>
+              ) : null}
+
+              {executiveReportData.analysis_foundations?.disclaimer ? (
+                <p style={{ margin: 0, color: '#94a3b8', fontSize: '14px' }}>
+                  {executiveReportData.analysis_foundations.disclaimer}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+
           <div
             style={{
               background: '#0a0f1c',
