@@ -111,6 +111,33 @@ def _paragraphs(lines: list[str]) -> str:
     return "\n\n".join(clean_lines)
 
 
+def _series_block(title: str, items: list[str], limit: int = 4) -> str:
+    normalized_items: list[str] = []
+    seen: set[str] = set()
+
+    for item in items:
+        cleaned = _safe_text(item).rstrip(".;:, ")
+        if not cleaned:
+            continue
+        fingerprint = cleaned.lower()
+        if fingerprint in seen:
+            continue
+        seen.add(fingerprint)
+        normalized_items.append(cleaned)
+
+    if not normalized_items:
+        return ""
+
+    lines = [title]
+    for item in normalized_items[:limit]:
+        lines.append(f"- {item}.")
+
+    if len(normalized_items) > limit:
+        lines.append("- Os demais pontos correlatos devem ser detalhados na versão final da minuta.")
+
+    return "\n".join(lines)
+
+
 def _build_missing_context_items(
     case_description: str,
     technical_summary: str,
@@ -217,6 +244,9 @@ def _build_assisted_sections(case: Case, analysis_record) -> list[dict]:
         decision.get("executive_summary") if isinstance(decision, dict) else ""
     )
     final_status = _safe_text(decision.get("final_status") if isinstance(decision, dict) else "")
+    normalized_area = str(getattr(case, "legal_area", "") or "").strip().lower()
+    controverted_points = list(dict.fromkeys([item for item in [*issues, *critical_points] if item]))
+    proof_checklist = list(dict.fromkeys([item for item in [*probative_gaps, *next_steps] if item]))
 
     missing_items = _build_missing_context_items(
         case_description=case_description,
@@ -225,10 +255,12 @@ def _build_assisted_sections(case: Case, analysis_record) -> list[dict]:
         next_steps=next_steps,
     )
 
-    insufficient_context = len(case_description) < 80 and (
-        not technical_summary
+    insufficient_context = (
+        len(case_description) < 80
+        or not technical_summary
         or "apenas identificador" in f"{case_description} {technical_summary}".lower()
         or "dados insuficientes" in f"{case_description} {technical_summary}".lower()
+        or (len(case_description) < 140 and len(proof_checklist) >= 2)
     )
 
     if insufficient_context:
@@ -243,6 +275,8 @@ def _build_assisted_sections(case: Case, analysis_record) -> list[dict]:
                     "origin_sources": ["case", "technical_analysis"],
                     "generation_mode": "assisted_draft_from_analysis",
                     "guardrail_status": "insufficient_data",
+                "missing_items": missing_items,
+                "guidance_title": "O que falta preencher antes de concluir este bloco",
                 },
             },
             {
@@ -255,6 +289,8 @@ def _build_assisted_sections(case: Case, analysis_record) -> list[dict]:
                     "origin_sources": ["technical_analysis", "strategic_analysis", "viability"],
                     "generation_mode": "assisted_draft_from_analysis",
                     "guardrail_status": "insufficient_data",
+                "missing_items": missing_items,
+                "guidance_title": "O que falta preencher antes de concluir este bloco",
                 },
             },
             {
@@ -267,6 +303,8 @@ def _build_assisted_sections(case: Case, analysis_record) -> list[dict]:
                     "origin_sources": ["decision", "viability", "technical_analysis"],
                     "generation_mode": "assisted_draft_from_analysis",
                     "guardrail_status": "insufficient_data",
+                "missing_items": missing_items,
+                "guidance_title": "O que falta preencher antes de concluir este bloco",
                 },
             },
         ]
@@ -276,7 +314,7 @@ def _build_assisted_sections(case: Case, analysis_record) -> list[dict]:
             f"Trata-se do caso {case.case_number} — {case.title}.",
             case_description,
             (
-                "A narrativa fática acima deverá ser revisada e completada, na versão final, com datas, períodos, jornadas, documentos e demais elementos concretos já disponíveis no caso."
+                "A narrativa fática acima deverá ser revisada e completada, na versão final, com datas, períodos, documentos e demais elementos concretos já disponíveis no caso."
                 if len(case_description) < 220
                 else ""
             ),
@@ -285,55 +323,22 @@ def _build_assisted_sections(case: Case, analysis_record) -> list[dict]:
 
     fundamentacao = _paragraphs(
         [
-            "À luz do quadro fático narrado, a fundamentação deve enfrentar a controvérsia jurídica central do caso com base nos fatos já descritos e na prova disponível.",
             (
-                "A base normativa preliminar identificada para sustentar a tese envolve: "
-                + "; ".join(normative_basis)
-                + "."
-                if normative_basis
-                else ""
+                "À luz dos fatos narrados, a tese preliminar deve ser estruturada em torno do direito de vizinhança, da tutela inibitória e da responsabilidade civil pelos impactos alegados sobre o sossego, a saúde e o uso regular do imóvel."
+                if normalized_area == "civil_ambiental"
+                else "À luz do quadro fático narrado, a fundamentação deve enfrentar a controvérsia jurídica central do caso com base nos fatos já descritos e na prova disponível."
             ),
+            _series_block("Base normativa preliminar identificada:", normative_basis, limit=4),
             (
-                "Na leitura atual do caso, foram considerados os seguintes elementos fáticos relevantes: "
-                + "; ".join(factual_elements)
-                + "."
-                if factual_elements
-                else ""
-            ),
-            (
-                "Antes do fechamento da tese, permanecem lacunas probatórias que exigem saneamento: "
-                + "; ".join(probative_gaps)
-                + "."
-                if probative_gaps
-                else ""
-            ),
-            (
-                f"A linha argumentativa preliminar indicada para a peça consiste em {recommended_strategy}."
+                f"A estratégia jurídica preliminar recomenda {recommended_strategy}."
                 if recommended_strategy
                 else ""
             ),
+            _series_block("Pontos controvertidos que exigem enfrentamento direto:", controverted_points, limit=4),
+            _series_block("Elementos probatórios e fáticos que ainda devem ser complementados:", proof_checklist, limit=4),
             (
-                "Devem ser enfrentados, de forma articulada, os seguintes pontos controvertidos: "
-                + "; ".join(issues)
-                + "."
-                if issues
-                else ""
-            ),
-            (
-                "Na construção da tese, merecem destaque os seguintes pontos críticos: "
-                + "; ".join(critical_points)
-                + "."
-                if critical_points
-                else ""
-            ),
-            (
-                f"Como orientação de coerência interna da minuta, considera-se a síntese executiva já consolidada: {executive_summary}"
-                if executive_summary
-                else ""
-            ),
-            (
-                f"A redação final deve observar a seguinte prudência jurídica já indicada na análise de viabilidade: {viability_recommendation}"
-                if viability_recommendation
+                f"Síntese executiva considerada na redação: {executive_summary}"
+                if executive_summary and "dados insuficientes" not in executive_summary.lower()
                 else ""
             ),
         ]
@@ -341,31 +346,86 @@ def _build_assisted_sections(case: Case, analysis_record) -> list[dict]:
 
     pedidos = _paragraphs(
         [
-            "Ao final, requer-se a procedência dos pedidos compatíveis com os fatos narrados, a tese sustentada e a prova atualmente disponível.",
             (
-                "Em linha preliminar, a minuta pode concentrar os pedidos nos seguintes eixos materiais já identificados no caso: "
-                + "; ".join(issues)
-                + "."
-                if issues
+                "Ao final, a minuta pode ser estruturada com pedidos de obrigação de fazer e de não fazer, tutela de urgência para cessação ou redução imediata dos impactos narrados, produção de prova técnica e eventual reparação por danos materiais e morais, conforme o conjunto probatório consolidado."
+                if normalized_area == "civil_ambiental"
+                else "Ao final, requer-se a procedência dos pedidos compatíveis com os fatos narrados, a tese sustentada e a prova atualmente disponível."
+            ),
+            _series_block("Eixos materiais para organizar os pedidos principais:", issues, limit=4),
+            "Também devem constar requerimentos probatórios, tutela provisória quando cabível e demais pedidos acessórios compatíveis com a estratégia processual adotada.",
+            (
+                f"A conclusão provisória da análise recomenda o seguinte enquadramento final dos pedidos: {final_status}."
+                if final_status and "dados insuficientes" not in final_status.lower()
                 else ""
             ),
-            "Também devem ser avaliados, conforme o caso concreto, reflexos legais, consectários, requerimentos probatórios e demais pedidos acessórios pertinentes.",
+            "Antes do fechamento definitivo, conferir a compatibilidade entre pedidos, prova disponível, tutela de urgência e extensão dos danos alegados.",
+        ]
+    )
+
+    enderecamento = _paragraphs(
+        [
             (
-                f"O fechamento dos pedidos deve respeitar a conclusão provisória registrada na análise: {final_status}."
-                if final_status
-                else ""
+                "AO JUÍZO CÍVEL COMPETENTE DA COMARCA A SER DEFINIDA PELO ADVOGADO."
+                if normalized_area == "civil_ambiental"
+                else "AO JUÍZO COMPETENTE A SER DEFINIDO PELO ADVOGADO."
             ),
+            "A competência, o rito e eventual prevenção devem ser revisados na versão final da peça."
+        ]
+    )
+
+    qualificacao_partes = _paragraphs(
+        [
+            "AUTORA/PARTE AUTORA: qualificação completa a ser inserida pelo advogado, com nome, CPF/CNPJ, endereço e demais dados necessários.",
+            "RÉ/PARTE RÉ: qualificação completa a ser confirmada pelo advogado, com nome ou razão social, CPF/CNPJ, endereço e elementos de identificação disponíveis.",
+            "A composição do polo ativo e do polo passivo deve ser revisada conforme os documentos, a estratégia processual e a legitimidade das partes.",
+        ]
+    )
+
+    provas_requerimentos = _paragraphs(
+        [
+            "Requer-se a produção de todos os meios de prova em direito admitidos, especialmente documental, testemunhal e pericial, conforme a natureza das controvérsias identificadas.",
             (
-                "Antes do fechamento definitivo, conferir e completar os seguintes pontos: "
-                + "; ".join(next_steps)
-                + "."
-                if next_steps
-                else "Antes da versão final, revisar pedidos principais, reflexos, acessórios e requerimentos probatórios conforme a prova disponível."
+                "Na versão final, devem ser especificados os documentos já existentes, a necessidade de prova técnica ambiental/acústica, eventual inspeção judicial e o fundamento da tutela de urgência."
+                if normalized_area == "civil_ambiental"
+                else "Na versão final, devem ser especificados os documentos já existentes, a prova técnica pertinente e os requerimentos probatórios adequados ao caso."
             ),
+            "Também devem ser ajustados os requerimentos acessórios, a intimação da parte contrária e as providências processuais cabíveis ao rito escolhido.",
+        ]
+    )
+
+    fechamento = _paragraphs(
+        [
+            "Dá-se à causa o valor a ser definido pelo advogado conforme critérios legais, extensão do dano e documentação disponível.",
+            "Termos em que, pede deferimento.",
+            "Local, data e assinatura profissional deverão ser inseridos na versão final da peça.",
         ]
     )
 
     return [
+        {
+            "key": "enderecamento",
+            "title": "Endereçamento",
+            "content": enderecamento,
+            "source": "assisted_draft",
+            "status": "draft",
+            "metadata": {
+                "origin_sources": ["case", "strategy"],
+                "generation_mode": "assisted_draft_from_analysis",
+                "guardrail_status": "ok",
+            },
+        },
+        {
+            "key": "qualificacao_partes",
+            "title": "Qualificação das Partes",
+            "content": qualificacao_partes,
+            "source": "assisted_draft",
+            "status": "draft",
+            "metadata": {
+                "origin_sources": ["case"],
+                "generation_mode": "assisted_draft_from_analysis",
+                "guardrail_status": "ok",
+            },
+        },
         {
             "key": "resumo_fatico",
             "title": "Resumo Fático",
@@ -402,8 +462,31 @@ def _build_assisted_sections(case: Case, analysis_record) -> list[dict]:
                 "guardrail_status": "ok",
             },
         },
+        {
+            "key": "provas_requerimentos",
+            "title": "Provas e Requerimentos",
+            "content": provas_requerimentos,
+            "source": "assisted_draft",
+            "status": "draft",
+            "metadata": {
+                "origin_sources": ["technical_analysis", "strategy"],
+                "generation_mode": "assisted_draft_from_analysis",
+                "guardrail_status": "ok",
+            },
+        },
+        {
+            "key": "fechamento",
+            "title": "Fechamento",
+            "content": fechamento,
+            "source": "assisted_draft",
+            "status": "draft",
+            "metadata": {
+                "origin_sources": ["strategy"],
+                "generation_mode": "assisted_draft_from_analysis",
+                "guardrail_status": "ok",
+            },
+        },
     ]
-
 
 @router.post(
     "",
