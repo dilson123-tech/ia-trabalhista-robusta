@@ -4,6 +4,7 @@ import {
   createEditableDocument,
   createEditableDocumentVersion,
   deleteEditableDocument,
+  generateAssistedDraft,
   getEditableDocument,
   listEditableDocumentsForCase,
   type EditableDocumentDetail,
@@ -36,9 +37,27 @@ const getSectionHelpText = (sectionKey: string | null | undefined): string => {
   }
 }
 
+
+const getSectionGuardrailStatus = (section: EditableSection): string => {
+  const value = section.metadata?.guardrail_status
+  return typeof value === 'string' ? value : ''
+}
+
+const getSectionMissingItems = (section: EditableSection): string[] => {
+  const value = section.metadata?.missing_items
+  if (!Array.isArray(value)) return []
+  return value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+}
+
+const getSectionGuidanceTitle = (section: EditableSection): string => {
+  const value = section.metadata?.guidance_title
+  return typeof value === 'string' && value.trim() ? value : 'O que falta preencher'
+}
+
 type EditorModulePanelProps = {
   token: string
   selectedCaseId: number | null
+  selectedCaseArea?: string | null
 }
 
 type EditableDocumentVersion = EditableDocumentDetail['versions'][number]
@@ -68,7 +87,7 @@ function getSectionIdentifier(section: EditableSection) {
 
 const API_BASE_URL = (import.meta.env.VITE_API_URL ?? 'http://127.0.0.1:8099/api/v1').replace(/\/$/, '')
 
-export function EditorModulePanel({ token, selectedCaseId }: EditorModulePanelProps) {
+export function EditorModulePanel({ token, selectedCaseId, selectedCaseArea }: EditorModulePanelProps) {
   const [documents, setDocuments] = useState<EditableDocumentItem[]>([])
   const [selectedDocumentId, setSelectedDocumentId] = useState<number | null>(null)
   const [selectedDocument, setSelectedDocument] = useState<EditableDocumentDetail | null>(null)
@@ -84,6 +103,7 @@ export function EditorModulePanel({ token, selectedCaseId }: EditorModulePanelPr
   const [versionSuccess, setVersionSuccess] = useState('')
   const [exportLoading, setExportLoading] = useState<'html' | 'pdf' | null>(null)
   const [deleteLoading, setDeleteLoading] = useState(false)
+  const [assistedDraftLoading, setAssistedDraftLoading] = useState(false)
   const [compareBaseVersionNumber, setCompareBaseVersionNumber] = useState<number | null>(null)
   const [compareTargetVersionNumber, setCompareTargetVersionNumber] = useState<number | null>(null)
   const [editingSectionKey, setEditingSectionKey] = useState<string | null>(null)
@@ -93,7 +113,14 @@ export function EditorModulePanel({ token, selectedCaseId }: EditorModulePanelPr
   const [saveEditLoading, setSaveEditLoading] = useState(false)
   const [newDocumentTitle, setNewDocumentTitle] = useState('')
   const [newDocumentType, setNewDocumentType] = useState('peticao_inicial')
-  const [newDocumentArea, setNewDocumentArea] = useState('trabalhista')
+  const [newDocumentArea, setNewDocumentArea] = useState(selectedCaseArea || 'trabalhista')
+  const [guidedInputs, setGuidedInputs] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    if (!showCreateForm) return
+    setNewDocumentArea(selectedCaseArea || 'trabalhista')
+  }, [selectedCaseArea, showCreateForm])
+
 
   function mapDetailToListItem(detail: EditableDocumentDetail): EditableDocumentItem {
     return {
@@ -131,6 +158,35 @@ export function EditorModulePanel({ token, selectedCaseId }: EditorModulePanelPr
     setSelectedDocument(detail)
     upsertDocumentInList(detail)
     return detail
+  }
+
+  async function handleGenerateAssistedDraft() {
+    if (!token.trim() || !selectedDocumentId) return
+
+    setAssistedDraftLoading(true)
+    setVersionError('')
+    setVersionSuccess('')
+    setEditingError('')
+    setEditingSuccess('')
+
+    try {
+      const detail = await generateAssistedDraft(token, selectedDocumentId)
+      setSelectedDocument(detail)
+      upsertDocumentInList(detail)
+      setCompareBaseVersionNumber(null)
+      setCompareTargetVersionNumber(null)
+      setEditingSectionKey(null)
+      setEditingContent('')
+      setVersionSuccess(`Peça assistida gerada com sucesso na versão ${detail.current_version_number}.`)
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setVersionError(err.message)
+      } else {
+        setVersionError('Não foi possível gerar a peça assistida a partir da análise.')
+      }
+    } finally {
+      setAssistedDraftLoading(false)
+    }
   }
 
   async function handleDeleteDocument() {
@@ -494,7 +550,7 @@ export function EditorModulePanel({ token, selectedCaseId }: EditorModulePanelPr
       setShowCreateForm(false)
       setNewDocumentTitle('')
       setNewDocumentType('peticao_inicial')
-      setNewDocumentArea('trabalhista')
+      setNewDocumentArea(selectedCaseArea || 'trabalhista')
       setCreateSuccess(`Documento "${created.title}" criado com sucesso.`)
     } catch (err) {
       if (err instanceof ApiError) {
@@ -588,12 +644,43 @@ export function EditorModulePanel({ token, selectedCaseId }: EditorModulePanelPr
     setEditingSuccess('')
   }
 
+  function handleGuidedInputChange(sectionKey: string, value: string) {
+    setGuidedInputs((prev) => ({
+      ...prev,
+      [sectionKey]: value,
+    }))
+  }
+
+  function handleApplyGuidedFill(section: EditableSection) {
+    const sectionKey = getSectionIdentifier(section)
+    const missingItems = getSectionMissingItems(section)
+    const draftedInput = (guidedInputs[sectionKey] || '').trim()
+    const guidedTemplate = draftedInput
+      ? draftedInput
+      : missingItems.map((item) => `- ${item}: `).join('\n')
+
+    const currentBase = (section.content || '').trim()
+    const guidedBlock = guidedTemplate
+      ? `[Complementos guiados do advogado]\n${guidedTemplate}`
+      : ''
+
+    setEditingSectionKey(sectionKey)
+    setEditingContent([currentBase, guidedBlock].filter(Boolean).join('\n\n'))
+    setEditingError('')
+    setEditingSuccess('')
+    setVersionError('')
+    setVersionSuccess('')
+  }
+
   async function handleSaveSectionEdit(section: EditableSection) {
     if (!token.trim() || !selectedDocument || !currentVersion) return
 
     const sectionKey = getSectionIdentifier(section)
     const normalizedOriginal = section.content ?? ''
     const normalizedEdited = editingContent
+    const guidedComplementMatch = normalizedEdited.match(/\[Complementos guiados do advogado\]\n([\s\S]*)$/)
+    const guidedComplement = guidedComplementMatch?.[1]?.trim() || ''
+    const shouldPropagateResumo = sectionKey === 'resumo_fatico' && guidedComplement.length > 0
 
     if (sectionKey !== editingSectionKey) {
       setEditingError('O bloco em edição não confere com a seleção atual.')
@@ -618,13 +705,43 @@ export function EditorModulePanel({ token, selectedCaseId }: EditorModulePanelPr
           const currentKey = getSectionIdentifier(currentSection)
 
           if (currentKey !== sectionKey) {
+            const shouldEnrichFromResumo =
+              shouldPropagateResumo &&
+              (currentKey === 'fundamentacao' || currentKey === 'pedidos')
+
+            if (!shouldEnrichFromResumo) {
+              return {
+                key: currentSection.key,
+                title: currentSection.title,
+                content: currentSection.content,
+                source: currentSection.source,
+                status: currentSection.status,
+                metadata: currentSection.metadata ?? {},
+              }
+            }
+
+            const propagationTitle =
+              currentKey === 'fundamentacao'
+                ? '[Insumos reaproveitados do Resumo Fático para apoiar a fundamentação]'
+                : '[Insumos reaproveitados do Resumo Fático para apoiar os pedidos]'
+
+            const baseContent = (currentSection.content || '').trim()
+            const propagatedBlock = `${propagationTitle}\n${guidedComplement}`
+            const propagatedContent = baseContent.includes(propagationTitle)
+              ? baseContent
+              : [baseContent, propagatedBlock].filter(Boolean).join('\n\n')
+
             return {
               key: currentSection.key,
               title: currentSection.title,
-              content: currentSection.content,
+              content: propagatedContent,
               source: currentSection.source,
               status: currentSection.status,
-              metadata: currentSection.metadata ?? {},
+              metadata: {
+                ...(currentSection.metadata ?? {}),
+                propagated_from_resumo_fatico: true,
+                propagated_source_version_number: currentVersion.version_number,
+              },
             }
           }
 
@@ -636,7 +753,11 @@ export function EditorModulePanel({ token, selectedCaseId }: EditorModulePanelPr
             status: 'edited',
             metadata: {
               ...(currentSection.metadata ?? {}),
-              edited_in_frontend: true
+              edited_in_frontend: true,
+                guardrail_status: 'manual_completed',
+                missing_items: [],
+                guidance_title: '',
+                manual_completion_source: 'guided_editor'
             },
           }
         }),
@@ -754,7 +875,7 @@ export function EditorModulePanel({ token, selectedCaseId }: EditorModulePanelPr
               onChange={(e) => setNewDocumentArea(e.target.value)}
             >
               <option value="trabalhista">Trabalhista</option>
-              <option value="civel">Cível</option>
+              <option value="civil_ambiental">Civil/Ambiental</option>
               <option value="consumidor">Consumidor</option>
               <option value="previdenciario">Previdenciário</option>
             </select>
@@ -873,6 +994,22 @@ export function EditorModulePanel({ token, selectedCaseId }: EditorModulePanelPr
                 </p>
 
                 <div className="actions-row" style={{ marginTop: '12px', flexWrap: 'wrap', gap: '10px' }}>
+                    <button
+                      type="button"
+                      className={`btn ${
+                        assistedDraftLoading || !selectedDocumentId || versionActionLoading || exportLoading !== null
+                          ? 'btn-muted'
+                          : 'btn-secondary'
+                      }`}
+                      onClick={() => void handleGenerateAssistedDraft()}
+                      disabled={
+                        assistedDraftLoading || !selectedDocumentId || Boolean(versionActionLoading) || exportLoading !== null
+                      }
+                      title="Gerar rascunho inicial dos blocos com base na análise, resumo executivo e decisão do caso"
+                    >
+                      {assistedDraftLoading ? 'Gerando peça assistida...' : 'Gerar peça assistida'}
+                    </button>
+
                   <button
                     type="button"
                     className={`btn ${versionActionLoading || !currentVersion ? 'btn-muted' : 'btn-primary'}`}
@@ -960,6 +1097,9 @@ export function EditorModulePanel({ token, selectedCaseId }: EditorModulePanelPr
                           {currentVersion.sections.length > 0 ? (
                             currentVersion.sections.map((section, index) => {
                               const isEditing = editingSectionKey === getSectionIdentifier(section)
+                                const guardrailStatus = getSectionGuardrailStatus(section)
+                                const missingItems = getSectionMissingItems(section)
+                                const guidanceTitle = getSectionGuidanceTitle(section)
 
                               return (
                                 <li key={`${section.key}-${index}`}>
@@ -968,9 +1108,60 @@ export function EditorModulePanel({ token, selectedCaseId }: EditorModulePanelPr
                                   <div style={{ marginTop: '8px' }}>
                                     {!isEditing ? (
                                       <>
-                                        <p className="body-text" style={{ whiteSpace: 'pre-wrap', marginBottom: '8px' }}>
-                                          {section.content || 'Sem conteúdo registrado neste bloco.'}
-                                        </p>
+                                          {guardrailStatus === 'insufficient_data' || missingItems.length > 0 ? (
+                                            <div
+                                              style={{
+                                                marginBottom: '12px',
+                                                padding: '12px',
+                                                borderRadius: '12px',
+                                                background: 'rgba(245, 158, 11, 0.10)',
+                                                border: '1px solid rgba(245, 158, 11, 0.28)',
+                                              }}
+                                            >
+                                              <p className="info-meta" style={{ marginBottom: '8px', fontWeight: 700 }}>
+                                                Atenção: dados insuficientes neste bloco.
+                                              </p>
+                                              <p className="info-meta" style={{ marginBottom: missingItems.length > 0 ? '8px' : 0 }}>
+                                                {guidanceTitle}
+                                              </p>
+                                              {missingItems.length > 0 ? (
+                                                <ul className="info-list" style={{ marginBottom: 0 }}>
+                                                  {missingItems.map((item, missingIndex) => (
+                                                    <li key={`${section.key}-missing-${missingIndex}`}>{item}</li>
+                                                  ))}
+                                                </ul>
+                                              ) : null}
+
+                                                {missingItems.length > 0 ? (
+                                                  <>
+                                                    <textarea
+                                                      className="form-control"
+                                                      value={guidedInputs[getSectionIdentifier(section)] || ''}
+                                                      onChange={(e) =>
+                                                        handleGuidedInputChange(getSectionIdentifier(section), e.target.value)
+                                                      }
+                                                      placeholder={missingItems.map((item) => `- ${item}:`).join('\n')}
+                                                      rows={4}
+                                                      style={{ width: '100%', marginBottom: '8px' }}
+                                                    />
+                                                    <div className="actions-row">
+                                                      <button
+                                                        type="button"
+                                                        className={`btn ${currentVersion.approved ? 'btn-muted' : 'btn-primary'}`}
+                                                        onClick={() => handleApplyGuidedFill(section)}
+                                                        disabled={currentVersion.approved}
+                                                      >
+                                                        Levar respostas para edição
+                                                      </button>
+                                                    </div>
+                                                  </>
+                                                ) : null}
+                                            </div>
+                                          ) : null}
+
+                                          <p className="body-text" style={{ whiteSpace: 'pre-wrap', marginBottom: '8px' }}>
+                                            {section.content || 'Sem conteúdo registrado neste bloco.'}
+                                          </p>
 
                                         <button
                                           type="button"
@@ -1177,9 +1368,27 @@ export function EditorModulePanel({ token, selectedCaseId }: EditorModulePanelPr
                                   <p className="info-meta" style={{ marginBottom: '8px' }}>
                                     Antes • V{compareBaseVersion.version_number}
                                   </p>
-                                  <p className="body-text" style={{ whiteSpace: 'pre-wrap' }}>
-                                    {row.baseContent || 'Sem conteúdo registrado nesta versão.'}
-                                  </p>
+                                  <div
+
+                                    style={{
+
+                                      maxHeight: '320px',
+
+                                      overflowY: 'auto',
+
+                                      paddingRight: '6px',
+
+                                    }}
+
+                                  >
+
+                                    <p className="body-text" style={{ whiteSpace: 'pre-wrap', marginBottom: 0 }}>
+
+                                      {row.baseContent || 'Sem conteúdo registrado nesta versão.'}
+
+                                    </p>
+
+                                  </div>
                                 </div>
 
                                 <div
@@ -1195,9 +1404,27 @@ export function EditorModulePanel({ token, selectedCaseId }: EditorModulePanelPr
                                   <p className="info-meta" style={{ marginBottom: '8px' }}>
                                     Depois • V{compareTargetVersion.version_number}
                                   </p>
-                                  <p className="body-text" style={{ whiteSpace: 'pre-wrap' }}>
-                                    {row.targetContent || 'Sem conteúdo registrado nesta versão.'}
-                                  </p>
+                                  <div
+
+                                    style={{
+
+                                      maxHeight: '320px',
+
+                                      overflowY: 'auto',
+
+                                      paddingRight: '6px',
+
+                                    }}
+
+                                  >
+
+                                    <p className="body-text" style={{ whiteSpace: 'pre-wrap', marginBottom: 0 }}>
+
+                                      {row.targetContent || 'Sem conteúdo registrado nesta versão.'}
+
+                                    </p>
+
+                                  </div>
                                 </div>
                               </div>
                             </article>
