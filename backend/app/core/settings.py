@@ -21,6 +21,18 @@ class Settings(BaseSettings):
     API_V1_PREFIX: str = "/api/v1"
     DATABASE_URL: str = "postgresql+psycopg2://ia_app:ia_app_pass@127.0.0.1:55432/ia_trabalhista"
 
+    PLAN_BASIC_ACTIVE_CASES_LIMIT: int = 50
+    PLAN_BASIC_CASE_RECORDS_LIMIT: int = 200
+    PLAN_BASIC_AI_ANALYSES_PER_MONTH: int = 20
+
+    PLAN_PRO_ACTIVE_CASES_LIMIT: int = 200
+    PLAN_PRO_CASE_RECORDS_LIMIT: int = 1000
+    PLAN_PRO_AI_ANALYSES_PER_MONTH: int = 100
+
+    PLAN_OFFICE_ACTIVE_CASES_LIMIT: int = 1000
+    PLAN_OFFICE_CASE_RECORDS_LIMIT: int = 10000
+    PLAN_OFFICE_AI_ANALYSES_PER_MONTH: int = 500
+
     LLM_PROVIDER: str = "openai"
     LLM_API_KEY: str = ""
     LLM_MODEL: str = "gpt-5-mini"

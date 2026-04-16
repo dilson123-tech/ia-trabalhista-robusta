@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import enum
-import os
 from dataclasses import dataclass
+
+from app.core.settings import settings
 
 
 class PlanType(str, enum.Enum):
@@ -19,23 +20,31 @@ class SubscriptionStatus(str, enum.Enum):
 
 @dataclass(frozen=True)
 class PlanLimits:
-    cases_per_month: int
+    active_cases_limit: int
+    case_records_limit: int
     ai_analyses_per_month: int
 
+    @property
+    def cases_per_month(self) -> int:
+        # alias legado para não quebrar contratos antigos imediatamente
+        return self.active_cases_limit
 
-# Fonte da verdade (pode tunar via env sem mexer em código — ótimo pra testes/CI)
+
 LIMITS: dict[PlanType, PlanLimits] = {
     PlanType.basic: PlanLimits(
-        cases_per_month=int(os.getenv("PLAN_BASIC_CASES_PER_MONTH", "50")),
-        ai_analyses_per_month=int(os.getenv("PLAN_BASIC_AI_ANALYSES_PER_MONTH", "20")),
+        active_cases_limit=settings.PLAN_BASIC_ACTIVE_CASES_LIMIT,
+        case_records_limit=settings.PLAN_BASIC_CASE_RECORDS_LIMIT,
+        ai_analyses_per_month=settings.PLAN_BASIC_AI_ANALYSES_PER_MONTH,
     ),
     PlanType.pro: PlanLimits(
-        cases_per_month=int(os.getenv("PLAN_PRO_CASES_PER_MONTH", "200")),
-        ai_analyses_per_month=int(os.getenv("PLAN_PRO_AI_ANALYSES_PER_MONTH", "100")),
+        active_cases_limit=settings.PLAN_PRO_ACTIVE_CASES_LIMIT,
+        case_records_limit=settings.PLAN_PRO_CASE_RECORDS_LIMIT,
+        ai_analyses_per_month=settings.PLAN_PRO_AI_ANALYSES_PER_MONTH,
     ),
     PlanType.office: PlanLimits(
-        cases_per_month=int(os.getenv("PLAN_OFFICE_CASES_PER_MONTH", "1000")),
-        ai_analyses_per_month=int(os.getenv("PLAN_OFFICE_AI_ANALYSES_PER_MONTH", "500")),
+        active_cases_limit=settings.PLAN_OFFICE_ACTIVE_CASES_LIMIT,
+        case_records_limit=settings.PLAN_OFFICE_CASE_RECORDS_LIMIT,
+        ai_analyses_per_month=settings.PLAN_OFFICE_AI_ANALYSES_PER_MONTH,
     ),
 }
 
