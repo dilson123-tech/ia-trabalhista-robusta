@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   ApiError,
   createEditableDocument,
@@ -58,6 +58,7 @@ type EditorModulePanelProps = {
   token: string
   selectedCaseId: number | null
   selectedCaseArea?: string | null
+  pieceReadyRequestId?: number
 }
 
 type EditableDocumentVersion = EditableDocumentDetail['versions'][number]
@@ -113,7 +114,7 @@ function getSectionIdentifier(section: EditableSection) {
 
 const API_BASE_URL = (import.meta.env.VITE_API_URL ?? 'http://127.0.0.1:8099/api/v1').replace(/\/$/, '')
 
-export function EditorModulePanel({ token, selectedCaseId, selectedCaseArea }: EditorModulePanelProps) {
+export function EditorModulePanel({ token, selectedCaseId, selectedCaseArea, pieceReadyRequestId }: EditorModulePanelProps) {
   const [documents, setDocuments] = useState<EditableDocumentItem[]>([])
   const [selectedDocumentId, setSelectedDocumentId] = useState<number | null>(null)
   const [selectedDocument, setSelectedDocument] = useState<EditableDocumentDetail | null>(null)
@@ -141,6 +142,7 @@ export function EditorModulePanel({ token, selectedCaseId, selectedCaseArea }: E
   const [newDocumentType, setNewDocumentType] = useState('peticao_inicial')
   const [newDocumentArea, setNewDocumentArea] = useState(selectedCaseArea || 'trabalhista')
   const [guidedInputs, setGuidedInputs] = useState<Record<string, string>>({})
+  const handledPieceReadyRequestRef = useRef(0)
 
   useEffect(() => {
     if (!showCreateForm) return
@@ -186,6 +188,83 @@ export function EditorModulePanel({ token, selectedCaseId, selectedCaseArea }: E
     return detail
   }
 
+  async function handleGenerateReadyPiece() {
+    if (!token.trim() || !selectedCaseId) return
+
+    setAssistedDraftLoading(true)
+    setCreateError('')
+    setCreateSuccess('')
+    setVersionError('')
+    setVersionSuccess('')
+    setEditingError('')
+    setEditingSuccess('')
+
+    try {
+      let documentId = selectedDocumentId ?? documents[0]?.id ?? null
+      let createdDetail: EditableDocumentDetail | null = null
+
+      if (!documentId) {
+        createdDetail = await createEditableDocument(token, {
+          case_id: selectedCaseId,
+          area: selectedCaseArea || 'trabalhista',
+          document_type: 'peticao_inicial',
+          title: `Peça pronta — Caso #${selectedCaseId}`,
+          notes: 'Documento base criado automaticamente pelo fluxo Gerar peça pronta.',
+          metadata: {
+            source: 'piece_ready_quick_flow',
+          },
+          sections: [
+            {
+              key: 'resumo_fatico',
+              title: 'Resumo fático',
+              content: '',
+              source: 'manual',
+            },
+            {
+              key: 'fundamentacao',
+              title: 'Fundamentação jurídica',
+              content: '',
+              source: 'manual',
+            },
+            {
+              key: 'pedidos',
+              title: 'Pedidos',
+              content: '',
+              source: 'manual',
+            },
+          ],
+        })
+
+        documentId = createdDetail.id
+        setSelectedDocumentId(createdDetail.id)
+        setSelectedDocument(createdDetail)
+        upsertDocumentInList(createdDetail)
+        setCreateSuccess('Documento base criado para iniciar a peça pronta.')
+      }
+
+      const assistedDetail = await generateAssistedDraft(token, documentId)
+      setSelectedDocument(assistedDetail)
+      upsertDocumentInList(assistedDetail)
+      setSelectedDocumentId(assistedDetail.id)
+      setCompareBaseVersionNumber(null)
+      setCompareTargetVersionNumber(null)
+      setEditingSectionKey(null)
+      setEditingContent('')
+      setShowCreateForm(false)
+      setVersionSuccess(
+        `Peça pronta gerada com sucesso na versão ${assistedDetail.current_version_number}. Revise, aprove e exporte o PDF final.`,
+      )
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setVersionError(err.message)
+      } else {
+        setVersionError('Não foi possível gerar a peça pronta para o caso selecionado.')
+      }
+    } finally {
+      setAssistedDraftLoading(false)
+    }
+  }
+
   async function handleGenerateAssistedDraft() {
     if (!token.trim() || !selectedDocumentId) return
 
@@ -203,12 +282,12 @@ export function EditorModulePanel({ token, selectedCaseId, selectedCaseArea }: E
       setCompareTargetVersionNumber(null)
       setEditingSectionKey(null)
       setEditingContent('')
-      setVersionSuccess(`Peça assistida gerada com sucesso na versão ${detail.current_version_number}.`)
+      setVersionSuccess(`Peça pronta atualizada com sucesso na versão ${detail.current_version_number}.`)
     } catch (err) {
       if (err instanceof ApiError) {
         setVersionError(err.message)
       } else {
-        setVersionError('Não foi possível gerar a peça assistida a partir da análise.')
+        setVersionError('Não foi possível gerar a peça pronta a partir da análise.')
       }
     } finally {
       setAssistedDraftLoading(false)
@@ -373,6 +452,24 @@ export function EditorModulePanel({ token, selectedCaseId, selectedCaseArea }: E
       isActive = false
     }
   }, [token, selectedDocumentId])
+
+  useEffect(() => {
+    if (!pieceReadyRequestId) return
+    if (handledPieceReadyRequestRef.current === pieceReadyRequestId) return
+    if (!token.trim() || !selectedCaseId) return
+    if (loadingList || loadingDetail || createLoading || assistedDraftLoading) return
+
+    handledPieceReadyRequestRef.current = pieceReadyRequestId
+    void handleGenerateReadyPiece()
+  }, [
+    pieceReadyRequestId,
+    token,
+    selectedCaseId,
+    loadingList,
+    loadingDetail,
+    createLoading,
+    assistedDraftLoading,
+  ])
 
   const currentVersion = useMemo(() => {
     if (!selectedDocument || selectedDocument.versions.length === 0) return null
@@ -1033,7 +1130,7 @@ export function EditorModulePanel({ token, selectedCaseId, selectedCaseArea }: E
                       }
                       title="Gerar rascunho inicial dos blocos com base na análise, resumo executivo e decisão do caso"
                     >
-                      {assistedDraftLoading ? 'Gerando peça assistida...' : 'Gerar peça assistida'}
+                      {assistedDraftLoading ? 'Gerando peça pronta...' : 'Gerar peça pronta'}
                     </button>
 
                   <button
@@ -1388,18 +1485,6 @@ export function EditorModulePanel({ token, selectedCaseId, selectedCaseArea }: E
                                 <span className="insight-badge">{row.changed ? 'Alterado' : 'Sem mudança'}</span>
                               </div>
 
-                              <p className="info-meta" style={{ marginBottom: '6px' }}>
-                                <strong>Auditoria:</strong> {row.changeType}
-                              </p>
-
-                              <p className="info-meta" style={{ marginBottom: '12px' }}>
-                                <strong>Detalhes:</strong> {row.changeSummary}
-                              </p>
-
-                              <p className="info-meta" style={{ marginBottom: '12px' }}>
-                                Status: V{compareBaseVersion.version_number} {row.baseStatus} → V
-                                {compareTargetVersion.version_number} {row.targetStatus} • Fonte: {row.baseSource} → {row.targetSource}
-                              </p>
 
                               <div
                                   style={{
@@ -1410,7 +1495,7 @@ export function EditorModulePanel({ token, selectedCaseId, selectedCaseArea }: E
                                   }}
                                 >
                                   <p className="info-meta" style={{ marginBottom: '8px' }}>
-                                    Resultado da alteração
+                                    Conteúdo atualizado
                                   </p>
                                   <div
                                     style={{
