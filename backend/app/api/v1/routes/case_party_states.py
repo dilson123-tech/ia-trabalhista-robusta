@@ -29,6 +29,8 @@ from app.schemas.case_party_state import (
     PartyRelationshipIn,
     PartyRepresentativeIn,
     PartyStatusUpdateIn,
+    PartyDataUpdateIn,
+    PartyStateMetadataUpdateIn,
     RegisterSuccessionIn,
 )
 
@@ -598,6 +600,84 @@ def update_case_party_status(
     return _build_state_detail_payload(db, state)
 
 
+@router.patch(
+    "/{state_id}/party-data",
+    response_model=CasePartyStateDetailOut,
+    dependencies=[Depends(require_role("admin", "advogado"))],
+)
+def update_case_party_data(
+    state_id: int,
+    payload: PartyDataUpdateIn,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_auth),
+):
+    state = _get_state_or_404(
+        db,
+        state_id=state_id,
+        tenant_id=current_user["tenant_id"],
+    )
+
+    party_model = (
+        db.query(CasePartyModel)
+        .filter(
+            CasePartyModel.tenant_id == current_user["tenant_id"],
+            CasePartyModel.party_state_id == state.id,
+            CasePartyModel.party_key == payload.party_key,
+        )
+        .first()
+    )
+    if not party_model:
+        raise HTTPException(status_code=404, detail="Party not found")
+
+    updated_fields: list[str] = []
+
+    if payload.name is not None:
+        party_model.name = payload.name
+        updated_fields.append("name")
+
+    if payload.role is not None:
+        party_model.role = payload.role
+        updated_fields.append("role")
+
+    if payload.party_type is not None:
+        party_model.party_type = payload.party_type
+        updated_fields.append("party_type")
+
+    if payload.document_id is not None:
+        party_model.document_id = payload.document_id
+        updated_fields.append("document_id")
+
+    merged_metadata = dict(party_model.party_metadata or {})
+    if payload.metadata:
+        merged_metadata.update(payload.metadata)
+        updated_fields.append("metadata")
+    party_model.party_metadata = merged_metadata
+
+    db.add(party_model)
+
+    db.add(
+        CasePartyEventModel(
+            tenant_id=current_user["tenant_id"],
+            party_state_id=state.id,
+            event_type="party_data_updated",
+            title=f"Dados da parte atualizados: {party_model.name}",
+            description=payload.description or "Dados cadastrais da parte foram atualizados.",
+            occurred_on=None,
+            party_keys=[payload.party_key],
+            event_metadata={
+                "source": "api_update_case_party_data",
+                "updated_fields": updated_fields,
+            },
+        )
+    )
+
+    _touch_state(db, state.id)
+    db.commit()
+    db.refresh(state)
+
+    return _build_state_detail_payload(db, state)
+
+
 @router.post(
     "/{state_id}/succession",
     response_model=CasePartyStateDetailOut,
@@ -828,3 +908,47 @@ def get_case_party_snapshot(
         ],
         "metadata": snapshot.metadata,
     }
+
+@router.patch(
+    "/{state_id}/metadata",
+    response_model=CasePartyStateDetailOut,
+    dependencies=[Depends(require_role("admin", "advogado"))],
+)
+def update_case_party_state_metadata(
+    state_id: int,
+    payload: PartyStateMetadataUpdateIn,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_auth),
+):
+    state = _get_state_or_404(
+        db,
+        state_id=state_id,
+        tenant_id=current_user["tenant_id"],
+    )
+
+    metadata = dict(state.state_metadata or {})
+
+    direct_fields = {
+        "case_comarca": payload.case_comarca,
+        "cause_value": payload.cause_value,
+        "lawyer_name": payload.lawyer_name,
+        "lawyer_oab": payload.lawyer_oab,
+        "lawyer_uf": payload.lawyer_uf,
+        "signature_local": payload.signature_local,
+        "signature_date": payload.signature_date,
+    }
+
+    for key, value in direct_fields.items():
+        if value is not None:
+            metadata[key] = value
+
+    if payload.metadata:
+        metadata.update(payload.metadata)
+
+    state.state_metadata = metadata
+    _touch_state(db, state.id)
+    db.commit()
+    db.refresh(state)
+
+    return _build_state_detail_payload(db, state)
+

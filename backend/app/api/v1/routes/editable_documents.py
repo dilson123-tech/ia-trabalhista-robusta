@@ -1,3 +1,5 @@
+import unicodedata
+
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
@@ -5,7 +7,7 @@ from sqlalchemy.orm import Session
 from app.core.security import require_auth, require_role
 from app.core.tenant import scoped_query
 from app.db.session import get_db
-from app.models import Case, User
+from app.models import Case, User, CasePartyModel, CasePartyStateModel
 from app.api.v1.routes.cases import _get_or_create_case_analysis_record
 from app.models.editable_document import EditableDocument, EditableDocumentVersion
 from app.schemas.editable_document import (
@@ -196,7 +198,125 @@ def _build_insufficient_content(block_title: str, missing_items: list[str]) -> s
 
     return "\n".join(base)
 
-def _build_assisted_sections(case: Case, analysis_record) -> list[dict]:
+
+def _normalize_role_token(value) -> str:
+    raw = _safe_text(value).lower()
+    if not raw:
+        return ""
+    return "".join(
+        char for char in unicodedata.normalize("NFD", raw)
+        if unicodedata.category(char) != "Mn"
+    )
+
+
+def _load_case_active_parties(db: Session, tenant_id: int, case_id: int) -> list[dict]:
+    state = (
+        db.query(CasePartyStateModel)
+        .filter(
+            CasePartyStateModel.tenant_id == tenant_id,
+            CasePartyStateModel.case_id == case_id,
+        )
+        .order_by(CasePartyStateModel.updated_at.desc())
+        .first()
+    )
+    if not state:
+        return []
+
+    parties = (
+        db.query(CasePartyModel)
+        .filter(
+            CasePartyModel.tenant_id == tenant_id,
+            CasePartyModel.party_state_id == state.id,
+            CasePartyModel.status == "active",
+        )
+        .order_by(CasePartyModel.is_original_party.desc(), CasePartyModel.id.asc())
+        .all()
+    )
+
+    return [
+        {
+            "name": party.name,
+            "role": party.role,
+            "party_type": party.party_type,
+            "document_id": party.document_id,
+            "party_metadata": party.party_metadata or {},
+        }
+        for party in parties
+    ]
+
+
+def _load_case_state_metadata(db: Session, tenant_id: int, case_id: int) -> dict:
+    state = (
+        db.query(CasePartyStateModel)
+        .filter(
+            CasePartyStateModel.tenant_id == tenant_id,
+            CasePartyStateModel.case_id == case_id,
+        )
+        .order_by(CasePartyStateModel.updated_at.desc())
+        .first()
+    )
+    if not state:
+        return {}
+    return dict(state.state_metadata or {})
+
+
+def _select_primary_party(parties: list[dict], keywords: list[str]) -> dict | None:
+    normalized_keywords = [_normalize_role_token(keyword) for keyword in keywords]
+
+    for party in parties:
+        role = _normalize_role_token(party.get("role"))
+        if any(keyword and keyword in role for keyword in normalized_keywords):
+            return party
+
+    return None
+
+
+def _format_party_inline_qualification(
+    party: dict | None,
+    fallback_name: str,
+    *,
+    default_is_company: bool = False,
+) -> str:
+    if not party:
+        if default_is_company:
+            return f"{fallback_name}, pessoa jurídica inscrita no CNPJ nº [CNPJ a complementar], com sede em [endereço completo]"
+        return f"{fallback_name}, [nacionalidade], [estado civil], [profissão], inscrito(a) no CPF nº [CPF a complementar] e RG nº [RG a complementar], residente e domiciliado(a) em [endereço completo]"
+
+    metadata = party.get("party_metadata") or {}
+    raw_qualification = _safe_text(metadata.get("qualificacao"))
+    if raw_qualification:
+        return raw_qualification.rstrip(".")
+
+    name = _safe_text(party.get("name")) or fallback_name
+    document_id = (
+        _safe_text(party.get("document_id"))
+        or _safe_text(metadata.get("cpf"))
+        or _safe_text(metadata.get("cnpj"))
+    )
+    address = (
+        _safe_text(metadata.get("endereco"))
+        or _safe_text(metadata.get("address"))
+        or _safe_text(metadata.get("endereco_completo"))
+        or _safe_text(metadata.get("residencia"))
+        or "[endereço completo]"
+    )
+
+    normalized_party_type = _normalize_role_token(
+        party.get("party_type") or metadata.get("party_type") or ""
+    )
+    digits = "".join(ch for ch in str(document_id) if ch.isdigit())
+    is_company = default_is_company or normalized_party_type in {"company", "legal_entity", "pj", "empresa"} or len(digits) == 14
+
+    if is_company:
+        cnpj = document_id if document_id else "[CNPJ a complementar]"
+        return f"{name}, pessoa jurídica inscrita no CNPJ nº {cnpj}, com sede em {address}"
+
+    cpf = document_id if document_id else "[CPF a complementar]"
+    rg = _safe_text(metadata.get("rg")) or "[RG a complementar]"
+    return f"{name}, [nacionalidade], [estado civil], [profissão], inscrito(a) no CPF nº {cpf} e RG nº {rg}, residente e domiciliado(a) em {address}"
+
+
+def _build_assisted_sections(db: Session, case: Case, analysis_record, tenant_id: int) -> list[dict]:
     full_analysis = analysis_record.analysis or {}
     executive_data = analysis_record.executive_data or {}
 
@@ -247,6 +367,43 @@ def _build_assisted_sections(case: Case, analysis_record) -> list[dict]:
     normalized_area = str(getattr(case, "legal_area", "") or "").strip().lower()
     controverted_points = list(dict.fromkeys([item for item in [*issues, *critical_points] if item]))
     proof_checklist = list(dict.fromkeys([item for item in [*probative_gaps, *next_steps] if item]))
+
+    active_parties = _load_case_active_parties(db, tenant_id, case.id)
+    state_metadata = _load_case_state_metadata(db, tenant_id, case.id)
+
+    case_comarca = _safe_text(state_metadata.get("case_comarca")) or "[COMARCA A DEFINIR PELO ADVOGADO]"
+    cause_value = _safe_text(state_metadata.get("cause_value")) or "[valor a ser definido pelo advogado]"
+    lawyer_name = _safe_text(state_metadata.get("lawyer_name")) or "[Nome do advogado]"
+    lawyer_oab = _safe_text(state_metadata.get("lawyer_oab")) or "[número]"
+    lawyer_uf = _safe_text(state_metadata.get("lawyer_uf")) or "[UF]"
+    signature_local = _safe_text(state_metadata.get("signature_local")) or "[Local]"
+    signature_date = _safe_text(state_metadata.get("signature_date")) or "[data]"
+
+    active_parties = _load_case_active_parties(db, tenant_id, case.id)
+    author_party = _select_primary_party(
+        active_parties,
+        ["autor", "autora", "parte autora", "requerente", "demandante", "reclamante", "impetrante"],
+    )
+    defendant_party = _select_primary_party(
+        active_parties,
+        ["reu", "ré", "réu", "parte re", "parte ré", "requerido", "demandado", "reclamada", "impetrado"],
+    )
+
+    if author_party is None and active_parties:
+        author_party = active_parties[0]
+
+    if defendant_party is None:
+        defendant_party = next((party for party in active_parties if party is not author_party), None)
+
+    author_inline_qualification = _format_party_inline_qualification(
+        author_party,
+        "[NOME COMPLETO DA PARTE AUTORA]",
+    )
+    defendant_inline_qualification = _format_party_inline_qualification(
+        defendant_party,
+        "[NOME/RAZÃO SOCIAL DA PARTE RÉ]",
+        default_is_company=True,
+    )
 
     missing_items = _build_missing_context_items(
         case_description=case_description,
@@ -324,20 +481,20 @@ def _build_assisted_sections(case: Case, analysis_record) -> list[dict]:
     fundamentacao = _paragraphs(
         [
             (
-                "À luz dos fatos narrados, a tese preliminar deve ser estruturada em torno do direito de vizinhança, da tutela inibitória e da responsabilidade civil pelos impactos alegados sobre o sossego, a saúde e o uso regular do imóvel."
+                "I. Do cabimento da pretensão. À luz do quadro fático descrito, a demanda deve ser estruturada para cessar a lesão narrada, recompor o status jurídico violado e prevenir a reiteração dos impactos ao direito material discutido."
                 if normalized_area == "civil_ambiental"
-                else "À luz do quadro fático narrado, a fundamentação deve enfrentar a controvérsia jurídica central do caso com base nos fatos já descritos e na prova disponível."
+                else "I. Do cabimento da pretensão. À luz do quadro fático narrado, a demanda deve ser estruturada para tutelar o direito material afirmado e enfrentar a controvérsia central com base na prova já disponível."
             ),
-            _series_block("Base normativa preliminar identificada:", normative_basis, limit=4),
+            _series_block("II. Dos fundamentos normativos aplicáveis:", normative_basis, limit=5),
             (
-                f"A estratégia jurídica preliminar recomenda {recommended_strategy}."
+                f"III. Da estratégia jurídica sugerida. {recommended_strategy}"
                 if recommended_strategy
-                else ""
+                else "III. Da estratégia jurídica sugerida. A condução da tese deve priorizar coerência entre narrativa fática, prova disponível, pedido principal e tutela pretendida."
             ),
-            _series_block("Pontos controvertidos que exigem enfrentamento direto:", controverted_points, limit=4),
-            _series_block("Elementos probatórios e fáticos que ainda devem ser complementados:", proof_checklist, limit=4),
+            _series_block("IV. Dos pontos controvertidos que exigem enfrentamento direto:", controverted_points, limit=5),
+            _series_block("V. Das lacunas probatórias a suprir antes do protocolo definitivo:", proof_checklist, limit=5),
             (
-                f"Síntese executiva considerada na redação: {executive_summary}"
+                f"VI. Da síntese conclusiva considerada na redação. {executive_summary}"
                 if executive_summary and "dados insuficientes" not in executive_summary.lower()
                 else ""
             ),
@@ -347,37 +504,42 @@ def _build_assisted_sections(case: Case, analysis_record) -> list[dict]:
     pedidos = _paragraphs(
         [
             (
-                "Ao final, a minuta pode ser estruturada com pedidos de obrigação de fazer e de não fazer, tutela de urgência para cessação ou redução imediata dos impactos narrados, produção de prova técnica e eventual reparação por danos materiais e morais, conforme o conjunto probatório consolidado."
+                "I. Requer-se, em tutela provisória de urgência, quando presentes os requisitos legais, a imediata cessação, redução ou mitigação dos impactos narrados, inclusive por obrigação de fazer e/ou não fazer."
                 if normalized_area == "civil_ambiental"
-                else "Ao final, requer-se a procedência dos pedidos compatíveis com os fatos narrados, a tese sustentada e a prova atualmente disponível."
+                else "I. Requer-se, quando presentes os requisitos legais, a concessão da tutela provisória cabível para resguardar desde logo a utilidade do provimento final."
             ),
-            _series_block("Eixos materiais para organizar os pedidos principais:", issues, limit=4),
-            "Também devem constar requerimentos probatórios, tutela provisória quando cabível e demais pedidos acessórios compatíveis com a estratégia processual adotada.",
+            _series_block("II. Pedidos principais sugeridos para a minuta final:", issues, limit=5),
             (
-                f"A conclusão provisória da análise recomenda o seguinte enquadramento final dos pedidos: {final_status}."
+                "III. Requer-se, ao final, a procedência dos pedidos principais, com imposição das obrigações materiais compatíveis com a narrativa, a prova produzida e a extensão do dano demonstrado."
+                if normalized_area == "civil_ambiental"
+                else "III. Requer-se, ao final, a procedência dos pedidos compatíveis com os fatos narrados, a tese sustentada e a prova disponível."
+            ),
+            "IV. Requer-se, ainda, a citação da parte ré, a produção de prova documental, testemunhal e pericial, bem como os requerimentos acessórios pertinentes ao rito e à estratégia processual adotada.",
+            (
+                f"V. O enquadramento provisório da análise indica a seguinte diretriz para fechamento dos pedidos: {final_status}."
                 if final_status and "dados insuficientes" not in final_status.lower()
                 else ""
             ),
-            "Antes do fechamento definitivo, conferir a compatibilidade entre pedidos, prova disponível, tutela de urgência e extensão dos danos alegados.",
+            "VI. Antes do protocolo definitivo, o advogado deverá revisar a aderência entre pedidos, causa de pedir, prova disponível, tutela de urgência e liquidez dos danos postulados.",
         ]
     )
 
     enderecamento = _paragraphs(
         [
             (
-                "AO JUÍZO CÍVEL COMPETENTE DA COMARCA A SER DEFINIDA PELO ADVOGADO."
+                f"EXCELENTÍSSIMO(A) SENHOR(A) DOUTOR(A) JUIZ(A) DE DIREITO DE UMA DAS VARAS CÍVEIS DA COMARCA DE {case_comarca}."
                 if normalized_area == "civil_ambiental"
-                else "AO JUÍZO COMPETENTE A SER DEFINIDO PELO ADVOGADO."
+                else f"EXCELENTÍSSIMO(A) SENHOR(A) DOUTOR(A) JUIZ(A) DE DIREITO DO JUÍZO COMPETENTE DA COMARCA DE {case_comarca}."
             ),
-            "A competência, o rito e eventual prevenção devem ser revisados na versão final da peça."
+            "Na versão final, o advogado deverá confirmar a competência territorial, o órgão jurisdicional, eventual prevenção e o rito adequado antes do protocolo.",
         ]
     )
 
     qualificacao_partes = _paragraphs(
         [
-            "AUTORA/PARTE AUTORA: qualificação completa a ser inserida pelo advogado, com nome, CPF/CNPJ, endereço e demais dados necessários.",
-            "RÉ/PARTE RÉ: qualificação completa a ser confirmada pelo advogado, com nome ou razão social, CPF/CNPJ, endereço e elementos de identificação disponíveis.",
-            "A composição do polo ativo e do polo passivo deve ser revisada conforme os documentos, a estratégia processual e a legitimidade das partes.",
+            f"{author_inline_qualification}, por seu advogado, vem, respeitosamente, à presença de Vossa Excelência, propor a presente demanda em face de {defendant_inline_qualification}.",
+            "Na revisão final, deverão ser confirmados os dados completos de qualificação, a legitimidade ativa e passiva, a existência de representantes, sucessores, litisconsortes e demais elementos subjetivos relevantes ao caso.",
+            "Se houver representantes, espólio, sucessores, litisconsórcio ou pessoa jurídica no polo passivo, complementar a qualificação com os dados formais constantes dos documentos do caso.",
         ]
     )
 
@@ -395,9 +557,12 @@ def _build_assisted_sections(case: Case, analysis_record) -> list[dict]:
 
     fechamento = _paragraphs(
         [
-            "Dá-se à causa o valor a ser definido pelo advogado conforme critérios legais, extensão do dano e documentação disponível.",
+            "Ante o exposto, requer o regular processamento da presente demanda e, ao final, o acolhimento dos pedidos formulados, nos limites da narrativa fática, da prova produzida e da estratégia jurídica consolidada na versão final da peça.",
+            "Protesta por todos os meios de prova em direito admitidos, especialmente documental, testemunhal e pericial, sem prejuízo de outros que se tornem necessários no curso da instrução.",
+            f"Dá-se à causa o valor de R$ {cause_value}, sujeito a ajuste conforme os critérios legais aplicáveis e a consolidação definitiva dos pedidos.",
             "Termos em que, pede deferimento.",
-            "Local, data e assinatura profissional deverão ser inseridos na versão final da peça.",
+            f"{signature_local}, {signature_date}.",
+            f"{lawyer_name} — OAB/{lawyer_uf} {lawyer_oab}.",
         ]
     )
 
@@ -785,7 +950,7 @@ def generate_assisted_draft(
         )
 
     analysis_record = _get_or_create_case_analysis_record(db=db, case=case, current_user=current_user)
-    assisted_sections = _build_assisted_sections(case, analysis_record)
+    assisted_sections = _build_assisted_sections(db, case, analysis_record, current_user["tenant_id"])
 
     current_user_id = _resolve_current_user_id(db, current_user)
     next_version_number = document.current_version_number + 1
@@ -796,7 +961,7 @@ def generate_assisted_draft(
         created_by_user_id=current_user_id,
         version_number=next_version_number,
         approved=False,
-        notes="Versão assistida gerada a partir da análise do caso",
+        notes="Peça pronta gerada a partir da análise do caso",
         sections=assisted_sections,
         version_metadata={
             "source": "assisted_draft_from_analysis",
