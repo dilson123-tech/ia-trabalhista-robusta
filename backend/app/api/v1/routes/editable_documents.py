@@ -311,9 +311,28 @@ def _format_party_inline_qualification(
         cnpj = document_id if document_id else "[CNPJ a complementar]"
         return f"{name}, pessoa jurídica inscrita no CNPJ nº {cnpj}, com sede em {address}"
 
+    nationality = (
+        _safe_text(metadata.get("nacionalidade"))
+        or _safe_text(metadata.get("nationality"))
+        or "[nacionalidade]"
+    )
+    civil_status = (
+        _safe_text(metadata.get("estado_civil"))
+        or _safe_text(metadata.get("estado civil"))
+        or _safe_text(metadata.get("civil_status"))
+        or "[estado civil]"
+    )
+    profession = (
+        _safe_text(metadata.get("profissao"))
+        or _safe_text(metadata.get("profissão"))
+        or _safe_text(metadata.get("profession"))
+        or _safe_text(metadata.get("occupation"))
+        or "[profissão]"
+    )
+
     cpf = document_id if document_id else "[CPF a complementar]"
     rg = _safe_text(metadata.get("rg")) or "[RG a complementar]"
-    return f"{name}, [nacionalidade], [estado civil], [profissão], inscrito(a) no CPF nº {cpf} e RG nº {rg}, residente e domiciliado(a) em {address}"
+    return f"{name}, {nationality}, {civil_status}, {profession}, inscrito(a) no CPF nº {cpf} e RG nº {rg}, residente e domiciliado(a) em {address}"
 
 
 def _build_assisted_sections(db: Session, case: Case, analysis_record, tenant_id: int) -> list[dict]:
