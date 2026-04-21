@@ -95,6 +95,110 @@ export async function getCases(token: string): Promise<CaseItem[]> {
   return response.json()
 }
 
+export type UsageSummaryV2Response = {
+  plan: {
+    type: string
+    status: string
+  }
+  limits: {
+    active_cases: number
+    case_records: number
+    ai_analyses_per_month?: number
+    cases_per_month?: number
+  }
+  current: {
+    active_cases: number
+    archived_cases: number
+    case_records: number
+    ai_analyses_generated?: number
+    cases_created?: number
+  }
+  remaining: {
+    active_cases: number
+    case_records: number
+    ai_analyses_per_month?: number
+    ai_analyses?: number
+    cases?: number
+  }
+}
+
+type UsageSummaryV2ApiResponse = {
+  plan?: {
+    type?: string
+    status?: string
+  }
+  limits?: {
+    active_cases?: number
+    case_records?: number
+    ai_analyses_per_month?: number
+    cases_per_month?: number
+  }
+  current?: {
+    active_cases?: number
+    archived_cases?: number
+    case_records?: number
+    ai_analyses_generated?: number
+    cases_created?: number
+  }
+  used?: {
+    active_cases?: number
+    archived_cases?: number
+    case_records?: number
+    ai_analyses_generated?: number
+    cases_created?: number
+  }
+  remaining?: {
+    active_cases?: number
+    case_records?: number
+    ai_analyses_per_month?: number
+    ai_analyses?: number
+    cases?: number
+  }
+}
+
+export async function getUsageSummaryV2(token: string): Promise<UsageSummaryV2Response> {
+  const response = await fetch(`${API_URL}/usage/summary-v2`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+
+  if (!response.ok) {
+    await parseError(response, "Erro ao buscar resumo de uso do plano")
+  }
+
+  const data = (await response.json()) as UsageSummaryV2ApiResponse
+  const current = data.current ?? data.used ?? {}
+
+  return {
+    plan: {
+      type: data.plan?.type ?? 'basic',
+      status: data.plan?.status ?? 'active',
+    },
+    limits: {
+      active_cases: data.limits?.active_cases ?? 0,
+      case_records: data.limits?.case_records ?? 0,
+      ai_analyses_per_month: data.limits?.ai_analyses_per_month ?? 0,
+      cases_per_month: data.limits?.cases_per_month ?? 0,
+    },
+    current: {
+      active_cases: current.active_cases ?? 0,
+      archived_cases: current.archived_cases ?? 0,
+      case_records: current.case_records ?? 0,
+      ai_analyses_generated: current.ai_analyses_generated ?? 0,
+      cases_created: current.cases_created ?? 0,
+    },
+    remaining: {
+      active_cases: data.remaining?.active_cases ?? 0,
+      case_records: data.remaining?.case_records ?? 0,
+      ai_analyses_per_month:
+        data.remaining?.ai_analyses_per_month ?? data.remaining?.ai_analyses ?? 0,
+      ai_analyses: data.remaining?.ai_analyses ?? 0,
+      cases: data.remaining?.cases ?? 0,
+    },
+  }
+}
+
 export type CaseAnalysisResponse = {
   case_id: number
   analysis_id: number

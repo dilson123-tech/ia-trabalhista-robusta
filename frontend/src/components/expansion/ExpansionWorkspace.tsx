@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { AppealsModulePanel } from './AppealsModulePanel'
 import { EditorModulePanel } from './EditorModulePanel'
 import { ExpansionModulesNav, type ExpansionModule } from './ExpansionModulesNav'
@@ -7,10 +7,24 @@ import { SuccessionModulePanel } from './SuccessionModulePanel'
 type ExpansionWorkspaceProps = {
   token: string
   selectedCaseId: number | null
+  selectedCaseArea?: string | null
+  forcedModule?: ExpansionModule
+  pieceReadyRequestId?: number
 }
 
-export function ExpansionWorkspace({ token, selectedCaseId }: ExpansionWorkspaceProps) {
+export function ExpansionWorkspace({
+  token,
+  selectedCaseId,
+  selectedCaseArea,
+  forcedModule,
+  pieceReadyRequestId,
+}: ExpansionWorkspaceProps) {
   const [activeModule, setActiveModule] = useState<ExpansionModule>('editor')
+
+  useEffect(() => {
+    if (!forcedModule) return
+    setActiveModule(forcedModule)
+  }, [forcedModule])
 
   return (
     <>
@@ -40,7 +54,14 @@ export function ExpansionWorkspace({ token, selectedCaseId }: ExpansionWorkspace
         onChange={setActiveModule}
       />
 
-      {activeModule === 'editor' ? <EditorModulePanel token={token} selectedCaseId={selectedCaseId} /> : null}
+      {activeModule === 'editor' ? (
+        <EditorModulePanel
+          token={token}
+          selectedCaseId={selectedCaseId}
+          selectedCaseArea={selectedCaseArea}
+          pieceReadyRequestId={pieceReadyRequestId}
+        />
+      ) : null}
       {activeModule === 'succession' ? <SuccessionModulePanel selectedCaseId={selectedCaseId} /> : null}
       {activeModule === 'appeals' ? <AppealsModulePanel selectedCaseId={selectedCaseId} /> : null}
     </>

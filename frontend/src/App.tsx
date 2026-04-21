@@ -1,7 +1,7 @@
 import './App.css'
-import { useState, type KeyboardEvent } from 'react'
+import { useEffect, useState, type KeyboardEvent } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
-import { ApiError, cleanupDemoCases, createCase, getCases, getCaseAnalysis, getExecutiveSummary, getExecutiveReport, getExecutivePdf, login, updateCaseStatus, type CaseItem, type CaseAnalysisResponse, type ExecutiveSummaryResponse, type ExecutiveReportResponse } from './services/api'
+import { ApiError, cleanupDemoCases, createCase, getCases, getCaseAnalysis, getExecutiveSummary, getExecutiveReport, getExecutivePdf, getUsageSummaryV2, login, updateCaseStatus, type CaseItem, type CaseAnalysisResponse, type ExecutiveSummaryResponse, type ExecutiveReportResponse, type UsageSummaryV2Response } from './services/api'
 import { ExpansionWorkspace } from './components/expansion/ExpansionWorkspace'
 import { CaseFiltersBar } from './components/CaseFiltersBar'
 import { CaseCard } from './components/CaseCard'
@@ -9,10 +9,16 @@ import { DashboardTopPanel } from './components/DashboardTopPanel'
 import { LoginPanel } from './components/LoginPanel'
 import { CaseFocusPanel } from './components/CaseFocusPanel'
 
+const AUTH_TOKEN_STORAGE_KEY = 'ia_trabalhista_auth_token'
+
 function App() {
-  const [token, setToken] = useState('')
+  const [token, setToken] = useState(() => {
+    if (typeof window === 'undefined') return ''
+    return window.localStorage.getItem(AUTH_TOKEN_STORAGE_KEY) ?? ''
+  })
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [sessionBootstrapPending, setSessionBootstrapPending] = useState(() => Boolean(token.trim()))
   const [authLoading, setAuthLoading] = useState(false)
   const [cases, setCases] = useState<CaseItem[]>([])
   const [loading, setLoading] = useState(false)
@@ -44,6 +50,13 @@ function App() {
   const [caseActionError, setCaseActionError] = useState('')
   const [caseActionSuccess, setCaseActionSuccess] = useState('')
   const [cleanupDemoLoading, setCleanupDemoLoading] = useState(false)
+  const [usageSummary, setUsageSummary] = useState<UsageSummaryV2Response | null>(null)
+  const [usageLoading, setUsageLoading] = useState(false)
+  const [usageError, setUsageError] = useState('')
+  const [planPanelCollapsed, setPlanPanelCollapsed] = useState(false)
+  const [pieceReadyRequestId, setPieceReadyRequestId] = useState(0)
+  const [pieceReadyNotice, setPieceReadyNotice] = useState('')
+  const [expansionModuleTarget, setExpansionModuleTarget] = useState<'editor' | 'succession' | 'appeals'>('editor')
   const navigate = useNavigate()
   const location = useLocation()
   const isLoginRoute = location.pathname === '/login'
@@ -68,6 +81,34 @@ function App() {
   function getRiskLabel(risk: string | undefined) {
     if (!risk) return 'Não informado'
     return riskLabelMap[risk] ?? risk
+  }
+
+  const planLabelMap: Record<string, string> = {
+    basic: 'Básico',
+    pro: 'Pro',
+    office: 'Escritório',
+  }
+
+  const planStatusLabelMap: Record<string, string> = {
+    trial: 'Período de teste',
+    active: 'Ativo',
+    past_due: 'Pagamento pendente',
+    canceled: 'Cancelado',
+  }
+
+  function getPlanLabel(planType: string | undefined) {
+    if (!planType) return 'Plano não identificado'
+    return planLabelMap[planType] ?? planType
+  }
+
+  function getPlanStatusLabel(status: string | undefined) {
+    if (!status) return 'Status não informado'
+    return planStatusLabelMap[status] ?? status
+  }
+
+  function getCapacityPercent(current: number, limit: number) {
+    if (limit <= 0) return 0
+    return Math.min((current / limit) * 100, 100)
   }
 
   function sortCasesForDisplay(list: CaseItem[]) {
@@ -115,6 +156,45 @@ function App() {
     return haystack.includes(normalizedCaseSearch)
   })
 
+  const selectedCase = selectedCaseId ? cases.find((caso) => caso.id === selectedCaseId) ?? null : null
+
+  const usagePlanType = usageSummary?.plan?.type ?? 'basic'
+  const usagePlanStatus = usageSummary?.plan?.status ?? 'active'
+  const usageActiveCurrent = usageSummary?.current?.active_cases ?? 0
+  const usageArchivedCurrent = usageSummary?.current?.archived_cases ?? 0
+  const usageRecordsCurrent = usageSummary?.current?.case_records ?? 0
+  const usageActiveLimit = usageSummary?.limits?.active_cases ?? 0
+  const usageRecordsLimit = usageSummary?.limits?.case_records ?? 0
+  const usageActiveRemaining = usageSummary?.remaining?.active_cases ?? 0
+  const usageRecordsRemaining = usageSummary?.remaining?.case_records ?? 0
+  const usageActivePercent = getCapacityPercent(usageActiveCurrent, usageActiveLimit)
+  const usageRecordsPercent = getCapacityPercent(usageRecordsCurrent, usageRecordsLimit)
+
+  const usageCapacityMessage =
+    !usageSummary
+      ? 'Conecte o painel para carregar a capacidade operacional do plano.'
+      : usageActiveRemaining === 0
+        ? 'Limite de casos ativos atingido. Arquive um caso ou faça upgrade.'
+        : usageRecordsRemaining === 0
+          ? 'Limite de acervo atingido. Faça upgrade para armazenar mais casos.'
+          : usageActiveRemaining <= 3
+            ? `Atenção: restam apenas ${usageActiveRemaining} vaga(s) ativa(s) neste plano.`
+            : 'Operação dentro da capacidade do plano.'
+
+  useEffect(() => {
+    if (!token.trim()) return
+    if (!sessionBootstrapPending) return
+    if (authLoading) return
+
+    void (async () => {
+      try {
+        await refreshPortfolioAndUsage(token)
+      } finally {
+        setSessionBootstrapPending(false)
+      }
+    })()
+  }, [token, authLoading, sessionBootstrapPending])
+
   if (!isLoginRoute && !token.trim()) {
     return <Navigate to="/login" replace />
   }
@@ -123,8 +203,41 @@ function App() {
     return <Navigate to="/" replace />
   }
 
+  const isBootstrappingSession =
+    !isLoginRoute &&
+    Boolean(token.trim()) &&
+    (sessionBootstrapPending || (!loaded && (loading || usageLoading)))
+
+  if (isBootstrappingSession) {
+    return (
+      <main className="app-shell">
+        <section className="app-container">
+          <section className="insight-card">
+            <div className="insight-head">
+              <div>
+                <p className="insight-kicker">Sessão persistida</p>
+                <h2 className="insight-title">Restaurando painel do advogado</h2>
+                <p className="insight-description">
+                  Recarregando carteira, capacidade do plano e contexto operacional sem sair do painel.
+                </p>
+              </div>
+              <span className="insight-badge">Reidratação em andamento</span>
+            </div>
+
+            <p className="insight-empty">
+              Aguarde um instante. Sua sessão foi preservada e os dados estão sendo carregados novamente.
+            </p>
+          </section>
+        </section>
+      </main>
+    )
+  }
+
   function clearSession() {
     setToken('')
+    if (typeof window !== 'undefined') {
+      window.localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY)
+    }
     setUsername('')
     setPassword('')
     setCases([])
@@ -150,6 +263,11 @@ function App() {
     setCaseStatusFilter('main')
     setCleanupDemoLoading(false)
     setCaseActionLoadingId(null)
+    setUsageSummary(null)
+    setUsageLoading(false)
+    setUsageError('')
+    setPieceReadyNotice('')
+    setSessionBootstrapPending(false)
     setLoginFieldsUnlocked(false)
     setLoginFormKey((prev) => prev + 1)
   }
@@ -168,23 +286,36 @@ function App() {
     return fallbackMessage
   }
 
-  async function handleLoadCases() {
+  async function refreshPortfolioAndUsage(authToken: string) {
     setLoading(true)
+    setUsageLoading(true)
     setError('')
+    setUsageError('')
 
     try {
-      const data = await getCases(token)
-      setCases(sortCasesForDisplay(data))
+      const [casesData, usageData] = await Promise.all([
+        getCases(authToken),
+        getUsageSummaryV2(authToken),
+      ])
+
+      setCases(sortCasesForDisplay(casesData))
+      setUsageSummary(usageData)
       setLoaded(true)
     } catch (err) {
-      const fallback = handleApiFailure(err, 'Não foi possível carregar os casos. Verifique o token e o backend.')
+      const fallback = handleApiFailure(err, 'Não foi possível carregar os dados principais do painel.')
       if (fallback) {
         setError(fallback)
+        setUsageError(fallback)
         setLoaded(true)
       }
     } finally {
       setLoading(false)
+      setUsageLoading(false)
     }
+  }
+
+  async function handleLoadCases() {
+    await refreshPortfolioAndUsage(token)
   }
 
   async function handleLogin() {
@@ -198,10 +329,11 @@ function App() {
       })
 
       setToken(auth.access_token)
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, auth.access_token)
+      }
 
-      const data = await getCases(auth.access_token)
-      setCases(sortCasesForDisplay(data))
-      setLoaded(true)
+      await refreshPortfolioAndUsage(auth.access_token)
       setShowToken(false)
       setPassword('')
       navigate('/')
@@ -214,6 +346,8 @@ function App() {
       setAuthLoading(false)
     }
   }
+
+
 
   function handleLoginKeyDown(event: KeyboardEvent<HTMLInputElement>) {
     if (event.key !== 'Enter') return
@@ -322,8 +456,8 @@ function App() {
         status: newCaseForm.status,
       })
 
-      setCases((prev) => sortCasesForDisplay([createdCase, ...prev]))
-      setLoaded(true)
+      await refreshPortfolioAndUsage(token)
+      setSelectedCaseId(createdCase.id)
       setCaseActionError('')
       setCaseActionSuccess('')
       setShowNewCaseForm(false)
@@ -354,9 +488,7 @@ function App() {
     try {
       const updatedCase = await updateCaseStatus(token, caseId, { status: 'archived' })
 
-      setCases((prev) =>
-        sortCasesForDisplay(prev.map((caso) => (caso.id === caseId ? updatedCase : caso))),
-      )
+      await refreshPortfolioAndUsage(token)
       setSelectedCaseId(caseId)
       setCaseActionSuccess(`Caso "${updatedCase.title}" arquivado com sucesso.`)
     } catch (err) {
@@ -382,9 +514,7 @@ function App() {
 
     try {
       const result = await cleanupDemoCases(token)
-      const refreshedCases = await getCases(token)
-      setCases(sortCasesForDisplay(refreshedCases))
-      setLoaded(true)
+      await refreshPortfolioAndUsage(token)
       setCaseActionSuccess(
         `Limpeza concluída: ${result.deleted_cases} caso(s) demo e ${result.deleted_analyses} análise(s) removidos.`,
       )
@@ -459,7 +589,239 @@ function App() {
           loaded={loaded}
         />
 
-        <ExpansionWorkspace token={token} selectedCaseId={selectedCaseId} />
+        <section className="insight-card" style={{ marginBottom: '20px' }}>
+              <div className="insight-head">
+                <div>
+                  <p className="insight-kicker">Capacidade comercial</p>
+                  <h2 className="insight-title">Plano e ocupação da carteira</h2>
+                  <p className="insight-description">
+                    Leitura operacional do plano atual para decidir quando arquivar, quando ainda há folga
+                    e quando o escritório precisa subir de nível.
+                  </p>
+                </div>
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <span className="insight-badge">{getPlanLabel(usagePlanType)}</span>
+                  <button
+                    type="button"
+                    onClick={() => setPlanPanelCollapsed((prev) => !prev)}
+                    style={{
+                      border: '1px solid rgba(148, 163, 184, 0.24)',
+                      borderRadius: '999px',
+                      padding: '8px 14px',
+                      background: 'rgba(15, 23, 42, 0.42)',
+                      color: 'var(--text-primary)',
+                      cursor: 'pointer',
+                      fontSize: '0.85rem',
+                      fontWeight: 600,
+                    }}
+                  >
+                    {planPanelCollapsed ? 'Abrir visão executiva' : 'Recolher visão executiva'}
+                  </button>
+                </div>
+              </div>
+
+              {planPanelCollapsed ? (
+                  <p className="insight-empty">
+                    Visão executiva recolhida. Abra este bloco para consultar plano, ocupação e decisão operacional.
+                  </p>
+                ) : !loaded ? (
+                <p className="insight-empty">
+                  Conecte o painel para carregar a régua de capacidade do plano.
+                </p>
+              ) : usageLoading ? (
+                <p className="insight-empty">Atualizando capacidade operacional do plano...</p>
+              ) : usageError ? (
+                <p className="insight-empty">{usageError}</p>
+              ) : usageSummary ? (
+                <div style={{ display: 'grid', gap: '16px' }}>
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                      gap: '12px',
+                    }}
+                  >
+                    <article
+                      style={{
+                        border: '1px solid rgba(148, 163, 184, 0.18)',
+                        borderRadius: '18px',
+                        padding: '16px',
+                        background: 'rgba(15, 23, 42, 0.28)',
+                      }}
+                    >
+                      <p className="insight-kicker">Plano atual</p>
+                      <h3 style={{ margin: '6px 0 4px', fontSize: '1.08rem' }}>{getPlanLabel(usagePlanType)}</h3>
+                      <p style={{ margin: 0, color: 'var(--muted-text)' }}>
+                        {getPlanStatusLabel(usagePlanStatus)}
+                      </p>
+                    </article>
+
+                    <article
+                      style={{
+                        border: '1px solid rgba(148, 163, 184, 0.18)',
+                        borderRadius: '18px',
+                        padding: '16px',
+                        background: 'rgba(15, 23, 42, 0.28)',
+                      }}
+                    >
+                      <p className="insight-kicker">Casos ativos</p>
+                      <h3 style={{ margin: '6px 0 4px', fontSize: '1.08rem' }}>
+                        {usageActiveCurrent} / {usageActiveLimit}
+                      </h3>
+                      <p style={{ margin: 0, color: 'var(--muted-text)' }}>
+                        {usageActiveRemaining} vaga(s) disponível(is)
+                      </p>
+                    </article>
+
+                    <article
+                      style={{
+                        border: '1px solid rgba(148, 163, 184, 0.18)',
+                        borderRadius: '18px',
+                        padding: '16px',
+                        background: 'rgba(15, 23, 42, 0.28)',
+                      }}
+                    >
+                      <p className="insight-kicker">Arquivados</p>
+                      <h3 style={{ margin: '6px 0 4px', fontSize: '1.08rem' }}>{usageArchivedCurrent}</h3>
+                      <p style={{ margin: 0, color: 'var(--muted-text)' }}>
+                        Organizam a operação, mas seguem contando no acervo
+                      </p>
+                    </article>
+
+                    <article
+                      style={{
+                        border: '1px solid rgba(148, 163, 184, 0.18)',
+                        borderRadius: '18px',
+                        padding: '16px',
+                        background: 'rgba(15, 23, 42, 0.28)',
+                      }}
+                    >
+                      <p className="insight-kicker">Acervo total</p>
+                      <h3 style={{ margin: '6px 0 4px', fontSize: '1.08rem' }}>
+                        {usageRecordsCurrent} / {usageRecordsLimit}
+                      </h3>
+                      <p style={{ margin: 0, color: 'var(--muted-text)' }}>
+                        {usageRecordsRemaining} espaço(s) restante(s) no histórico
+                      </p>
+                    </article>
+                  </div>
+
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+                      gap: '12px',
+                    }}
+                  >
+                    <article
+                      style={{
+                        border: '1px solid rgba(148, 163, 184, 0.18)',
+                        borderRadius: '18px',
+                        padding: '16px',
+                        background: 'rgba(15, 23, 42, 0.22)',
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', marginBottom: '8px' }}>
+                        <strong>Ocupação de ativos</strong>
+                        <span>{usageActivePercent.toFixed(0)}%</span>
+                      </div>
+                      <div
+                        style={{
+                          height: '8px',
+                          borderRadius: '999px',
+                          background: 'rgba(148, 163, 184, 0.18)',
+                          overflow: 'hidden',
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: `${usageActivePercent}%`,
+                            height: '100%',
+                            borderRadius: '999px',
+                            background:
+                              usageActivePercent >= 100
+                                ? 'linear-gradient(90deg, #dc2626, #f97316)'
+                                : usageActivePercent >= 80
+                                  ? 'linear-gradient(90deg, #f59e0b, #f97316)'
+                                  : 'linear-gradient(90deg, #22c55e, #84cc16)',
+                          }}
+                        />
+                      </div>
+                      <p style={{ margin: '10px 0 0', color: 'var(--muted-text)' }}>
+                        Ativos pressionam a operação diária e são o primeiro gatilho de upgrade.
+                      </p>
+                    </article>
+
+                    <article
+                      style={{
+                        border: '1px solid rgba(148, 163, 184, 0.18)',
+                        borderRadius: '18px',
+                        padding: '16px',
+                        background: 'rgba(15, 23, 42, 0.22)',
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', marginBottom: '8px' }}>
+                        <strong>Ocupação do acervo</strong>
+                        <span>{usageRecordsPercent.toFixed(0)}%</span>
+                      </div>
+                      <div
+                        style={{
+                          height: '8px',
+                          borderRadius: '999px',
+                          background: 'rgba(148, 163, 184, 0.18)',
+                          overflow: 'hidden',
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: `${usageRecordsPercent}%`,
+                            height: '100%',
+                            borderRadius: '999px',
+                            background:
+                              usageRecordsPercent >= 100
+                                ? 'linear-gradient(90deg, #dc2626, #f97316)'
+                                : usageRecordsPercent >= 80
+                                  ? 'linear-gradient(90deg, #f59e0b, #f97316)'
+                                  : 'linear-gradient(90deg, #22c55e, #84cc16)',
+                          }}
+                        />
+                      </div>
+                      <p style={{ margin: '10px 0 0', color: 'var(--muted-text)' }}>
+                        Arquivados preservam histórico, mas continuam consumindo capacidade do plano.
+                      </p>
+                    </article>
+                  </div>
+
+                  <div
+                    style={{
+                      border: '1px solid rgba(245, 158, 11, 0.22)',
+                      borderRadius: '18px',
+                      padding: '16px',
+                      background: 'rgba(245, 158, 11, 0.08)',
+                    }}
+                  >
+                    <p className="insight-kicker">Decisão operacional</p>
+                    <strong style={{ display: 'block', marginBottom: '6px' }}>{usageCapacityMessage}</strong>
+                    <p style={{ margin: 0, color: 'var(--muted-text)' }}>
+                      Regra comercial: ativos contam na operação, arquivados continuam no acervo e upgrade
+                      amplia o teto sem apagar histórico.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <p className="insight-empty">
+                  Não foi possível carregar a régua comercial do plano neste momento.
+                </p>
+              )}
+            </section>
+
+          <ExpansionWorkspace
+            token={token}
+            selectedCaseId={selectedCaseId}
+            selectedCaseArea={selectedCase?.legal_area ?? null}
+            forcedModule={expansionModuleTarget}
+            pieceReadyRequestId={pieceReadyRequestId}
+          />
 
         <section className="cases-layout">
           <div className="cases-layout__list">
@@ -556,6 +918,61 @@ function App() {
           </div>
 
           <div className="cases-layout__focus">
+            <section className="insight-card" style={{ marginBottom: '16px' }}>
+              <div className="insight-head">
+                <div>
+                  <p className="insight-kicker">Peça pronta</p>
+                  <h2 className="insight-title">Montagem guiada para protocolo</h2>
+                  <p className="insight-description">
+                    Selecione um caso e gere a peça mastigada no Editor Jurídico Vivo com base na análise já produzida.
+                  </p>
+                </div>
+                <span className="insight-badge">
+                  {selectedCase ? `Caso pronto: #${selectedCase.id}` : 'Selecione um caso'}
+                </span>
+              </div>
+
+              <p className="info-text" style={{ marginBottom: '12px' }}>
+                <strong>Caso em foco:</strong>{' '}
+                {selectedCase ? `${selectedCase.title} — ${selectedCase.case_number}` : 'Nenhum caso selecionado.'}
+              </p>
+
+              {pieceReadyNotice ? (
+                <p className="status-message status-message--success" style={{ marginBottom: '12px' }}>
+                  {pieceReadyNotice}
+                </p>
+              ) : null}
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (!selectedCaseId) return
+                  setExpansionModuleTarget('editor')
+                  setPieceReadyRequestId((prev) => prev + 1)
+                  setPieceReadyNotice('Abrindo o Editor Jurídico Vivo e preparando a peça pronta do caso selecionado.')
+                  window.setTimeout(() => {
+                    document.querySelector('.expansion-shell-card')?.scrollIntoView({
+                      behavior: 'smooth',
+                      block: 'start',
+                    })
+                  }, 50)
+                }}
+                disabled={!selectedCaseId}
+                style={{
+                  border: '1px solid rgba(148, 163, 184, 0.24)',
+                  borderRadius: '999px',
+                  padding: '10px 16px',
+                  background: selectedCaseId ? 'rgba(15, 23, 42, 0.42)' : 'rgba(100, 116, 139, 0.24)',
+                  color: 'var(--text-primary)',
+                  cursor: selectedCaseId ? 'pointer' : 'not-allowed',
+                  fontSize: '0.92rem',
+                  fontWeight: 700,
+                }}
+              >
+                Gerar peça pronta
+              </button>
+            </section>
+
             <CaseFocusPanel
               selectedCaseId={selectedCaseId}
               activeTab={activeFocusTab}
