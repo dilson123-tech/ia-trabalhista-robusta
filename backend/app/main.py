@@ -7,7 +7,7 @@ import logging
 import re
 import time
 from app.core.middleware import install_middleware
-from app.core.settings import settings
+from app.core.settings import settings, get_cors_allow_origins
 from app.core.logging import setup_logging
 from app.api.v1.router import api_router
 
@@ -16,15 +16,15 @@ setup_logging(settings.LOG_LEVEL)
 app = FastAPI(
     title=settings.APP_NAME,
     version="0.1.0",
+    docs_url=None if settings.AUTH_PROTECT_DOCS else "/docs",
+    redoc_url=None if settings.AUTH_PROTECT_DOCS else "/redoc",
+    openapi_url=None if settings.AUTH_PROTECT_DOCS else "/openapi.json",
 )
 
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-    ],
+    allow_origins=get_cors_allow_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
