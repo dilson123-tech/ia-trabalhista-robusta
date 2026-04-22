@@ -18,7 +18,7 @@ Legenda de status:
 - [x] smoke test principal
 - [x] proteção de branch + fluxo por PR
 - [~] documentação operacional completa de produção
-- [ ] runbook de incidente/rollback
+- [x] runbook de incidente/rollback
 - [ ] procedimento formal de backup/restore validado
 
 ## 2) Auth, tenant e segurança
@@ -29,7 +29,7 @@ Legenda de status:
 - [x] admin key separada para rotas globais
 - [~] revisão final de exposição de dados sensíveis em logs
 - [ ] revisão LGPD mínima (retenção, exportação, exclusão, segredos)
-- [ ] revisão formal de seed/break-glass em produção
+- [x] revisão formal de seed/break-glass em produção
 
 ## 3) Fluxo principal do produto
 - [x] criar caso
@@ -76,7 +76,7 @@ Legenda de status:
 - [ ] experiência adequada para autoatendimento
 - [ ] onboarding de escritório/tenant claro
 - [ ] posicionamento comercial fechado
-- [ ] documento oficial “o que faz / o que não faz / limites da IA”
+- [x] documento oficial “o que faz / o que não faz / limites da IA”
 
 ## 8) Arquitetura e visão multicausa
 - [x] diretriz multicausa definida

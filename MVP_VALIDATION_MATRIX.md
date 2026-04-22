@@ -73,3 +73,6 @@ Legenda:
 - [ ] todos os fluxos críticos validados
 - [ ] todos os cenários críticos de erro validados
 - [ ] sem falhas abertas graves
+- [x] CORS por ambiente validado em production-like
+- [x] docs/openapi fechados em production-like
+- [x] fail-fast de configuração production-like validado
