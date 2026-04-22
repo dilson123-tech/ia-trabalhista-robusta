@@ -57,10 +57,10 @@ Legenda de status:
 - [x] estruturas de subscription/usage presentes
 - [x] enforcement inicial de limites
 - [x] summary de uso
-- [~] definição final dos planos comerciais
-- [ ] política clara de trial
-- [ ] comportamento documentado ao estourar limite
-- [ ] tabela comercial pronta para venda
+- [x] definição final dos planos comerciais
+- [x] política clara de trial
+- [x] comportamento documentado ao estourar limite
+- [x] tabela comercial pronta para venda
 
 ## 6) Admin e governança
 - [x] audit logs administrativos
@@ -90,7 +90,7 @@ Legenda de status:
 - [ ] checklist funcional 100% validado
 - [ ] governança mínima de produção fechada
 - [x] LGPD mínima revisada
-- [ ] fluxo comercial/planos fechados
+- [x] fluxo comercial/planos fechados
 - [ ] onboarding minimamente utilizável
 - [ ] documentação oficial do produto pronta
 
