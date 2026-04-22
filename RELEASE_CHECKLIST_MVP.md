@@ -19,7 +19,7 @@ Legenda de status:
 - [x] proteção de branch + fluxo por PR
 - [~] documentação operacional completa de produção
 - [x] runbook de incidente/rollback
-- [ ] procedimento formal de backup/restore validado
+- [x] procedimento formal de backup/restore validado
 
 ## 2) Auth, tenant e segurança
 - [x] autenticação funcional
