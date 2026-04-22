@@ -28,7 +28,7 @@ Legenda de status:
 - [x] activate/deactivate com restrição por tenant
 - [x] admin key separada para rotas globais
 - [~] revisão final de exposição de dados sensíveis em logs
-- [ ] revisão LGPD mínima (retenção, exportação, exclusão, segredos)
+- [x] revisão LGPD mínima (retenção, exportação, exclusão, segredos)
 - [x] revisão formal de seed/break-glass em produção
 
 ## 3) Fluxo principal do produto
@@ -89,7 +89,7 @@ Legenda de status:
 ## Bloqueadores de mercado aberto
 - [ ] checklist funcional 100% validado
 - [ ] governança mínima de produção fechada
-- [ ] LGPD mínima revisada
+- [x] LGPD mínima revisada
 - [ ] fluxo comercial/planos fechados
 - [ ] onboarding minimamente utilizável
 - [ ] documentação oficial do produto pronta
