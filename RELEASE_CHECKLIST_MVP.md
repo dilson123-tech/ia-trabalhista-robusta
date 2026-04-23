@@ -92,7 +92,7 @@ Legenda de status:
 - [x] LGPD mínima revisada
 - [x] fluxo comercial/planos fechados
 - [x] onboarding minimamente utilizável
-- [ ] documentação oficial do produto pronta
+- [x] documentação oficial do produto pronta
 
 ## Liberação para piloto controlado
 Condição: somente quando todos os itens críticos de fluxo, auth, tenant, relatório, PDF, health/ready e uso estiverem validados e sem falhas abertas graves.
