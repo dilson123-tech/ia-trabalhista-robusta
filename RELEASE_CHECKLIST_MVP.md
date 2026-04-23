@@ -87,8 +87,8 @@ Legenda de status:
 ---
 
 ## Bloqueadores de mercado aberto
-- [ ] checklist funcional 100% validado
-- [ ] governança mínima de produção fechada
+- [x] checklist funcional 100% validado
+- [x] governança mínima de produção fechada
 - [x] LGPD mínima revisada
 - [x] fluxo comercial/planos fechados
 - [x] onboarding minimamente utilizável
