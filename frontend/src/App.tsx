@@ -111,6 +111,12 @@ function App() {
     return Math.min((current / limit) * 100, 100)
   }
 
+  function formatCapacityPercent(value: number) {
+    if (!Number.isFinite(value) || value <= 0) return '0%'
+    if (value >= 100) return '100%'
+    return `${Math.floor(value)}%`
+  }
+
   function sortCasesForDisplay(list: CaseItem[]) {
     const statusPriority: Record<string, number> = {
       active: 0,
@@ -723,7 +729,7 @@ function App() {
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', marginBottom: '8px' }}>
                         <strong>Ocupação de ativos</strong>
-                        <span>{usageActivePercent.toFixed(0)}%</span>
+                        <span>{formatCapacityPercent(usageActivePercent)}</span>
                       </div>
                       <div
                         style={{
@@ -762,7 +768,7 @@ function App() {
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', marginBottom: '8px' }}>
                         <strong>Ocupação do acervo</strong>
-                        <span>{usageRecordsPercent.toFixed(0)}%</span>
+                        <span>{formatCapacityPercent(usageRecordsPercent)}</span>
                       </div>
                       <div
                         style={{
