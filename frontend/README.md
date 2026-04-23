@@ -1,73 +1,52 @@
-# React + TypeScript + Vite
+# Frontend — IA Trabalhista Robusta
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Frontend oficial do painel web do produto IA Trabalhista Robusta.
 
-Currently, two official plugins are available:
+## Papel no produto
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- autenticação do usuário
+- acesso ao workspace jurídico
+- operação de casos, análises, editor e PDFs
+- consumo da API FastAPI do backend
 
-## React Compiler
+## Stack
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- React
+- TypeScript
+- Vite
 
-## Expanding the ESLint configuration
+## Ambiente local
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+Instalar dependências:
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+cd ~/projetos/ia_trabalhista_robusta/frontend && npm install
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Subir ambiente de desenvolvimento:
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+cd ~/projetos/ia_trabalhista_robusta/frontend && npm run dev -- --host 0.0.0.0
 ```
+
+Build local:
+
+```bash
+cd ~/projetos/ia_trabalhista_robusta/frontend && npm run build
+```
+
+## Integração com backend
+
+O frontend deve apontar para o backend oficial do projeto.
+
+Durante desenvolvimento local, validar principalmente:
+
+- login
+- reidratação de sessão
+- painel de capacidade/plano
+- fluxo de caso -> análise -> decisão executiva -> editor -> PDF
+
+## Diretriz
+
+Este frontend não deve ser tratado como template genérico.
+Ele faz parte de um produto real para mercado e deve evoluir com foco em estabilidade, clareza operacional e percepção premium.

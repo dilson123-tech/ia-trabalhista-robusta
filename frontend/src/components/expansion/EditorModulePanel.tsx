@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   ApiError,
   createEditableDocument,
@@ -58,10 +58,37 @@ type EditorModulePanelProps = {
   token: string
   selectedCaseId: number | null
   selectedCaseArea?: string | null
+  pieceReadyRequestId?: number
 }
 
 type EditableDocumentVersion = EditableDocumentDetail['versions'][number]
 type EditableSection = EditableDocumentVersion['sections'][number]
+
+function getVersionOriginLabel(version: EditableDocumentVersion): string {
+  const source =
+    version.version_metadata && typeof version.version_metadata.source === 'string'
+      ? version.version_metadata.source
+      : ''
+
+  if (source === 'frontend_inline_edit') return 'edição'
+  if (source === 'frontend_expansion_approval') return 'aprovada'
+  if (source === 'frontend_expansion_new_version') return 'nova versão'
+
+  const sectionSources = new Set(version.sections.map((section) => section.source))
+  const hasEditedSection = version.sections.some((section) => section.status === 'edited')
+
+  if (hasEditedSection) return 'edição'
+  if (sectionSources.has('assisted_draft') && sectionSources.has('manual')) return 'mista'
+  if (sectionSources.has('assisted_draft')) return 'análise'
+  if (sectionSources.has('manual')) return 'inicial'
+
+  return 'rascunho'
+}
+
+function getVersionDisplayLabel(version: EditableDocumentVersion): string {
+  const status = version.approved ? 'aprovada' : 'rascunho'
+  return `V${version.version_number} — ${getVersionOriginLabel(version)} — ${status}`
+}
 
 type CompareRow = {
   key: string
@@ -87,7 +114,7 @@ function getSectionIdentifier(section: EditableSection) {
 
 const API_BASE_URL = (import.meta.env.VITE_API_URL ?? 'http://127.0.0.1:8099/api/v1').replace(/\/$/, '')
 
-export function EditorModulePanel({ token, selectedCaseId, selectedCaseArea }: EditorModulePanelProps) {
+export function EditorModulePanel({ token, selectedCaseId, selectedCaseArea, pieceReadyRequestId }: EditorModulePanelProps) {
   const [documents, setDocuments] = useState<EditableDocumentItem[]>([])
   const [selectedDocumentId, setSelectedDocumentId] = useState<number | null>(null)
   const [selectedDocument, setSelectedDocument] = useState<EditableDocumentDetail | null>(null)
@@ -115,6 +142,7 @@ export function EditorModulePanel({ token, selectedCaseId, selectedCaseArea }: E
   const [newDocumentType, setNewDocumentType] = useState('peticao_inicial')
   const [newDocumentArea, setNewDocumentArea] = useState(selectedCaseArea || 'trabalhista')
   const [guidedInputs, setGuidedInputs] = useState<Record<string, string>>({})
+  const handledPieceReadyRequestRef = useRef(0)
 
   useEffect(() => {
     if (!showCreateForm) return
@@ -160,6 +188,83 @@ export function EditorModulePanel({ token, selectedCaseId, selectedCaseArea }: E
     return detail
   }
 
+  async function handleGenerateReadyPiece() {
+    if (!token.trim() || !selectedCaseId) return
+
+    setAssistedDraftLoading(true)
+    setCreateError('')
+    setCreateSuccess('')
+    setVersionError('')
+    setVersionSuccess('')
+    setEditingError('')
+    setEditingSuccess('')
+
+    try {
+      let documentId = selectedDocumentId ?? documents[0]?.id ?? null
+      let createdDetail: EditableDocumentDetail | null = null
+
+      if (!documentId) {
+        createdDetail = await createEditableDocument(token, {
+          case_id: selectedCaseId,
+          area: selectedCaseArea || 'trabalhista',
+          document_type: 'peticao_inicial',
+          title: `Peça pronta — Caso #${selectedCaseId}`,
+          notes: 'Documento base criado automaticamente pelo fluxo Gerar peça pronta.',
+          metadata: {
+            source: 'piece_ready_quick_flow',
+          },
+          sections: [
+            {
+              key: 'resumo_fatico',
+              title: 'Resumo fático',
+              content: '',
+              source: 'manual',
+            },
+            {
+              key: 'fundamentacao',
+              title: 'Fundamentação jurídica',
+              content: '',
+              source: 'manual',
+            },
+            {
+              key: 'pedidos',
+              title: 'Pedidos',
+              content: '',
+              source: 'manual',
+            },
+          ],
+        })
+
+        documentId = createdDetail.id
+        setSelectedDocumentId(createdDetail.id)
+        setSelectedDocument(createdDetail)
+        upsertDocumentInList(createdDetail)
+        setCreateSuccess('Documento base criado para iniciar a peça pronta.')
+      }
+
+      const assistedDetail = await generateAssistedDraft(token, documentId)
+      setSelectedDocument(assistedDetail)
+      upsertDocumentInList(assistedDetail)
+      setSelectedDocumentId(assistedDetail.id)
+      setCompareBaseVersionNumber(null)
+      setCompareTargetVersionNumber(null)
+      setEditingSectionKey(null)
+      setEditingContent('')
+      setShowCreateForm(false)
+      setVersionSuccess(
+        `Peça pronta gerada com sucesso na versão ${assistedDetail.current_version_number}. Revise, aprove e exporte o PDF final.`,
+      )
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setVersionError(err.message)
+      } else {
+        setVersionError('Não foi possível gerar a peça pronta para o caso selecionado.')
+      }
+    } finally {
+      setAssistedDraftLoading(false)
+    }
+  }
+
   async function handleGenerateAssistedDraft() {
     if (!token.trim() || !selectedDocumentId) return
 
@@ -177,12 +282,12 @@ export function EditorModulePanel({ token, selectedCaseId, selectedCaseArea }: E
       setCompareTargetVersionNumber(null)
       setEditingSectionKey(null)
       setEditingContent('')
-      setVersionSuccess(`Peça assistida gerada com sucesso na versão ${detail.current_version_number}.`)
+      setVersionSuccess(`Peça pronta atualizada com sucesso na versão ${detail.current_version_number}.`)
     } catch (err) {
       if (err instanceof ApiError) {
         setVersionError(err.message)
       } else {
-        setVersionError('Não foi possível gerar a peça assistida a partir da análise.')
+        setVersionError('Não foi possível gerar a peça pronta a partir da análise.')
       }
     } finally {
       setAssistedDraftLoading(false)
@@ -347,6 +452,24 @@ export function EditorModulePanel({ token, selectedCaseId, selectedCaseArea }: E
       isActive = false
     }
   }, [token, selectedDocumentId])
+
+  useEffect(() => {
+    if (!pieceReadyRequestId) return
+    if (handledPieceReadyRequestRef.current === pieceReadyRequestId) return
+    if (!token.trim() || !selectedCaseId) return
+    if (loadingList || loadingDetail || createLoading || assistedDraftLoading) return
+
+    handledPieceReadyRequestRef.current = pieceReadyRequestId
+    void handleGenerateReadyPiece()
+  }, [
+    pieceReadyRequestId,
+    token,
+    selectedCaseId,
+    loadingList,
+    loadingDetail,
+    createLoading,
+    assistedDraftLoading,
+  ])
 
   const currentVersion = useMemo(() => {
     if (!selectedDocument || selectedDocument.versions.length === 0) return null
@@ -601,7 +724,7 @@ export function EditorModulePanel({ token, selectedCaseId, selectedCaseArea }: E
 
       setVersionSuccess(
         approved
-          ? `Versão ${createdVersion.version_number} criada como snapshot aprovado com sucesso.`
+          ? `Versão ${createdVersion.version_number} criada como aprovada com sucesso.`
           : `Nova versão ${createdVersion.version_number} criada com sucesso.`,
       )
     } catch (err) {
@@ -1007,7 +1130,7 @@ export function EditorModulePanel({ token, selectedCaseId, selectedCaseArea }: E
                       }
                       title="Gerar rascunho inicial dos blocos com base na análise, resumo executivo e decisão do caso"
                     >
-                      {assistedDraftLoading ? 'Gerando peça assistida...' : 'Gerar peça assistida'}
+                      {assistedDraftLoading ? 'Gerando peça pronta...' : 'Gerar peça pronta'}
                     </button>
 
                   <button
@@ -1253,50 +1376,77 @@ export function EditorModulePanel({ token, selectedCaseId, selectedCaseArea }: E
                   </p>
                 ) : (
                   <>
-                    <div
-                      style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-                        gap: '12px',
-                        marginBottom: '16px',
-                      }}
-                    >
-                      <label style={{ display: 'grid', gap: '8px' }}>
-                        <span className="info-meta">Versão base</span>
-                        <select
-                          className="form-control"
-                          value={compareBaseVersionNumber ?? ''}
-                          onChange={(e) => setCompareBaseVersionNumber(Number(e.target.value))}
-                        >
-                          {versionsTimeline.map((version) => (
-                            <option key={`base-${version.id}`} value={version.version_number}>
-                              V{version.version_number} — {version.approved ? 'aprovada' : 'rascunho'}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
+                    {versionsTimeline.length === 2 && compareBaseVersion && compareTargetVersion ? (
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          gap: '12px',
+                          flexWrap: 'wrap',
+                          marginBottom: '16px',
+                        }}
+                      >
+                        <p className="info-text" style={{ margin: 0 }}>
+                          <strong>Comparando:</strong> {getVersionDisplayLabel(compareBaseVersion)} → {getVersionDisplayLabel(compareTargetVersion)}
+                        </p>
 
-                      <label style={{ display: 'grid', gap: '8px' }}>
-                        <span className="info-meta">Versão comparada</span>
-                        <select
-                          className="form-control"
-                          value={compareTargetVersionNumber ?? ''}
-                          onChange={(e) => setCompareTargetVersionNumber(Number(e.target.value))}
+                        <button
+                          type="button"
+                          className="btn btn-ghost"
+                          onClick={() => {
+                            setCompareBaseVersionNumber(compareTargetVersion.version_number)
+                            setCompareTargetVersionNumber(compareBaseVersion.version_number)
+                          }}
                         >
-                          {versionsTimeline.map((version) => (
-                            <option key={`target-${version.id}`} value={version.version_number}>
-                              V{version.version_number} — {version.approved ? 'aprovada' : 'rascunho'}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    </div>
+                          Inverter
+                        </button>
+                      </div>
+                    ) : (
+                      <div
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                          gap: '12px',
+                          marginBottom: '16px',
+                        }}
+                      >
+                        <label style={{ display: 'grid', gap: '8px' }}>
+                          <span className="info-meta">De</span>
+                          <select
+                            className="form-control"
+                            value={compareBaseVersionNumber ?? ''}
+                            onChange={(e) => setCompareBaseVersionNumber(Number(e.target.value))}
+                          >
+                            {versionsTimeline.map((version) => (
+                              <option key={`base-${version.id}`} value={version.version_number}>
+                                {getVersionDisplayLabel(version)}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+
+                        <label style={{ display: 'grid', gap: '8px' }}>
+                          <span className="info-meta">Para</span>
+                          <select
+                            className="form-control"
+                            value={compareTargetVersionNumber ?? ''}
+                            onChange={(e) => setCompareTargetVersionNumber(Number(e.target.value))}
+                          >
+                            {versionsTimeline.map((version) => (
+                              <option key={`target-${version.id}`} value={version.version_number}>
+                                {getVersionDisplayLabel(version)}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      </div>
+                    )}
 
                     {compareBaseVersion && compareTargetVersion ? (
                       <>
                         <p className="info-text">
-                          <strong>Resumo:</strong> V{compareBaseVersion.version_number} → V
-                          {compareTargetVersion.version_number} • {compareSummary.changed} alteração(ões) •{' '}
+                          <strong>Resumo:</strong> {compareSummary.changed} alteração(ões) detectada(s) •{' '}
                           {compareSummary.unchanged} bloco(s) sem mudança
                         </p>
 
@@ -1307,7 +1457,7 @@ export function EditorModulePanel({ token, selectedCaseId, selectedCaseArea }: E
                             marginTop: '16px',
                           }}
                         >
-                          {compareRows.map((row) => (
+                          {compareRows.filter((row) => row.changed).map((row) => (
                             <article
                               key={row.key}
                               style={{
@@ -1335,99 +1485,31 @@ export function EditorModulePanel({ token, selectedCaseId, selectedCaseArea }: E
                                 <span className="insight-badge">{row.changed ? 'Alterado' : 'Sem mudança'}</span>
                               </div>
 
-                              <p className="info-meta" style={{ marginBottom: '6px' }}>
-                                <strong>Auditoria:</strong> {row.changeType}
-                              </p>
-
-                              <p className="info-meta" style={{ marginBottom: '12px' }}>
-                                <strong>Detalhes:</strong> {row.changeSummary}
-                              </p>
-
-                              <p className="info-meta" style={{ marginBottom: '12px' }}>
-                                Status: V{compareBaseVersion.version_number} {row.baseStatus} → V
-                                {compareTargetVersion.version_number} {row.targetStatus} • Fonte: {row.baseSource} → {row.targetSource}
-                              </p>
 
                               <div
-                                style={{
-                                  display: 'grid',
-                                  gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-                                  gap: '12px',
-                                }}
-                              >
-                                <div
                                   style={{
                                     borderRadius: '12px',
                                     padding: '12px',
-                                    background: row.changed ? 'rgba(239, 68, 68, 0.08)' : 'rgba(255,255,255,0.03)',
-                                    border: row.changed
-                                      ? '1px solid rgba(239, 68, 68, 0.26)'
-                                      : '1px solid rgba(255,255,255,0.06)',
+                                    background: 'rgba(34, 197, 94, 0.10)',
+                                    border: '1px solid rgba(34, 197, 94, 0.28)',
                                   }}
                                 >
                                   <p className="info-meta" style={{ marginBottom: '8px' }}>
-                                    Antes • V{compareBaseVersion.version_number}
+                                    Conteúdo atualizado
                                   </p>
                                   <div
-
                                     style={{
-
                                       maxHeight: '320px',
-
                                       overflowY: 'auto',
-
                                       paddingRight: '6px',
-
                                     }}
-
                                   >
-
                                     <p className="body-text" style={{ whiteSpace: 'pre-wrap', marginBottom: 0 }}>
-
-                                      {row.baseContent || 'Sem conteúdo registrado nesta versão.'}
-
-                                    </p>
-
-                                  </div>
-                                </div>
-
-                                <div
-                                  style={{
-                                    borderRadius: '12px',
-                                    padding: '12px',
-                                    background: row.changed ? 'rgba(34, 197, 94, 0.10)' : 'rgba(255,255,255,0.03)',
-                                    border: row.changed
-                                      ? '1px solid rgba(34, 197, 94, 0.28)'
-                                      : '1px solid rgba(255,255,255,0.06)',
-                                  }}
-                                >
-                                  <p className="info-meta" style={{ marginBottom: '8px' }}>
-                                    Depois • V{compareTargetVersion.version_number}
-                                  </p>
-                                  <div
-
-                                    style={{
-
-                                      maxHeight: '320px',
-
-                                      overflowY: 'auto',
-
-                                      paddingRight: '6px',
-
-                                    }}
-
-                                  >
-
-                                    <p className="body-text" style={{ whiteSpace: 'pre-wrap', marginBottom: 0 }}>
-
                                       {row.targetContent || 'Sem conteúdo registrado nesta versão.'}
-
                                     </p>
-
                                   </div>
                                 </div>
-                              </div>
-                            </article>
+</article>
                           ))}
                         </div>
                       </>
@@ -1445,7 +1527,7 @@ export function EditorModulePanel({ token, selectedCaseId, selectedCaseArea }: E
                   {versionsTimeline.length > 0 ? (
                     versionsTimeline.map((version) => (
                       <li key={version.id}>
-                        <strong>V{version.version_number}</strong> — {version.approved ? 'aprovada' : 'rascunho'}
+                        <strong>{getVersionDisplayLabel(version)}</strong>
                         {version.version_number === selectedDocument.current_version_number ? ' • atual' : ''}
                       </li>
                     ))

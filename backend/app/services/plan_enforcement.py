@@ -4,15 +4,18 @@ from dataclasses import dataclass
 from datetime import date, datetime, timezone
 
 from fastapi import HTTPException
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.core.plans import PlanType, limits_for
+from app.models.case import Case
 from app.models.subscription import Subscription
 from app.models.usage_counter import UsageCounter
 
 
 class PlanAction:
     CASE_CREATE = "cases.create"
+    CASE_RESTORE = "cases.restore"
     AI_ANALYSIS_CREATE = "case_analyses.create"
 
 
@@ -20,6 +23,17 @@ class PlanAction:
 class EffectivePlan:
     plan_type: PlanType
     status: str  # active/trial/canceled (string do banco)
+
+
+@dataclass(frozen=True)
+class CaseCapacitySummary:
+    active_cases: int
+    archived_cases: int
+    case_records: int
+    active_cases_limit: int
+    case_records_limit: int
+    remaining_active_cases: int
+    remaining_case_records: int
 
 
 def _month_start(dt: datetime | None = None) -> date:
@@ -35,11 +49,9 @@ def get_effective_plan(db: Session, tenant_id: int) -> EffectivePlan:
         .one_or_none()
     )
 
-    # Sem assinatura = cai no basic (trial implícito)
     if not sub:
         return EffectivePlan(plan_type=PlanType.basic, status="trial")
 
-    # Expirou? cai no basic (e segue vida)
     exp = sub.expires_at
     if exp is not None and exp.tzinfo is None:
         exp = exp.replace(tzinfo=timezone.utc)
@@ -52,7 +64,6 @@ def get_effective_plan(db: Session, tenant_id: int) -> EffectivePlan:
     except Exception:
         pt = PlanType.basic
 
-    # canceled não bloqueia o app inteiro; ele só “desce o plano” na prática
     if sub.status == "canceled":
         return EffectivePlan(plan_type=PlanType.basic, status="canceled")
 
@@ -69,11 +80,68 @@ def _get_or_create_counter_locked(db: Session, tenant_id: int, month: date) -> U
     if row:
         return row
 
-    # cria e re-busca com lock (padrão seguro)
     row = UsageCounter(tenant_id=tenant_id, month=month, cases_created=0, ai_analyses_generated=0)
     db.add(row)
-    db.flush()  # garante PK e respeita transação do request
+    db.flush()
     return q.one()
+
+
+def _active_case_filter():
+    return or_(Case.status.is_(None), Case.status != "archived")
+
+
+def _count_active_cases(db: Session, tenant_id: int) -> int:
+    return (
+        db.query(Case)
+        .filter(Case.tenant_id == tenant_id)
+        .filter(_active_case_filter())
+        .count()
+    )
+
+
+def _count_case_records(db: Session, tenant_id: int) -> int:
+    return db.query(Case).filter(Case.tenant_id == tenant_id).count()
+
+
+def get_case_capacity_summary(db: Session, tenant_id: int) -> CaseCapacitySummary:
+    eff = get_effective_plan(db, tenant_id)
+    lim = limits_for(eff.plan_type)
+
+    active_cases = _count_active_cases(db, tenant_id)
+    case_records = _count_case_records(db, tenant_id)
+    archived_cases = max(case_records - active_cases, 0)
+
+    return CaseCapacitySummary(
+        active_cases=active_cases,
+        archived_cases=archived_cases,
+        case_records=case_records,
+        active_cases_limit=lim.active_cases_limit,
+        case_records_limit=lim.case_records_limit,
+        remaining_active_cases=max(lim.active_cases_limit - active_cases, 0),
+        remaining_case_records=max(lim.case_records_limit - case_records, 0),
+    )
+
+
+def _enforce_case_storage_limits(
+    db: Session,
+    tenant_id: int,
+    *,
+    extra_active: int,
+    extra_records: int,
+) -> None:
+    storage = get_case_capacity_summary(db, tenant_id)
+
+    if (storage.case_records + extra_records) > storage.case_records_limit:
+        raise HTTPException(
+            status_code=402,
+            detail="Limite de acervo do plano atingido. Faça upgrade para armazenar mais casos.",
+        )
+
+    if (storage.active_cases + extra_active) > storage.active_cases_limit:
+        raise HTTPException(
+            status_code=402,
+            detail="Limite de casos ativos do plano atingido. Arquive um caso ou faça upgrade.",
+        )
 
 
 def enforce_plan_limits(db: Session, tenant_id: int, action: str) -> None:
@@ -84,9 +152,13 @@ def enforce_plan_limits(db: Session, tenant_id: int, action: str) -> None:
     counter = _get_or_create_counter_locked(db, tenant_id, month)
 
     if action == PlanAction.CASE_CREATE:
-        if (counter.cases_created + 1) > lim.cases_per_month:
-            raise HTTPException(status_code=402, detail="Limite do plano atingido. Faça upgrade.")
+        _enforce_case_storage_limits(db, tenant_id, extra_active=1, extra_records=1)
         counter.cases_created += 1
+        db.flush()
+        return
+
+    if action == PlanAction.CASE_RESTORE:
+        _enforce_case_storage_limits(db, tenant_id, extra_active=1, extra_records=0)
         db.flush()
         return
 

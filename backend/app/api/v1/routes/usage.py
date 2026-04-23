@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 from app.core.plans import limits_for
-from app.services.plan_enforcement import get_effective_plan
+from app.services.plan_enforcement import get_effective_plan, get_case_capacity_summary
 from app.models.usage_counter import UsageCounter
 from fastapi import Depends
 from app.db.session import get_db
@@ -48,6 +48,7 @@ def usage_summary_v2(
 
     remaining_cases = max(lim.cases_per_month - used_cases, 0)
     remaining_ai = max(lim.ai_analyses_per_month - used_ai, 0)
+    storage = get_case_capacity_summary(db, tenant_id)
 
     return {
         "tenant_id": tenant_id,
@@ -55,8 +56,21 @@ def usage_summary_v2(
         "plan": {"type": getattr(eff.plan_type, "value", str(eff.plan_type)), "status": str(eff.status)},
         "limits": {
             "cases_per_month": lim.cases_per_month,
+            "active_cases": storage.active_cases_limit,
+            "case_records": storage.case_records_limit,
             "ai_analyses_per_month": lim.ai_analyses_per_month,
         },
-        "used": {"cases_created": used_cases, "ai_analyses_generated": used_ai},
-        "remaining": {"cases": remaining_cases, "ai_analyses": remaining_ai},
+        "used": {
+            "cases_created": used_cases,
+            "ai_analyses_generated": used_ai,
+            "active_cases": storage.active_cases,
+            "archived_cases": storage.archived_cases,
+            "case_records": storage.case_records,
+        },
+        "remaining": {
+            "cases": remaining_cases,
+            "ai_analyses": remaining_ai,
+            "active_cases": storage.remaining_active_cases,
+            "case_records": storage.remaining_case_records,
+        },
     }

@@ -268,3 +268,60 @@ Ele é tratado como **produto real**, com foco em:
 - evolução modular
 - venda futura como SaaS jurídico
 
+## Produção / production-like
+
+O projeto possui blindagens mínimas para ambiente production-like.
+
+### Variáveis críticas
+
+- `APP_ENV`
+- `AUTH_PROTECT_DOCS`
+- `DATABASE_URL`
+- `CORS_ALLOW_ORIGINS`
+- `JWT_SECRET`
+- `ALLOW_SEED_ADMIN`
+- `ADMIN_SEED_TOKEN`
+
+### Regras de segurança em production-like
+
+Quando `APP_ENV` estiver em modo de produção (`prod`, `production` ou `staging`), o backend aplica fail-fast de configuração:
+
+- `AUTH_PROTECT_DOCS` deve estar como `true`
+- `DATABASE_URL` não pode usar o default local do ambiente dev
+- se `ALLOW_SEED_ADMIN=true`, então `ADMIN_SEED_TOKEN` deve ser real e não placeholder
+
+Se essas condições não forem atendidas, o backend deve falhar no boot. Isso é esperado e desejado.
+
+### CORS por ambiente
+
+A lista de origens permitidas é controlada por:
+
+`CORS_ALLOW_ORIGINS="http://localhost:5173,http://127.0.0.1:5173"`
+
+Em ambiente publicado, essa variável deve incluir o domínio real do frontend.
+
+Exemplo:
+
+`CORS_ALLOW_ORIGINS="https://app.seudominio.com,https://painel.seudominio.com"`
+
+### Documentação técnica exposta
+
+Para ambiente production-like, a diretriz é:
+
+`AUTH_PROTECT_DOCS="true"`
+
+Com isso:
+- `/docs` deve retornar `404`
+- `/redoc` deve retornar `404`
+- `/openapi.json` deve retornar `404`
+
+### Exemplo mínimo de subida production-like
+
+```bash
+cd ~/projetos/ia_trabalhista_robusta/backend && \
+APP_ENV="production" \
+AUTH_PROTECT_DOCS="true" \
+DATABASE_URL="postgresql+psycopg2://USUARIO:SENHA@HOST:PORTA/DB" \
+CORS_ALLOW_ORIGINS="https://app.seudominio.com" \
+python3 -m uvicorn app.main:app --host 127.0.0.1 --port 8099
+```

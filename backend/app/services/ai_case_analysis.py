@@ -360,7 +360,7 @@ def analyze_case(
             action_type=action_type,
         )
     except Exception as exc:
-        logger.exception("ai_case_analysis fallback acionado para case_number=%s: %s", case_number, exc)
+        logger.exception("ai_case_analysis fallback acionado")
         return _fallback_analysis(
             case_number=case_number,
             title=title,

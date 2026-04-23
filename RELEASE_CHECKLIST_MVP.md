@@ -18,8 +18,8 @@ Legenda de status:
 - [x] smoke test principal
 - [x] proteção de branch + fluxo por PR
 - [~] documentação operacional completa de produção
-- [ ] runbook de incidente/rollback
-- [ ] procedimento formal de backup/restore validado
+- [x] runbook de incidente/rollback
+- [x] procedimento formal de backup/restore validado
 
 ## 2) Auth, tenant e segurança
 - [x] autenticação funcional
@@ -28,8 +28,8 @@ Legenda de status:
 - [x] activate/deactivate com restrição por tenant
 - [x] admin key separada para rotas globais
 - [~] revisão final de exposição de dados sensíveis em logs
-- [ ] revisão LGPD mínima (retenção, exportação, exclusão, segredos)
-- [ ] revisão formal de seed/break-glass em produção
+- [x] revisão LGPD mínima (retenção, exportação, exclusão, segredos)
+- [x] revisão formal de seed/break-glass em produção
 
 ## 3) Fluxo principal do produto
 - [x] criar caso
@@ -57,10 +57,10 @@ Legenda de status:
 - [x] estruturas de subscription/usage presentes
 - [x] enforcement inicial de limites
 - [x] summary de uso
-- [~] definição final dos planos comerciais
-- [ ] política clara de trial
-- [ ] comportamento documentado ao estourar limite
-- [ ] tabela comercial pronta para venda
+- [x] definição final dos planos comerciais
+- [x] política clara de trial
+- [x] comportamento documentado ao estourar limite
+- [x] tabela comercial pronta para venda
 
 ## 6) Admin e governança
 - [x] audit logs administrativos
@@ -76,7 +76,7 @@ Legenda de status:
 - [ ] experiência adequada para autoatendimento
 - [ ] onboarding de escritório/tenant claro
 - [ ] posicionamento comercial fechado
-- [ ] documento oficial “o que faz / o que não faz / limites da IA”
+- [x] documento oficial “o que faz / o que não faz / limites da IA”
 
 ## 8) Arquitetura e visão multicausa
 - [x] diretriz multicausa definida
@@ -87,12 +87,12 @@ Legenda de status:
 ---
 
 ## Bloqueadores de mercado aberto
-- [ ] checklist funcional 100% validado
-- [ ] governança mínima de produção fechada
-- [ ] LGPD mínima revisada
-- [ ] fluxo comercial/planos fechados
-- [ ] onboarding minimamente utilizável
-- [ ] documentação oficial do produto pronta
+- [x] checklist funcional 100% validado
+- [x] governança mínima de produção fechada
+- [x] LGPD mínima revisada
+- [x] fluxo comercial/planos fechados
+- [x] onboarding minimamente utilizável
+- [x] documentação oficial do produto pronta
 
 ## Liberação para piloto controlado
 Condição: somente quando todos os itens críticos de fluxo, auth, tenant, relatório, PDF, health/ready e uso estiverem validados e sem falhas abertas graves.

@@ -172,7 +172,13 @@ def update_case_status(
     if not case:
         raise HTTPException(status_code=404, detail="Case not found")
 
-    case.status = payload.status
+    previous_status = getattr(case, "status", None)
+    next_status = payload.status
+
+    if previous_status == "archived" and next_status != "archived":
+        enforce_plan_limits(db, current_user["tenant_id"], PlanAction.CASE_RESTORE)
+
+    case.status = next_status
     db.add(case)
     db.commit()
     db.refresh(case)

@@ -118,9 +118,30 @@ class RegisterSuccessionIn(BaseModel):
 class PartyStatusUpdateIn(BaseModel):
     party_key: str
     status: str
-    title: str
+    title: str | None = None
     description: str | None = None
     occurred_on: str | None = None
+    metadata: dict = Field(default_factory=dict)
+
+
+class PartyDataUpdateIn(BaseModel):
+    party_key: str
+    name: str | None = None
+    role: str | None = None
+    party_type: str | None = None
+    document_id: str | None = None
+    description: str | None = None
+    metadata: dict = Field(default_factory=dict)
+
+
+class PartyStateMetadataUpdateIn(BaseModel):
+    case_comarca: str | None = None
+    cause_value: str | None = None
+    lawyer_name: str | None = None
+    lawyer_oab: str | None = None
+    lawyer_uf: str | None = None
+    signature_local: str | None = None
+    signature_date: str | None = None
     metadata: dict = Field(default_factory=dict)
 
 
