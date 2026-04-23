@@ -11,11 +11,12 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import func, text
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.plans import PlanType, limits_for
 from app.core.tenant import set_tenant_on_session
+from app.core.security import pwd_context
 from app.db.session import get_db
 from app.models.audit_log import AuditLog
 from app.models.subscription import Subscription
@@ -80,6 +81,13 @@ class SubscriptionUpsertIn(BaseModel):
     plan_type: str = Field(..., description="basic|pro|office")
     status: str = Field(..., description="trial|active|canceled")
     expires_at: Optional[datetime] = Field(default=None, description="ISO datetime (UTC recomendado)")
+
+
+class OnboardingBootstrapIn(BaseModel):
+    tenant_name: str = Field(..., min_length=3, max_length=150, description="Nome do tenant/escritório")
+    username: str = Field(..., min_length=3, max_length=80, description="Usuário responsável inicial")
+    password: str = Field(..., min_length=8, max_length=128, description="Senha inicial do responsável")
+    trial_days: int = Field(default=7, ge=1, le=30, description="Duração do trial inicial em dias")
 
 
 
@@ -184,6 +192,137 @@ def admin_dashboard_summary(
     except Exception as e:
         logger.exception("admin dashboard summary failed (unexpected)")
         raise HTTPException(status_code=500, detail=f"admin dashboard summary failed: {type(e).__name__}: {e}")
+
+
+@router.post("/onboarding/bootstrap", dependencies=[Depends(require_admin_key)])
+def admin_onboarding_bootstrap(
+    payload: OnboardingBootstrapIn,
+    db: Session = Depends(get_db),
+):
+    """
+    Cria onboarding mínimo oficial:
+    - tenant
+    - usuário responsável inicial
+    - membership admin
+    - subscription basic/trial
+    """
+    try:
+        tenant_name = (payload.tenant_name or "").strip()
+        username = (payload.username or "").strip()
+
+        if not tenant_name:
+            raise HTTPException(status_code=422, detail="tenant_name é obrigatório")
+        if not username:
+            raise HTTPException(status_code=422, detail="username é obrigatório")
+
+        existing_tenant = db.query(Tenant).filter(Tenant.name == tenant_name).one_or_none()
+        if existing_tenant is not None:
+            raise HTTPException(status_code=409, detail="tenant name already exists")
+
+        existing_user = db.query(User).filter(User.username == username).one_or_none()
+        if existing_user is not None:
+            raise HTTPException(status_code=409, detail="username already exists")
+
+        tenant = Tenant(
+            name=tenant_name,
+            plan="basic",
+        )
+        db.add(tenant)
+        db.flush()
+
+        set_tenant_on_session(db, tenant.id)
+
+        trial_expires_at = datetime.now(timezone.utc) + timedelta(days=payload.trial_days)
+        lim = limits_for(PlanType.basic)
+
+        sub = Subscription(
+            tenant_id=tenant.id,
+            plan_type="basic",
+            status="trial",
+            case_limit=lim.cases_per_month,
+            active=True,
+            expires_at=trial_expires_at,
+        )
+        db.add(sub)
+
+        user = User(
+            username=username,
+            password_hash=pwd_context.hash(payload.password),
+            role="admin",
+            is_active=True,
+        )
+        db.add(user)
+        db.flush()
+
+        membership = TenantMember(
+            tenant_id=tenant.id,
+            user_id=user.id,
+            role="admin",
+        )
+        db.add(membership)
+
+        db.commit()
+        db.refresh(tenant)
+        db.refresh(user)
+        db.refresh(sub)
+
+        return {
+            "tenant": {
+                "tenant_id": tenant.id,
+                "name": tenant.name,
+                "plan": tenant.plan,
+                "created_at": tenant.created_at.isoformat() if getattr(tenant, "created_at", None) else None,
+            },
+            "user": {
+                "user_id": user.id,
+                "username": user.username,
+                "role": user.role,
+                "is_active": bool(user.is_active),
+            },
+            "subscription": {
+                "plan_type": sub.plan_type,
+                "status": sub.status,
+                "active": bool(sub.active),
+                "expires_at": sub.expires_at.isoformat() if sub.expires_at else None,
+            },
+            "next_steps": {
+                "login_path": "/api/v1/auth/login",
+                "smoke_flow": [
+                    "login",
+                    "create_case",
+                    "read_case",
+                    "analysis",
+                    "executive_summary",
+                    "executive_report",
+                    "executive_pdf",
+                ],
+            },
+        }
+
+    except HTTPException:
+        raise
+    except IntegrityError:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        raise HTTPException(status_code=409, detail="tenant or username already exists")
+    except SQLAlchemyError as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        logger.exception("admin onboarding bootstrap failed (SQLAlchemyError)")
+        raise HTTPException(status_code=500, detail=f"admin onboarding bootstrap failed: SQLAlchemyError: {e}")
+    except Exception as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        logger.exception("admin onboarding bootstrap failed (unexpected)")
+        raise HTTPException(status_code=500, detail=f"admin onboarding bootstrap failed: {type(e).__name__}: {e}")
+    finally:
+        _reset_tenant_context(db)
 
 
 @router.get("/tenants", dependencies=[Depends(require_admin_key)])
