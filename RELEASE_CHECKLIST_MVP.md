@@ -91,7 +91,7 @@ Legenda de status:
 - [ ] governança mínima de produção fechada
 - [x] LGPD mínima revisada
 - [x] fluxo comercial/planos fechados
-- [ ] onboarding minimamente utilizável
+- [x] onboarding minimamente utilizável
 - [ ] documentação oficial do produto pronta
 
 ## Liberação para piloto controlado
