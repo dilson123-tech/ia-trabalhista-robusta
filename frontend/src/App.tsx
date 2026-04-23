@@ -8,6 +8,7 @@ import { CaseCard } from './components/CaseCard'
 import { DashboardTopPanel } from './components/DashboardTopPanel'
 import { LoginPanel } from './components/LoginPanel'
 import { CaseFocusPanel } from './components/CaseFocusPanel'
+import { getPlanLabel as getCatalogPlanLabel, getPlanPricing, getPlanStatusLabel as getCatalogPlanStatusLabel, listPlanPricing } from './config/pricing'
 
 const AUTH_TOKEN_STORAGE_KEY = 'ia_trabalhista_auth_token'
 
@@ -53,6 +54,7 @@ function App() {
   const [usageSummary, setUsageSummary] = useState<UsageSummaryV2Response | null>(null)
   const [usageLoading, setUsageLoading] = useState(false)
   const [usageError, setUsageError] = useState('')
+  const [planActionNotice, setPlanActionNotice] = useState('')
   const [planPanelCollapsed, setPlanPanelCollapsed] = useState(false)
   const [pieceReadyRequestId, setPieceReadyRequestId] = useState(0)
   const [pieceReadyNotice, setPieceReadyNotice] = useState('')
@@ -83,27 +85,23 @@ function App() {
     return riskLabelMap[risk] ?? risk
   }
 
-  const planLabelMap: Record<string, string> = {
-    basic: 'Básico',
-    pro: 'Pro',
-    office: 'Escritório',
-  }
-
-  const planStatusLabelMap: Record<string, string> = {
-    trial: 'Período de teste',
-    active: 'Ativo',
-    past_due: 'Pagamento pendente',
-    canceled: 'Cancelado',
-  }
-
   function getPlanLabel(planType: string | undefined) {
-    if (!planType) return 'Plano não identificado'
-    return planLabelMap[planType] ?? planType
+    return getCatalogPlanLabel(planType)
   }
 
   function getPlanStatusLabel(status: string | undefined) {
-    if (!status) return 'Status não informado'
-    return planStatusLabelMap[status] ?? status
+    return getCatalogPlanStatusLabel(status)
+  }
+
+  function handlePlanAction(planType: string, planLabel: string) {
+    if (planType === usagePlanType) {
+      setPlanActionNotice(`Você já está no plano ${planLabel}.`)
+      return
+    }
+
+    setPlanActionNotice(
+      `Interesse registrado no plano ${planLabel}. Próximo passo: conectar este botão ao fluxo comercial/admin de upgrade sem alterar automaticamente a assinatura.`
+    )
   }
 
   function getCapacityPercent(current: number, limit: number) {
@@ -166,6 +164,8 @@ function App() {
 
   const usagePlanType = usageSummary?.plan?.type ?? 'basic'
   const usagePlanStatus = usageSummary?.plan?.status ?? 'active'
+  const currentPlanPricing = getPlanPricing(usagePlanType)
+  const upgradePlanOptions = listPlanPricing().filter((plan) => plan.monthlyPrice > (currentPlanPricing?.monthlyPrice ?? 0))
   const usageActiveCurrent = usageSummary?.current?.active_cases ?? 0
   const usageArchivedCurrent = usageSummary?.current?.archived_cases ?? 0
   const usageRecordsCurrent = usageSummary?.current?.case_records ?? 0
@@ -655,11 +655,70 @@ function App() {
                         background: 'rgba(15, 23, 42, 0.28)',
                       }}
                     >
-                      <p className="insight-kicker">Plano atual</p>
-                      <h3 style={{ margin: '6px 0 4px', fontSize: '1.08rem' }}>{getPlanLabel(usagePlanType)}</h3>
-                      <p style={{ margin: 0, color: 'var(--muted-text)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', alignItems: 'flex-start' }}>
+                        <div>
+                          <p className="insight-kicker">Plano atual</p>
+                          <h3 style={{ margin: '6px 0 4px', fontSize: '1.08rem' }}>{getPlanLabel(usagePlanType)}</h3>
+                        </div>
+                        <span
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            padding: '6px 10px',
+                            borderRadius: '999px',
+                            fontSize: '0.76rem',
+                            fontWeight: 700,
+                            background: 'rgba(59, 130, 246, 0.16)',
+                            color: '#bfdbfe',
+                            border: '1px solid rgba(96, 165, 250, 0.26)',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {currentPlanPricing?.badge ?? 'Plano operacional'}
+                        </span>
+                      </div>
+
+                      <p style={{ margin: '2px 0 0', color: 'var(--muted-text)' }}>
                         {getPlanStatusLabel(usagePlanStatus)}
                       </p>
+
+                      <p
+                        style={{
+                          margin: '14px 0 6px',
+                          fontSize: '1.32rem',
+                          fontWeight: 800,
+                          letterSpacing: '-0.02em',
+                        }}
+                      >
+                        {currentPlanPricing?.formattedMonthlyPrice ?? 'Preço sob consulta'}
+                      </p>
+
+                      <p style={{ margin: 0, color: 'var(--muted-text)', lineHeight: 1.5 }}>
+                        {currentPlanPricing?.description ?? 'Plano carregado conforme capacidade operacional do tenant.'}
+                      </p>
+
+                      <p style={{ margin: '12px 0 0', color: 'var(--muted-text)', lineHeight: 1.45, fontSize: '0.93rem' }}>
+                        {currentPlanPricing?.onboardingNote ?? 'Condição comercial sujeita à proposta e maturidade operacional.'}
+                      </p>
+
+                      <button
+                        type="button"
+                        onClick={() => handlePlanAction(usagePlanType, getPlanLabel(usagePlanType))}
+                        style={{
+                          marginTop: '14px',
+                          width: '100%',
+                          border: '1px solid rgba(96, 165, 250, 0.26)',
+                          background: 'rgba(59, 130, 246, 0.14)',
+                          color: '#dbeafe',
+                          borderRadius: '12px',
+                          padding: '12px 14px',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Plano atual em uso
+                      </button>
                     </article>
 
                     <article
@@ -797,6 +856,112 @@ function App() {
                       </p>
                     </article>
                   </div>
+
+                  <section
+                    style={{
+                      border: '1px solid rgba(148, 163, 184, 0.16)',
+                      borderRadius: '18px',
+                      padding: '16px',
+                      background: 'rgba(15, 23, 42, 0.22)',
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', alignItems: 'flex-start', marginBottom: '12px' }}>
+                      <div>
+                        <p className="insight-kicker">Próximos planos</p>
+                        <h3 style={{ margin: '6px 0 4px', fontSize: '1.02rem' }}>Comparativo rápido para upgrade</h3>
+                        <p style={{ margin: 0, color: 'var(--muted-text)' }}>
+                          Visualize a evolução comercial sem mexer na base operacional já validada.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                        gap: '12px',
+                      }}
+                    >
+                      {upgradePlanOptions.map((plan) => (
+                        <article
+                          key={plan.type}
+                          style={{
+                            border: '1px solid rgba(148, 163, 184, 0.18)',
+                            borderRadius: '16px',
+                            padding: '14px',
+                            background: 'rgba(15, 23, 42, 0.24)',
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', alignItems: 'flex-start' }}>
+                            <div>
+                              <p className="insight-kicker">{plan.label}</p>
+                              <h4 style={{ margin: '6px 0 4px', fontSize: '1rem' }}>{plan.formattedMonthlyPrice}</h4>
+                            </div>
+                            <span
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                padding: '5px 9px',
+                                borderRadius: '999px',
+                                fontSize: '0.72rem',
+                                fontWeight: 700,
+                                background: 'rgba(59, 130, 246, 0.14)',
+                                color: '#bfdbfe',
+                                border: '1px solid rgba(96, 165, 250, 0.22)',
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
+                              {plan.badge}
+                            </span>
+                          </div>
+
+                          <p style={{ margin: '10px 0 0', color: 'var(--muted-text)', lineHeight: 1.5 }}>
+                            {plan.description}
+                          </p>
+
+                          <p style={{ margin: '12px 0 0', color: 'var(--muted-text)', lineHeight: 1.45, fontSize: '0.92rem' }}>
+                            {plan.recommendedFor}
+                          </p>
+
+                          <button
+                            type="button"
+                            onClick={() => handlePlanAction(plan.type, plan.label)}
+                            style={{
+                              marginTop: '14px',
+                              width: '100%',
+                              border: '1px solid rgba(96, 165, 250, 0.22)',
+                              background: 'rgba(59, 130, 246, 0.10)',
+                              color: '#dbeafe',
+                              borderRadius: '12px',
+                              padding: '11px 13px',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            {plan.ctaLabel}
+                          </button>
+                        </article>
+                      ))}
+                    </div>
+                  </section>
+
+                  {planActionNotice ? (
+                    <div
+                      style={{
+                        border: '1px solid rgba(96, 165, 250, 0.22)',
+                        borderRadius: '18px',
+                        padding: '16px',
+                        background: 'rgba(59, 130, 246, 0.08)',
+                      }}
+                    >
+                      <p className="insight-kicker">Fluxo comercial</p>
+                      <strong style={{ display: 'block', marginBottom: '6px' }}>{planActionNotice}</strong>
+                      <p style={{ margin: 0, color: 'var(--muted-text)' }}>
+                        Nesta fase, o clique registra intenção no painel. A ligação com upgrade real será conectada ao fluxo comercial/admin sem mudança automática de plano.
+                      </p>
+                    </div>
+                  ) : null}
 
                   <div
                     style={{

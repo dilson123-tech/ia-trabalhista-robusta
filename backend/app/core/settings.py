@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     JWT_EXPIRES_MIN: int = 60
     ADMIN_SEED_TOKEN: str = "CHANGE_ME_SEED_TOKEN"
     ALLOW_SEED_ADMIN: bool = False
-    CORS_ALLOW_ORIGINS: str = "http://localhost:5173,http://127.0.0.1:5173"
+    CORS_ALLOW_ORIGINS: str = "http://localhost:5173,http://127.0.0.1:5173,http://localhost:4173,http://127.0.0.1:4173"
     API_V1_PREFIX: str = "/api/v1"
     DATABASE_URL: str = "postgresql+psycopg2://ia_app:ia_app_pass@127.0.0.1:55432/ia_trabalhista"
 
