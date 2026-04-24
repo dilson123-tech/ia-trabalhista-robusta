@@ -45,6 +45,10 @@ class Settings(BaseSettings):
     PAYMENT_PROVIDER: str = "manual"
     PAYMENT_CHECKOUT_BASE_URL: str = ""
 
+    ASAAS_API_KEY: str = ""
+    ASAAS_BASE_URL: str = "https://api-sandbox.asaas.com/v3"
+    ASAAS_WEBHOOK_TOKEN: str = ""
+
 settings = Settings()
 
 

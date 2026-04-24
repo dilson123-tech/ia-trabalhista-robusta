@@ -165,7 +165,7 @@ function App() {
   const usagePlanType = usageSummary?.plan?.type ?? 'basic'
   const usagePlanStatus = usageSummary?.plan?.status ?? 'active'
   const currentPlanPricing = getPlanPricing(usagePlanType)
-  const upgradePlanOptions = listPlanPricing().filter((plan) => plan.monthlyPrice > (currentPlanPricing?.monthlyPrice ?? 0))
+  const planActionOptions = listPlanPricing().filter((plan) => plan.type !== usagePlanType)
   const usageActiveCurrent = usageSummary?.current?.active_cases ?? 0
   const usageArchivedCurrent = usageSummary?.current?.archived_cases ?? 0
   const usageRecordsCurrent = usageSummary?.current?.case_records ?? 0
@@ -868,7 +868,7 @@ function App() {
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', alignItems: 'flex-start', marginBottom: '12px' }}>
                       <div>
                         <p className="insight-kicker">Próximos planos</p>
-                        <h3 style={{ margin: '6px 0 4px', fontSize: '1.02rem' }}>Comparativo rápido para upgrade</h3>
+                        <h3 style={{ margin: '6px 0 4px', fontSize: '1.02rem' }}>Comparativo rápido de planos</h3>
                         <p style={{ margin: 0, color: 'var(--muted-text)' }}>
                           Visualize a evolução comercial sem mexer na base operacional já validada.
                         </p>
@@ -882,7 +882,7 @@ function App() {
                         gap: '12px',
                       }}
                     >
-                      {upgradePlanOptions.map((plan) => (
+                      {planActionOptions.map((plan) => (
                         <article
                           key={plan.type}
                           style={{
