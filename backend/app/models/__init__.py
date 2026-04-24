@@ -20,5 +20,6 @@ from .tenant_member import TenantMember  # noqa: F401
 from app.models.business_audit_log import BusinessAuditLog
 from .tenant_usage_event import TenantUsageEvent
 
+from .billing_request import BillingRequest  # noqa: F401
 from .subscription import Subscription  # noqa: F401
 from .usage_counter import UsageCounter  # noqa: F401

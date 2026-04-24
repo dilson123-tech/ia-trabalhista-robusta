@@ -19,6 +19,7 @@ from app.core.tenant import set_tenant_on_session
 from app.core.security import pwd_context
 from app.db.session import get_db
 from app.models.audit_log import AuditLog
+from app.models.billing_request import BillingRequest
 from app.models.subscription import Subscription
 from app.models.tenant import Tenant
 from app.models.tenant_member import TenantMember
@@ -26,9 +27,23 @@ from app.models.usage_counter import UsageCounter
 from app.models.tenant_usage_event import TenantUsageEvent
 from app.models.user import User
 from app.services.plan_enforcement import get_effective_plan
+from app.services.payment_checkout import PaymentCheckoutError, create_checkout_session
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 logger = logging.getLogger(__name__)
+
+PLAN_MONTHLY_PRICES_CENTS = {
+    "basic": 24700,
+    "pro": 49700,
+    "office": 109700,
+}
+
+PLAN_ORDER = {
+    "basic": 1,
+    "pro": 2,
+    "office": 3,
+}
+
 
 
 def require_admin_key(x_admin_key: str | None = Header(default=None, alias="X-Admin-Key")) -> None:
@@ -89,6 +104,372 @@ class OnboardingBootstrapIn(BaseModel):
     password: str = Field(..., min_length=8, max_length=128, description="Senha inicial do responsável")
     trial_days: int = Field(default=7, ge=1, le=30, description="Duração do trial inicial em dias")
 
+
+class BillingRequestCreateIn(BaseModel):
+    requested_plan_type: str = Field(..., description="basic|pro|office")
+    payment_method: str = Field(..., description="pix|credit_card|debit_card")
+    payment_provider: str = Field(default="manual", max_length=30, description="Identificador do provedor de pagamento")
+    billing_reason: str = Field(default="plan_upgrade", description="plan_upgrade|plan_downgrade|plan_renewal")
+
+
+class BillingRequestMarkPaidIn(BaseModel):
+    payment_method: Optional[str] = Field(default=None, description="pix|credit_card|debit_card")
+    provider_reference: Optional[str] = Field(default=None, max_length=120)
+    paid_at: Optional[datetime] = Field(default=None, description="ISO datetime (UTC recomendado)")
+
+
+class BillingRequestCheckoutIn(BaseModel):
+    payment_method: Optional[str] = Field(default=None, description="pix|credit_card|debit_card")
+    payment_provider: Optional[str] = Field(default=None, max_length=30, description="Provider desejado para o checkout")
+
+
+@router.post("/tenants/{tenant_id}/billing-requests", dependencies=[Depends(require_admin_key)])
+def admin_create_billing_request(
+    tenant_id: int,
+    payload: BillingRequestCreateIn,
+    db: Session = Depends(get_db),
+):
+    try:
+        tenant = db.query(Tenant).filter(Tenant.id == tenant_id).one_or_none()
+        if tenant is None:
+            raise HTTPException(status_code=404, detail="Tenant não encontrado.")
+
+        try:
+            requested_plan = PlanType(payload.requested_plan_type)
+        except Exception:
+            raise HTTPException(status_code=422, detail="requested_plan_type inválido (use basic|pro|office).")
+
+        if payload.payment_method not in ("pix", "credit_card", "debit_card"):
+            raise HTTPException(status_code=422, detail="payment_method inválido (use pix|credit_card|debit_card).")
+
+        if payload.billing_reason not in ("plan_upgrade", "plan_downgrade", "plan_renewal"):
+            raise HTTPException(status_code=422, detail="billing_reason inválido (use plan_upgrade|plan_downgrade|plan_renewal).")
+
+        eff = get_effective_plan(db, tenant_id)
+        current_plan_type = getattr(eff.plan_type, "value", str(eff.plan_type))
+        requested_plan_type = getattr(requested_plan, "value", str(requested_plan))
+
+        if payload.billing_reason == "plan_upgrade":
+            if PLAN_ORDER.get(requested_plan_type, 0) <= PLAN_ORDER.get(current_plan_type, 0):
+                raise HTTPException(status_code=422, detail="plan_upgrade exige plano superior ao atual.")
+
+        amount_cents = PLAN_MONTHLY_PRICES_CENTS.get(requested_plan_type)
+        if amount_cents is None:
+            raise HTTPException(status_code=422, detail="Preço do plano solicitado não configurado.")
+
+        expires_at = datetime.now(timezone.utc) + timedelta(minutes=30)
+
+        billing = BillingRequest(
+            tenant_id=tenant_id,
+            requested_plan_type=requested_plan_type,
+            current_plan_type=current_plan_type,
+            billing_reason=payload.billing_reason,
+            payment_method=payload.payment_method,
+            payment_provider=(payload.payment_provider or "manual").strip() or "manual",
+            amount_cents=amount_cents,
+            currency="BRL",
+            status="requested",
+            expires_at=expires_at,
+        )
+        db.add(billing)
+        db.commit()
+        db.refresh(billing)
+
+        return {
+            "tenant_id": tenant_id,
+            "billing_request": {
+                "id": billing.id,
+                "current_plan_type": billing.current_plan_type,
+                "requested_plan_type": billing.requested_plan_type,
+                "billing_reason": billing.billing_reason,
+                "payment_method": billing.payment_method,
+                "payment_provider": billing.payment_provider,
+                "amount_cents": billing.amount_cents,
+                "currency": billing.currency,
+                "status": billing.status,
+                "expires_at": billing.expires_at.isoformat() if billing.expires_at else None,
+                "created_at": billing.created_at.isoformat() if getattr(billing, "created_at", None) else None,
+            },
+            "next_step": "Conectar esta billing_request ao checkout real (PIX/cartão) antes de automatizar a troca de plano.",
+        }
+
+    except HTTPException:
+        raise
+    except SQLAlchemyError as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        logger.exception("admin create billing request failed (SQLAlchemyError)")
+        raise HTTPException(status_code=500, detail=f"admin create billing request failed: SQLAlchemyError: {e}")
+    except Exception as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        logger.exception("admin create billing request failed (unexpected)")
+        raise HTTPException(status_code=500, detail=f"admin create billing request failed: {type(e).__name__}: {e}")
+    finally:
+        _reset_tenant_context(db)
+
+
+@router.post("/billing-requests/{billing_request_id}/checkout-session", dependencies=[Depends(require_admin_key)])
+def admin_create_billing_checkout_session(
+    billing_request_id: int,
+    payload: BillingRequestCheckoutIn,
+    db: Session = Depends(get_db),
+):
+    try:
+        billing = (
+            db.query(BillingRequest)
+            .filter(BillingRequest.id == billing_request_id)
+            .one_or_none()
+        )
+        if billing is None:
+            raise HTTPException(status_code=404, detail="Billing request não encontrada.")
+
+        if billing.status in ("paid", "canceled", "expired", "failed"):
+            raise HTTPException(status_code=409, detail="Billing request não permite novo checkout no status atual.")
+
+        payment_method = (payload.payment_method or billing.payment_method or "").strip()
+        if payment_method not in ("pix", "credit_card", "debit_card"):
+            raise HTTPException(status_code=422, detail="payment_method inválido (use pix|credit_card|debit_card).")
+
+        requested_provider = (payload.payment_provider or billing.payment_provider or "").strip() or None
+
+        session = create_checkout_session(
+            billing_request_id=billing.id,
+            tenant_id=billing.tenant_id,
+            amount_cents=billing.amount_cents,
+            currency=billing.currency,
+            payment_method=payment_method,
+            requested_plan_type=billing.requested_plan_type,
+            payment_provider=requested_provider,
+        )
+
+        billing.payment_method = payment_method
+        billing.payment_provider = session.provider
+        billing.provider_reference = session.provider_reference
+        billing.checkout_url = session.checkout_url
+        billing.status = "checkout_pending"
+        if session.expires_at is not None:
+            billing.expires_at = session.expires_at
+
+        db.commit()
+        db.refresh(billing)
+
+        return {
+            "billing_request": {
+                "id": billing.id,
+                "tenant_id": billing.tenant_id,
+                "status": billing.status,
+                "current_plan_type": billing.current_plan_type,
+                "requested_plan_type": billing.requested_plan_type,
+                "payment_method": billing.payment_method,
+                "payment_provider": billing.payment_provider,
+                "provider_reference": billing.provider_reference,
+                "amount_cents": billing.amount_cents,
+                "currency": billing.currency,
+                "checkout_url": billing.checkout_url,
+                "expires_at": billing.expires_at.isoformat() if billing.expires_at else None,
+            },
+            "checkout": {
+                "provider": session.provider,
+                "provider_reference": session.provider_reference,
+                "checkout_url": session.checkout_url,
+                "expires_at": session.expires_at.isoformat() if session.expires_at else None,
+                "raw_payload": session.raw_payload,
+            },
+            "next_step": "Conectar provider real de PIX/cartão e depois webhook para confirmação automática.",
+        }
+
+    except HTTPException:
+        raise
+    except PaymentCheckoutError as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        raise HTTPException(status_code=422, detail=str(e))
+    except SQLAlchemyError as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        logger.exception("admin create billing checkout session failed (SQLAlchemyError)")
+        raise HTTPException(status_code=500, detail=f"admin create billing checkout session failed: SQLAlchemyError: {e}")
+    except Exception as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        logger.exception("admin create billing checkout session failed (unexpected)")
+        raise HTTPException(status_code=500, detail=f"admin create billing checkout session failed: {type(e).__name__}: {e}")
+    finally:
+        _reset_tenant_context(db)
+
+
+@router.get("/tenants/{tenant_id}/billing-requests", dependencies=[Depends(require_admin_key)])
+def admin_list_billing_requests(
+    tenant_id: int,
+    status: Optional[str] = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=200),
+    db: Session = Depends(get_db),
+):
+    try:
+        tenant = db.query(Tenant).filter(Tenant.id == tenant_id).one_or_none()
+        if tenant is None:
+            raise HTTPException(status_code=404, detail="Tenant não encontrado.")
+
+        q = db.query(BillingRequest).filter(BillingRequest.tenant_id == tenant_id)
+
+        if status:
+            q = q.filter(BillingRequest.status == status)
+
+        rows = (
+            q.order_by(BillingRequest.created_at.desc(), BillingRequest.id.desc())
+            .limit(limit)
+            .all()
+        )
+
+        items = [
+            {
+                "id": row.id,
+                "current_plan_type": row.current_plan_type,
+                "requested_plan_type": row.requested_plan_type,
+                "billing_reason": row.billing_reason,
+                "payment_method": row.payment_method,
+                "payment_provider": row.payment_provider,
+                "amount_cents": row.amount_cents,
+                "currency": row.currency,
+                "status": row.status,
+                "provider_reference": row.provider_reference,
+                "checkout_url": row.checkout_url,
+                "expires_at": row.expires_at.isoformat() if getattr(row, "expires_at", None) else None,
+                "paid_at": row.paid_at.isoformat() if getattr(row, "paid_at", None) else None,
+                "created_at": row.created_at.isoformat() if getattr(row, "created_at", None) else None,
+            }
+            for row in rows
+        ]
+
+        return {
+            "tenant_id": tenant_id,
+            "count": len(items),
+            "limit": limit,
+            "items": items,
+        }
+
+    except HTTPException:
+        raise
+    except SQLAlchemyError as e:
+        logger.exception("admin list billing requests failed (SQLAlchemyError)")
+        raise HTTPException(status_code=500, detail=f"admin list billing requests failed: SQLAlchemyError: {e}")
+    except Exception as e:
+        logger.exception("admin list billing requests failed (unexpected)")
+        raise HTTPException(status_code=500, detail=f"admin list billing requests failed: {type(e).__name__}: {e}")
+
+
+@router.patch("/billing-requests/{billing_request_id}/mark-paid", dependencies=[Depends(require_admin_key)])
+def admin_mark_billing_request_paid(
+    billing_request_id: int,
+    payload: BillingRequestMarkPaidIn,
+    db: Session = Depends(get_db),
+):
+    try:
+        billing = (
+            db.query(BillingRequest)
+            .filter(BillingRequest.id == billing_request_id)
+            .one_or_none()
+        )
+        if billing is None:
+            raise HTTPException(status_code=404, detail="Billing request não encontrada.")
+
+        if billing.status in ("canceled", "expired", "failed"):
+            raise HTTPException(status_code=409, detail="Billing request não pode ser marcada como paga no status atual.")
+
+        if payload.payment_method is not None and payload.payment_method not in ("pix", "credit_card", "debit_card"):
+            raise HTTPException(status_code=422, detail="payment_method inválido (use pix|credit_card|debit_card).")
+
+        paid_at = payload.paid_at or datetime.now(timezone.utc)
+        if paid_at.tzinfo is None:
+            paid_at = paid_at.replace(tzinfo=timezone.utc)
+
+        requested_plan = PlanType(billing.requested_plan_type)
+        lim = limits_for(requested_plan)
+        new_expires_at = paid_at + timedelta(days=30)
+
+        sub = (
+            db.query(Subscription)
+            .filter(Subscription.tenant_id == billing.tenant_id)
+            .one_or_none()
+        )
+
+        if sub is None:
+            sub = Subscription(
+                tenant_id=billing.tenant_id,
+                plan_type=billing.requested_plan_type,
+                status="active",
+                case_limit=lim.cases_per_month,
+                active=True,
+                expires_at=new_expires_at,
+            )
+            db.add(sub)
+        else:
+            sub.plan_type = billing.requested_plan_type
+            sub.status = "active"
+            sub.case_limit = lim.cases_per_month
+            sub.active = True
+            sub.expires_at = new_expires_at
+
+        if payload.payment_method:
+            billing.payment_method = payload.payment_method
+        if payload.provider_reference is not None:
+            billing.provider_reference = payload.provider_reference.strip() or None
+
+        billing.status = "paid"
+        billing.paid_at = paid_at
+
+        db.commit()
+        db.refresh(billing)
+        db.refresh(sub)
+
+        return {
+            "billing_request": {
+                "id": billing.id,
+                "tenant_id": billing.tenant_id,
+                "status": billing.status,
+                "payment_method": billing.payment_method,
+                "provider_reference": billing.provider_reference,
+                "paid_at": billing.paid_at.isoformat() if billing.paid_at else None,
+                "requested_plan_type": billing.requested_plan_type,
+            },
+            "subscription": {
+                "tenant_id": sub.tenant_id,
+                "plan_type": sub.plan_type,
+                "status": sub.status,
+                "active": bool(sub.active),
+                "case_limit": sub.case_limit,
+                "expires_at": sub.expires_at.isoformat() if sub.expires_at else None,
+            },
+            "next_step": "Conectar confirmação automática do gateway/webhook para dispensar baixa manual.",
+        }
+
+    except HTTPException:
+        raise
+    except SQLAlchemyError as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        logger.exception("admin mark billing request paid failed (SQLAlchemyError)")
+        raise HTTPException(status_code=500, detail=f"admin mark billing request paid failed: SQLAlchemyError: {e}")
+    except Exception as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        logger.exception("admin mark billing request paid failed (unexpected)")
+        raise HTTPException(status_code=500, detail=f"admin mark billing request paid failed: {type(e).__name__}: {e}")
 
 
 @router.get("/audit/logs", dependencies=[Depends(require_admin_key)])
