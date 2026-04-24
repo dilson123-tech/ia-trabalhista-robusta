@@ -42,6 +42,9 @@ class Settings(BaseSettings):
     LLM_ANALYSIS_ENABLED: bool = False
     LLM_BASE_URL: str | None = None
 
+    PAYMENT_PROVIDER: str = "manual"
+    PAYMENT_CHECKOUT_BASE_URL: str = ""
+
 settings = Settings()
 
 

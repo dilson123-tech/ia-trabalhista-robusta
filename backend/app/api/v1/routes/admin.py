@@ -27,6 +27,7 @@ from app.models.usage_counter import UsageCounter
 from app.models.tenant_usage_event import TenantUsageEvent
 from app.models.user import User
 from app.services.plan_enforcement import get_effective_plan
+from app.services.payment_checkout import PaymentCheckoutError, create_checkout_session
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 logger = logging.getLogger(__name__)
@@ -117,6 +118,11 @@ class BillingRequestMarkPaidIn(BaseModel):
     paid_at: Optional[datetime] = Field(default=None, description="ISO datetime (UTC recomendado)")
 
 
+class BillingRequestCheckoutIn(BaseModel):
+    payment_method: Optional[str] = Field(default=None, description="pix|credit_card|debit_card")
+    payment_provider: Optional[str] = Field(default=None, max_length=30, description="Provider desejado para o checkout")
+
+
 @router.post("/tenants/{tenant_id}/billing-requests", dependencies=[Depends(require_admin_key)])
 def admin_create_billing_request(
     tenant_id: int,
@@ -203,6 +209,102 @@ def admin_create_billing_request(
             pass
         logger.exception("admin create billing request failed (unexpected)")
         raise HTTPException(status_code=500, detail=f"admin create billing request failed: {type(e).__name__}: {e}")
+    finally:
+        _reset_tenant_context(db)
+
+
+@router.post("/billing-requests/{billing_request_id}/checkout-session", dependencies=[Depends(require_admin_key)])
+def admin_create_billing_checkout_session(
+    billing_request_id: int,
+    payload: BillingRequestCheckoutIn,
+    db: Session = Depends(get_db),
+):
+    try:
+        billing = (
+            db.query(BillingRequest)
+            .filter(BillingRequest.id == billing_request_id)
+            .one_or_none()
+        )
+        if billing is None:
+            raise HTTPException(status_code=404, detail="Billing request não encontrada.")
+
+        if billing.status in ("paid", "canceled", "expired", "failed"):
+            raise HTTPException(status_code=409, detail="Billing request não permite novo checkout no status atual.")
+
+        payment_method = (payload.payment_method or billing.payment_method or "").strip()
+        if payment_method not in ("pix", "credit_card", "debit_card"):
+            raise HTTPException(status_code=422, detail="payment_method inválido (use pix|credit_card|debit_card).")
+
+        requested_provider = (payload.payment_provider or billing.payment_provider or "").strip() or None
+
+        session = create_checkout_session(
+            billing_request_id=billing.id,
+            tenant_id=billing.tenant_id,
+            amount_cents=billing.amount_cents,
+            currency=billing.currency,
+            payment_method=payment_method,
+            requested_plan_type=billing.requested_plan_type,
+            payment_provider=requested_provider,
+        )
+
+        billing.payment_method = payment_method
+        billing.payment_provider = session.provider
+        billing.provider_reference = session.provider_reference
+        billing.checkout_url = session.checkout_url
+        billing.status = "checkout_pending"
+        if session.expires_at is not None:
+            billing.expires_at = session.expires_at
+
+        db.commit()
+        db.refresh(billing)
+
+        return {
+            "billing_request": {
+                "id": billing.id,
+                "tenant_id": billing.tenant_id,
+                "status": billing.status,
+                "current_plan_type": billing.current_plan_type,
+                "requested_plan_type": billing.requested_plan_type,
+                "payment_method": billing.payment_method,
+                "payment_provider": billing.payment_provider,
+                "provider_reference": billing.provider_reference,
+                "amount_cents": billing.amount_cents,
+                "currency": billing.currency,
+                "checkout_url": billing.checkout_url,
+                "expires_at": billing.expires_at.isoformat() if billing.expires_at else None,
+            },
+            "checkout": {
+                "provider": session.provider,
+                "provider_reference": session.provider_reference,
+                "checkout_url": session.checkout_url,
+                "expires_at": session.expires_at.isoformat() if session.expires_at else None,
+                "raw_payload": session.raw_payload,
+            },
+            "next_step": "Conectar provider real de PIX/cartão e depois webhook para confirmação automática.",
+        }
+
+    except HTTPException:
+        raise
+    except PaymentCheckoutError as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        raise HTTPException(status_code=422, detail=str(e))
+    except SQLAlchemyError as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        logger.exception("admin create billing checkout session failed (SQLAlchemyError)")
+        raise HTTPException(status_code=500, detail=f"admin create billing checkout session failed: SQLAlchemyError: {e}")
+    except Exception as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        logger.exception("admin create billing checkout session failed (unexpected)")
+        raise HTTPException(status_code=500, detail=f"admin create billing checkout session failed: {type(e).__name__}: {e}")
     finally:
         _reset_tenant_context(db)
 
