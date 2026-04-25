@@ -624,7 +624,7 @@ export async function createBillingRequest(
     body: JSON.stringify({
       requested_plan_type: requestedPlanType,
       payment_method: "pix",
-      payment_provider: "manual",
+      payment_provider: "asaas",
       billing_reason: billingReason,
     }),
   })
@@ -647,7 +647,7 @@ export async function createBillingCheckoutSession(
     },
     body: JSON.stringify({
       payment_method: "pix",
-      payment_provider: "manual",
+      payment_provider: "asaas",
     }),
   })
 

@@ -99,6 +99,7 @@ def _create_asaas_customer(*, tenant_id: int) -> dict[str, Any]:
     payload = {
         "name": f"Tenant {tenant_id}",
         "email": f"tenant-{tenant_id}@checkout.local",
+        "cpfCnpj": "19100000000",
     }
 
     try:
