@@ -1,7 +1,7 @@
 import './App.css'
 import { useEffect, useState, type KeyboardEvent } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
-import { ApiError, cleanupDemoCases, createBillingCheckoutSession, createBillingRequest, createCase, getCases, getCaseAnalysis, getExecutiveSummary, getExecutiveReport, getExecutivePdf, getUsageSummaryV2, login, updateCaseStatus, type CaseItem, type CaseAnalysisResponse, type ExecutiveSummaryResponse, type ExecutiveReportResponse, type UsageSummaryV2Response } from './services/api'
+import { ApiError, cleanupDemoCases, createPlanChangeCheckout, createCase, getCases, getCaseAnalysis, getExecutiveSummary, getExecutiveReport, getExecutivePdf, getUsageSummaryV2, login, updateCaseStatus, type CaseItem, type CaseAnalysisResponse, type ExecutiveSummaryResponse, type ExecutiveReportResponse, type UsageSummaryV2Response } from './services/api'
 import { ExpansionWorkspace } from './components/expansion/ExpansionWorkspace'
 import { CaseFiltersBar } from './components/CaseFiltersBar'
 import { CaseCard } from './components/CaseCard'
@@ -99,20 +99,9 @@ function App() {
       return
     }
 
-    const tenantId = cases[0]?.tenant_id
-    if (!tenantId) {
-      setPlanActionNotice('Não foi possível identificar o tenant para iniciar a mudança de plano.')
-      return
-    }
-
     try {
-      setPlanActionNotice(`Criando solicitação de mudança para o plano ${planLabel}...`)
-      const selectedPlanPricing = getPlanPricing(planType)
-      const currentMonthlyPrice = currentPlanPricing?.monthlyPrice ?? 0
-      const selectedMonthlyPrice = selectedPlanPricing?.monthlyPrice ?? 0
-      const billingReason = selectedMonthlyPrice < currentMonthlyPrice ? 'plan_downgrade' : 'plan_upgrade'
-      const billing = await createBillingRequest(tenantId, planType, billingReason)
-      const checkout = await createBillingCheckoutSession(billing.billing_request.id)
+      setPlanActionNotice(`Criando checkout para o plano ${planLabel}...`)
+      const checkout = await createPlanChangeCheckout(token, planType)
 
       setPlanActionNotice(
         `Checkout criado para o plano ${planLabel}. Link: ${checkout.checkout.checkout_url ?? 'checkout indisponível'}`
