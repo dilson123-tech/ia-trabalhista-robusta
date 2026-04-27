@@ -580,22 +580,7 @@ export async function generateAssistedDraft(
 }
 
 
-const ADMIN_API_KEY = "dev-admin-ia-trabalhista"
-
-export type BillingRequestResponse = {
-  tenant_id: number
-  billing_request: {
-    id: number
-    requested_plan_type: string
-    payment_method: string
-    payment_provider: string
-    status: string
-    amount_cents: number
-    currency: string
-  }
-}
-
-export type BillingCheckoutSessionResponse = {
+export type PlanChangeCheckoutResponse = {
   billing_request: {
     id: number
     status: string
@@ -610,44 +595,18 @@ export type BillingCheckoutSessionResponse = {
   }
 }
 
-export async function createBillingRequest(
-  tenantId: number,
-  requestedPlanType: string,
-  billingReason: "plan_upgrade" | "plan_downgrade" | "plan_renewal"
-): Promise<BillingRequestResponse> {
-  const response = await fetch(`${API_URL}/admin/tenants/${tenantId}/billing-requests`, {
+export async function createPlanChangeCheckout(
+  token: string,
+  requestedPlanType: string
+): Promise<PlanChangeCheckoutResponse> {
+  const response = await fetch(`${API_URL}/billing/plan-change`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "x-admin-key": ADMIN_API_KEY,
+      Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify({
       requested_plan_type: requestedPlanType,
-      payment_method: "pix",
-      payment_provider: "asaas",
-      billing_reason: billingReason,
-    }),
-  })
-
-  if (!response.ok) {
-    await parseError(response, "Erro ao criar solicitação de mudança de plano")
-  }
-
-  return response.json()
-}
-
-export async function createBillingCheckoutSession(
-  billingRequestId: number
-): Promise<BillingCheckoutSessionResponse> {
-  const response = await fetch(`${API_URL}/admin/billing-requests/${billingRequestId}/checkout-session`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-admin-key": ADMIN_API_KEY,
-    },
-    body: JSON.stringify({
-      payment_method: "pix",
-      payment_provider: "asaas",
     }),
   })
 
