@@ -49,16 +49,46 @@ export function DashboardTopPanel({
 }: DashboardTopPanelProps) {
   return (
     <>
-      <section className="hero-panel">
-        <div className="hero-card">
+      <section
+        className="hero-panel"
+        style={{
+          gap: '14px',
+          alignItems: 'stretch',
+          marginBottom: '14px',
+        }}
+      >
+        <div
+          className="hero-card"
+          style={{
+            padding: '22px 20px',
+            minHeight: 'unset',
+          }}
+        >
           <p className="hero-kicker">Plataforma jurídica estratégica multiárea</p>
-          <h1 className="hero-heading">Painel do Advogado</h1>
-          <p className="hero-description">
+          <h1
+            className="hero-heading"
+            style={{
+              fontSize: '2.05rem',
+              lineHeight: 1.05,
+              marginBottom: '10px',
+            }}
+          >
+            Painel do Advogado
+          </h1>
+          <p
+            className="hero-description"
+            style={{
+              maxWidth: '58ch',
+              fontSize: '0.98rem',
+              lineHeight: 1.55,
+              marginBottom: '14px',
+            }}
+          >
             Centralize análise jurídica, leitura de risco, resumos executivos e relatórios estratégicos
             em um ambiente com visão clara para decisão, operação e apresentação ao cliente.
           </p>
 
-          <div className="hero-actions">
+          <div className="hero-actions" style={{ gap: '10px' }}>
             <button
               className={`btn ${showNewCaseForm ? 'btn-secondary' : 'btn-primary'}`}
               type="button"
@@ -78,11 +108,32 @@ export function DashboardTopPanel({
           </div>
         </div>
 
-        <aside className="technical-card technical-card--connected">
-          <div className="technical-topbar">
+        <aside
+          className="technical-card technical-card--connected"
+          style={{
+            padding: '18px 18px 16px',
+            minHeight: 'unset',
+          }}
+        >
+          <div className="technical-topbar" style={{ marginBottom: '10px' }}>
             <div>
-              <h2 className="technical-title">Sessão ativa</h2>
-              <p className="technical-description">
+              <h2
+                className="technical-title"
+                style={{
+                  fontSize: '1.08rem',
+                  marginBottom: '4px',
+                }}
+              >
+                Sessão ativa
+              </h2>
+              <p
+                className="technical-description"
+                style={{
+                  fontSize: '0.92rem',
+                  lineHeight: 1.45,
+                  marginBottom: 0,
+                }}
+              >
                 Backend autenticado e carteira pronta para operação no painel.
               </p>
             </div>
@@ -221,16 +272,31 @@ export function DashboardTopPanel({
         </section>
       ) : null}
 
-      <section className="metrics-grid metrics-grid--hero">
+      <section
+        className="metrics-grid metrics-grid--hero"
+        style={{
+          gap: '10px',
+          marginTop: '2px',
+          marginBottom: '12px',
+        }}
+      >
         {[
           ['Casos carregados', String(casesCount), 'metric-card metric-card--highlight', 'metric-value metric-value--gold'],
           ['Backend', 'Online', 'metric-card', 'metric-value'],
           ['Modo', loaded ? 'Real' : 'Demo', 'metric-card', 'metric-value'],
           ['Sessão', token.trim() ? 'Ativa' : 'Pendente', 'metric-card', 'metric-value'],
         ].map(([label, value, cardClass, valueClass]) => (
-          <article key={label} className={cardClass}>
-            <p className="metric-label">{label}</p>
-            <h2 className={valueClass}>{value}</h2>
+          <article
+            key={label}
+            className={cardClass}
+            style={{
+              padding: '14px 16px',
+              minHeight: 'unset',
+              borderRadius: '16px',
+            }}
+          >
+            <p className="metric-label" style={{ marginBottom: '6px', fontSize: '0.72rem' }}>{label}</p>
+            <h2 className={valueClass} style={{ fontSize: '1.02rem', margin: 0 }}>{value}</h2>
           </article>
         ))}
       </section>

@@ -2,9 +2,9 @@
   position: relative;
   min-height: 100vh;
   background:
-    radial-gradient(circle at top, rgba(212, 175, 55, 0.10), transparent 24%),
-    radial-gradient(circle at 18% 16%, rgba(59, 130, 246, 0.08), transparent 22%),
-    linear-gradient(180deg, #060b16 0%, #081225 48%, #07172d 100%);
+    radial-gradient(circle at top center, rgba(212, 175, 55, 0.08), transparent 18%),
+    radial-gradient(circle at 50% 35%, rgba(30, 41, 59, 0.20), transparent 28%),
+    linear-gradient(180deg, #06070b 0%, #0a0d14 42%, #11151d 100%);
   color: var(--text-primary);
   font-family: Inter, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   padding: 36px 32px 40px;
@@ -16,10 +16,12 @@
   inset: 0;
   pointer-events: none;
   background:
-    linear-gradient(180deg, rgba(255,255,255,0.02) 0%, transparent 18%),
-    radial-gradient(circle at top right, rgba(212, 175, 55, 0.08), transparent 20%);
-  opacity: 0.9;
+    linear-gradient(180deg, rgba(255,255,255,0.010) 0%, transparent 15%),
+    radial-gradient(circle at top right, rgba(212, 175, 55, 0.05), transparent 16%),
+    radial-gradient(circle at bottom center, rgba(17, 24, 39, 0.16), transparent 30%);
+  opacity: 0.92;
 }
+
 
 .app-container {
   position: relative;

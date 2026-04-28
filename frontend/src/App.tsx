@@ -56,6 +56,8 @@ function App() {
   const [usageError, setUsageError] = useState('')
   const [planActionNotice, setPlanActionNotice] = useState('')
   const [planPanelCollapsed, setPlanPanelCollapsed] = useState(false)
+  const [planWorkspaceView, setPlanWorkspaceView] = useState<'capacity' | 'commercial'>('capacity')
+  const [dashboardWorkspace, setDashboardWorkspace] = useState<'production' | 'commercial'>('production')
   const [pieceReadyRequestId, setPieceReadyRequestId] = useState(0)
   const [pieceReadyNotice, setPieceReadyNotice] = useState('')
   const [expansionModuleTarget, setExpansionModuleTarget] = useState<'editor' | 'succession' | 'appeals'>('editor')
@@ -103,9 +105,13 @@ function App() {
       setPlanActionNotice(`Criando checkout para o plano ${planLabel}...`)
       const checkout = await createPlanChangeCheckout(token, planType)
 
-      setPlanActionNotice(
-        `Checkout criado para o plano ${planLabel}. Link: ${checkout.checkout.checkout_url ?? 'checkout indisponível'}`
-      )
+      const checkoutUrl = checkout.checkout.checkout_url ?? ''
+      if (checkoutUrl) {
+        window.open(checkoutUrl, '_blank', 'noopener,noreferrer')
+        setPlanActionNotice(`Checkout do plano ${planLabel} aberto em nova aba.`)
+      } else {
+        setPlanActionNotice(`Checkout criado para o plano ${planLabel}, mas o link não foi retornado.`)
+      }
     } catch (err) {
       const message = err instanceof ApiError ? err.message : 'Erro ao iniciar mudança de plano.'
       setPlanActionNotice(message)
@@ -183,17 +189,6 @@ function App() {
   const usageRecordsRemaining = usageSummary?.remaining?.case_records ?? 0
   const usageActivePercent = getCapacityPercent(usageActiveCurrent, usageActiveLimit)
   const usageRecordsPercent = getCapacityPercent(usageRecordsCurrent, usageRecordsLimit)
-
-  const usageCapacityMessage =
-    !usageSummary
-      ? 'Conecte o painel para carregar a capacidade operacional do plano.'
-      : usageActiveRemaining === 0
-        ? 'Limite de casos ativos atingido. Arquive um caso ou faça upgrade.'
-        : usageRecordsRemaining === 0
-          ? 'Limite de acervo atingido. Faça upgrade para armazenar mais casos.'
-          : usageActiveRemaining <= 3
-            ? `Atenção: restam apenas ${usageActiveRemaining} vaga(s) ativa(s) neste plano.`
-            : 'Operação dentro da capacidade do plano.'
 
   useEffect(() => {
     if (!token.trim()) return
@@ -602,41 +597,112 @@ function App() {
           casesCount={cases.length}
           loaded={loaded}
         />
-
-        <section className="insight-card" style={{ marginBottom: '20px' }}>
-              <div className="insight-head">
+        <section
+          className="insight-card"
+          style={{
+            marginBottom: '20px',
+            paddingTop: '14px',
+            paddingBottom: '14px',
+          }}
+        >
+              <div
+                className="insight-head"
+                style={{
+                  alignItems: 'center',
+                  marginBottom: dashboardWorkspace === 'production' ? '0' : undefined,
+                }}
+              >
                 <div>
-                  <p className="insight-kicker">Capacidade comercial</p>
-                  <h2 className="insight-title">Plano e ocupação da carteira</h2>
-                  <p className="insight-description">
-                    Leitura operacional do plano atual para decidir quando arquivar, quando ainda há folga
-                    e quando o escritório precisa subir de nível.
+                  <p className="insight-kicker">Navegação do painel</p>
+                  <h2 className="insight-title" style={{ marginBottom: '4px' }}>Workspaces</h2>
+                  <p className="insight-description" style={{ marginBottom: 0 }}>
+                    Alterne entre operação principal e gestão comercial sem poluir o painel.
                   </p>
                 </div>
                 <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-                  <span className="insight-badge">{getPlanLabel(usagePlanType)}</span>
                   <button
                     type="button"
-                    onClick={() => setPlanPanelCollapsed((prev) => !prev)}
+                    onClick={() => setDashboardWorkspace('production')}
                     style={{
-                      border: '1px solid rgba(148, 163, 184, 0.24)',
+                      border: dashboardWorkspace === 'production'
+                        ? '1px solid rgba(245, 158, 11, 0.44)'
+                        : '1px solid rgba(148, 163, 184, 0.20)',
                       borderRadius: '999px',
-                      padding: '8px 14px',
-                      background: 'rgba(15, 23, 42, 0.42)',
-                      color: 'var(--text-primary)',
+                      padding: '10px 16px',
+                      minWidth: '118px',
+                      background: dashboardWorkspace === 'production'
+                        ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.30), rgba(234, 179, 8, 0.18))'
+                        : 'rgba(15, 23, 42, 0.42)',
+                      color: dashboardWorkspace === 'production' ? '#fff4cc' : 'var(--text-primary)',
+                      boxShadow: dashboardWorkspace === 'production'
+                        ? '0 10px 24px rgba(245, 158, 11, 0.18)'
+                        : 'none',
                       cursor: 'pointer',
-                      fontSize: '0.85rem',
-                      fontWeight: 600,
+                      fontSize: '0.88rem',
+                      fontWeight: 800,
+                      letterSpacing: '0.01em',
                     }}
                   >
-                    {planPanelCollapsed ? 'Abrir visão executiva' : 'Recolher visão executiva'}
+                    Produção
                   </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDashboardWorkspace('commercial')
+                      setPlanPanelCollapsed(false)
+                    }}
+                    style={{
+                      border: dashboardWorkspace === 'commercial'
+                        ? '1px solid rgba(168, 85, 247, 0.44)'
+                        : '1px solid rgba(148, 163, 184, 0.20)',
+                      borderRadius: '999px',
+                      padding: '10px 16px',
+                      minWidth: '154px',
+                      background: dashboardWorkspace === 'commercial'
+                        ? 'linear-gradient(135deg, rgba(168, 85, 247, 0.30), rgba(126, 34, 206, 0.18))'
+                        : 'rgba(15, 23, 42, 0.42)',
+                      color: dashboardWorkspace === 'commercial' ? '#f5e8ff' : 'var(--text-primary)',
+                      boxShadow: dashboardWorkspace === 'commercial'
+                        ? '0 10px 24px rgba(168, 85, 247, 0.18)'
+                        : 'none',
+                      cursor: 'pointer',
+                      fontSize: '0.88rem',
+                      fontWeight: 800,
+                      letterSpacing: '0.01em',
+                    }}
+                  >
+                    Gestão comercial
+                  </button>
+
+                  {dashboardWorkspace === 'commercial' ? (
+                    <button
+                      type="button"
+                      onClick={() => setPlanPanelCollapsed((prev) => !prev)}
+                      style={{
+                        border: '1px solid rgba(148, 163, 184, 0.18)',
+                        borderRadius: '999px',
+                        padding: '8px 12px',
+                        background: 'rgba(15, 23, 42, 0.20)',
+                        color: 'var(--muted-text)',
+                        cursor: 'pointer',
+                        fontSize: '0.79rem',
+                        fontWeight: 600,
+                      }}
+                    >
+                      {planPanelCollapsed ? 'Abrir visão executiva' : 'Recolher visão executiva'}
+                    </button>
+                  ) : null}
                 </div>
               </div>
 
-              {planPanelCollapsed ? (
+              {dashboardWorkspace === 'production' ? (
+                <p className="insight-empty">
+                  Você está no workspace de Produção. Gestão comercial fica separada para manter a operação limpa.
+                </p>
+              ) : planPanelCollapsed ? (
                   <p className="insight-empty">
-                    Visão executiva recolhida. Abra este bloco para consultar plano, ocupação e decisão operacional.
+                    Visão comercial recolhida. Abra quando quiser consultar assinatura, capacidade e cobrança.
                   </p>
                 ) : !loaded ? (
                 <p className="insight-empty">
@@ -647,7 +713,57 @@ function App() {
               ) : usageError ? (
                 <p className="insight-empty">{usageError}</p>
               ) : usageSummary ? (
-                <div style={{ display: 'grid', gap: '16px' }}>
+                <>
+                <div
+                  style={{
+                    display: 'flex',
+                    gap: '10px',
+                    flexWrap: 'wrap',
+                    marginBottom: '14px',
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => setPlanWorkspaceView('capacity')}
+                    style={{
+                      border: planWorkspaceView === 'capacity'
+                        ? '1px solid rgba(245, 158, 11, 0.30)'
+                        : '1px solid rgba(148, 163, 184, 0.18)',
+                      background: planWorkspaceView === 'capacity'
+                        ? 'rgba(245, 158, 11, 0.16)'
+                        : 'rgba(15, 23, 42, 0.28)',
+                      color: planWorkspaceView === 'capacity' ? '#fef3c7' : '#dbeafe',
+                      borderRadius: '12px',
+                      padding: '11px 14px',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Capacidade comercial
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setPlanWorkspaceView('commercial')}
+                    style={{
+                      border: planWorkspaceView === 'commercial'
+                        ? '1px solid rgba(168, 85, 247, 0.30)'
+                        : '1px solid rgba(148, 163, 184, 0.18)',
+                      background: planWorkspaceView === 'commercial'
+                        ? 'rgba(168, 85, 247, 0.16)'
+                        : 'rgba(15, 23, 42, 0.28)',
+                      color: planWorkspaceView === 'commercial' ? '#f3e8ff' : '#dbeafe',
+                      borderRadius: '12px',
+                      padding: '11px 14px',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Assinatura e cobrança
+                  </button>
+                </div>
+
+                <div style={{ display: planWorkspaceView === 'capacity' ? 'grid' : 'none', gap: '16px' }}>
                   <div
                     style={{
                       display: 'grid',
@@ -781,7 +897,7 @@ function App() {
 
                   <div
                     style={{
-                      display: 'grid',
+                      display: planWorkspaceView === 'capacity' ? 'grid' : 'none',
                       gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
                       gap: '12px',
                     }}
@@ -865,134 +981,185 @@ function App() {
                     </article>
                   </div>
 
-                  <section
-                    style={{
-                      border: '1px solid rgba(148, 163, 184, 0.16)',
-                      borderRadius: '18px',
-                      padding: '16px',
-                      background: 'rgba(15, 23, 42, 0.22)',
-                    }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', alignItems: 'flex-start', marginBottom: '12px' }}>
-                      <div>
-                        <p className="insight-kicker">Próximos planos</p>
-                        <h3 style={{ margin: '6px 0 4px', fontSize: '1.02rem' }}>Comparativo rápido de planos</h3>
-                        <p style={{ margin: 0, color: 'var(--muted-text)' }}>
-                          Visualize a evolução comercial sem mexer na base operacional já validada.
-                        </p>
-                      </div>
-                    </div>
 
-                    <div
-                      style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-                        gap: '12px',
-                      }}
-                    >
-                      {planActionOptions.map((plan) => (
-                        <article
-                          key={plan.type}
-                          style={{
-                            border: '1px solid rgba(148, 163, 184, 0.18)',
-                            borderRadius: '16px',
-                            padding: '14px',
-                            background: 'rgba(15, 23, 42, 0.24)',
-                          }}
-                        >
-                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', alignItems: 'flex-start' }}>
-                            <div>
-                              <p className="insight-kicker">{plan.label}</p>
-                              <h4 style={{ margin: '6px 0 4px', fontSize: '1rem' }}>{plan.formattedMonthlyPrice}</h4>
-                            </div>
-                            <span
-                              style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                padding: '5px 9px',
-                                borderRadius: '999px',
-                                fontSize: '0.72rem',
-                                fontWeight: 700,
-                                background: 'rgba(59, 130, 246, 0.14)',
-                                color: '#bfdbfe',
-                                border: '1px solid rgba(96, 165, 250, 0.22)',
-                                whiteSpace: 'nowrap',
-                              }}
-                            >
-                              {plan.badge}
-                            </span>
-                          </div>
-
-                          <p style={{ margin: '10px 0 0', color: 'var(--muted-text)', lineHeight: 1.5 }}>
-                            {plan.description}
-                          </p>
-
-                          <p style={{ margin: '12px 0 0', color: 'var(--muted-text)', lineHeight: 1.45, fontSize: '0.92rem' }}>
-                            {plan.recommendedFor}
-                          </p>
-
-                          <button
-                            type="button"
-                            onClick={() => handlePlanAction(plan.type, plan.label)}
-                            style={{
-                              marginTop: '14px',
-                              width: '100%',
-                              border: '1px solid rgba(96, 165, 250, 0.22)',
-                              background: 'rgba(59, 130, 246, 0.10)',
-                              color: '#dbeafe',
-                              borderRadius: '12px',
-                              padding: '11px 13px',
-                              fontWeight: 700,
-                              cursor: 'pointer',
-                            }}
-                          >
-                            {plan.ctaLabel}
-                          </button>
-                        </article>
-                      ))}
-                    </div>
-                  </section>
-
-                  {planActionNotice ? (
-                    <div
-                      style={{
-                        border: '1px solid rgba(96, 165, 250, 0.22)',
-                        borderRadius: '18px',
-                        padding: '16px',
-                        background: 'rgba(59, 130, 246, 0.08)',
-                      }}
-                    >
-                      <p className="insight-kicker">Fluxo comercial</p>
-                      <strong style={{ display: 'block', marginBottom: '6px' }}>{planActionNotice}</strong>
-                      <p style={{ margin: 0, color: 'var(--muted-text)' }}>
-                        Nesta fase, o clique registra intenção no painel. A ligação com upgrade real será conectada ao fluxo comercial/admin sem mudança automática de plano.
-                      </p>
-                    </div>
-                  ) : null}
-
-                  <div
-                    style={{
-                      border: '1px solid rgba(245, 158, 11, 0.22)',
-                      borderRadius: '18px',
-                      padding: '16px',
-                      background: 'rgba(245, 158, 11, 0.08)',
-                    }}
-                  >
-                    <p className="insight-kicker">Decisão operacional</p>
-                    <strong style={{ display: 'block', marginBottom: '6px' }}>{usageCapacityMessage}</strong>
-                    <p style={{ margin: 0, color: 'var(--muted-text)' }}>
-                      Regra comercial: ativos contam na operação, arquivados continuam no acervo e upgrade
-                      amplia o teto sem apagar histórico.
-                    </p>
-                  </div>
                 </div>
+                </>
               ) : (
                 <p className="insight-empty">
                   Não foi possível carregar a régua comercial do plano neste momento.
                 </p>
               )}
+<div
+                    style={{
+                      display: dashboardWorkspace === 'commercial' && !planPanelCollapsed && planWorkspaceView === 'commercial' ? 'grid' : 'none',
+                      gridTemplateColumns: '1fr',
+                      gap: '14px',
+                    }}
+                  >
+                    <section
+                      style={{
+                        border: '1px solid rgba(168, 85, 247, 0.24)',
+                        borderRadius: '22px',
+                        padding: '18px',
+                        background: 'linear-gradient(180deg, rgba(88, 28, 135, 0.16), rgba(15, 23, 42, 0.30))',
+                        boxShadow: '0 18px 40px rgba(15, 23, 42, 0.22)',
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          gap: '12px',
+                          alignItems: 'flex-start',
+                          marginBottom: '14px',
+                          flexWrap: 'wrap',
+                        }}
+                      >
+                        <div>
+                          <p className="insight-kicker">Comercial e assinatura</p>
+                          <h3 style={{ margin: '6px 0 4px', fontSize: '1.08rem' }}>Planos, upgrade e cobrança</h3>
+                          <p style={{ margin: 0, color: 'var(--muted-text)' }}>
+                            Área isolada da produção para assinatura, mudança de plano e checkout.
+                          </p>
+                        </div>
+
+                        <span
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            padding: '7px 11px',
+                            borderRadius: '999px',
+                            fontSize: '0.74rem',
+                            fontWeight: 800,
+                            background: 'rgba(168, 85, 247, 0.18)',
+                            color: '#f3e8ff',
+                            border: '1px solid rgba(216, 180, 254, 0.22)',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          Plano atual: {getPlanLabel(usagePlanType)}
+                        </span>
+                      </div>
+
+                      <section
+                        style={{
+                          border: '1px solid rgba(168, 85, 247, 0.14)',
+                          borderRadius: '18px',
+                          padding: '16px',
+                          background: 'rgba(15, 23, 42, 0.18)',
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            gap: '10px',
+                            alignItems: 'flex-start',
+                            marginBottom: '12px',
+                          }}
+                        >
+                          <div>
+                            <p className="insight-kicker">Próximos planos</p>
+                            <h3 style={{ margin: '6px 0 4px', fontSize: '1.02rem' }}>Comparativo rápido de planos</h3>
+                            <p style={{ margin: 0, color: 'var(--muted-text)' }}>
+                              Visualize a evolução comercial sem mexer no bloco operacional já validado.
+                            </p>
+                          </div>
+                        </div>
+
+                        <div
+                          style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                            gap: '12px',
+                          }}
+                        >
+                          {planActionOptions.map((plan) => (
+                            <article
+                              key={plan.type}
+                              style={{
+                                border: '1px solid rgba(168, 85, 247, 0.18)',
+                                borderRadius: '16px',
+                                padding: '14px',
+                                background: 'rgba(15, 23, 42, 0.28)',
+                              }}
+                            >
+                              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', alignItems: 'flex-start' }}>
+                                <div>
+                                  <p className="insight-kicker">{plan.label}</p>
+                                  <h4 style={{ margin: '6px 0 4px', fontSize: '1rem' }}>{plan.formattedMonthlyPrice}</h4>
+                                </div>
+                                <span
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    padding: '5px 9px',
+                                    borderRadius: '999px',
+                                    fontSize: '0.72rem',
+                                    fontWeight: 700,
+                                    background: 'rgba(168, 85, 247, 0.16)',
+                                    color: '#f3e8ff',
+                                    border: '1px solid rgba(216, 180, 254, 0.20)',
+                                    whiteSpace: 'nowrap',
+                                  }}
+                                >
+                                  {plan.badge}
+                                </span>
+                              </div>
+
+                              <p style={{ margin: '10px 0 0', color: 'var(--muted-text)', lineHeight: 1.5 }}>
+                                {plan.description}
+                              </p>
+
+                              <p style={{ margin: '12px 0 0', color: 'var(--muted-text)', lineHeight: 1.45, fontSize: '0.92rem' }}>
+                                {plan.recommendedFor}
+                              </p>
+
+                              <button
+                                type="button"
+                                onClick={() => handlePlanAction(plan.type, plan.label)}
+                                style={{
+                                  marginTop: '14px',
+                                  width: '100%',
+                                  border: '1px solid rgba(192, 132, 252, 0.24)',
+                                  background: 'rgba(168, 85, 247, 0.14)',
+                                  color: '#f5e8ff',
+                                  borderRadius: '12px',
+                                  padding: '11px 13px',
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                {plan.ctaLabel}
+                              </button>
+                            </article>
+                          ))}
+                        </div>
+                      </section>
+
+                      <div
+                        style={{
+                          marginTop: '14px',
+                          border: '1px solid rgba(168, 85, 247, 0.18)',
+                          borderRadius: '18px',
+                          padding: '16px',
+                          background: 'rgba(168, 85, 247, 0.10)',
+                        }}
+                      >
+                        <p className="insight-kicker">Fluxo comercial</p>
+                        <strong style={{ display: 'block', marginBottom: '6px' }}>
+                          {planActionNotice ?? 'Ao clicar em um plano, o checkout é aberto em nova aba e a ativação depende da confirmação do pagamento.'}
+                        </strong>
+                        <p style={{ margin: 0, color: 'var(--muted-text)' }}>
+                          Contratação e cobrança ficam separadas da operação jurídica.
+                        </p>
+                      </div>
+                    </section>
+                  </div>
             </section>
+
 
           <ExpansionWorkspace
             token={token}
