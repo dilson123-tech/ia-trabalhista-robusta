@@ -109,7 +109,8 @@ class BillingRequestCreateIn(BaseModel):
     requested_plan_type: str = Field(..., description="basic|pro|office")
     payment_method: str = Field(..., description="pix|credit_card|debit_card")
     payment_provider: str = Field(default="manual", max_length=30, description="Identificador do provedor de pagamento")
-    billing_reason: str = Field(default="plan_upgrade", description="plan_upgrade|plan_downgrade|plan_renewal")
+    billing_reason: str = Field(default="plan_upgrade", description="plan_upgrade|plan_downgrade|plan_renewal|validation_test")
+    custom_amount_cents: Optional[int] = Field(default=None, ge=100, le=5000, description="Valor customizado em centavos para validation_test")
 
 
 class BillingRequestMarkPaidIn(BaseModel):
@@ -142,20 +143,26 @@ def admin_create_billing_request(
         if payload.payment_method not in ("pix", "credit_card", "debit_card"):
             raise HTTPException(status_code=422, detail="payment_method inválido (use pix|credit_card|debit_card).")
 
-        if payload.billing_reason not in ("plan_upgrade", "plan_downgrade", "plan_renewal"):
-            raise HTTPException(status_code=422, detail="billing_reason inválido (use plan_upgrade|plan_downgrade|plan_renewal).")
+        if payload.billing_reason not in ("plan_upgrade", "plan_downgrade", "plan_renewal", "validation_test"):
+            raise HTTPException(status_code=422, detail="billing_reason inválido (use plan_upgrade|plan_downgrade|plan_renewal|validation_test).")
 
         eff = get_effective_plan(db, tenant_id)
         current_plan_type = getattr(eff.plan_type, "value", str(eff.plan_type))
         requested_plan_type = getattr(requested_plan, "value", str(requested_plan))
 
-        if payload.billing_reason == "plan_upgrade":
-            if PLAN_ORDER.get(requested_plan_type, 0) <= PLAN_ORDER.get(current_plan_type, 0):
-                raise HTTPException(status_code=422, detail="plan_upgrade exige plano superior ao atual.")
+        if payload.billing_reason == "validation_test":
+            requested_plan_type = current_plan_type
+            amount_cents = payload.custom_amount_cents
+            if amount_cents is None or amount_cents <= 0:
+                raise HTTPException(status_code=422, detail="validation_test exige custom_amount_cents > 0.")
+        else:
+            if payload.billing_reason == "plan_upgrade":
+                if PLAN_ORDER.get(requested_plan_type, 0) <= PLAN_ORDER.get(current_plan_type, 0):
+                    raise HTTPException(status_code=422, detail="plan_upgrade exige plano superior ao atual.")
 
-        amount_cents = PLAN_MONTHLY_PRICES_CENTS.get(requested_plan_type)
-        if amount_cents is None:
-            raise HTTPException(status_code=422, detail="Preço do plano solicitado não configurado.")
+            amount_cents = PLAN_MONTHLY_PRICES_CENTS.get(requested_plan_type)
+            if amount_cents is None:
+                raise HTTPException(status_code=422, detail="Preço do plano solicitado não configurado.")
 
         expires_at = datetime.now(timezone.utc) + timedelta(minutes=30)
 
