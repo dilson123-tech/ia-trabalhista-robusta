@@ -92,10 +92,27 @@ async def asaas_webhook(
                 "billing_request_id": billing.id,
             }
 
+        paid_at = datetime.now(timezone.utc)
+
+        if billing.billing_reason == "validation_test":
+            billing.status = "paid"
+            billing.paid_at = paid_at
+            billing.provider_reference = payment_id or billing.provider_reference
+
+            db.commit()
+
+            return {
+                "ok": True,
+                "billing_request_id": billing.id,
+                "tenant_id": billing.tenant_id,
+                "plan_type": billing.requested_plan_type,
+                "provider_reference": billing.provider_reference,
+                "validation_test": True,
+                "subscription_changed": False,
+            }
+
         requested_plan = PlanType(billing.requested_plan_type)
         lim = limits_for(requested_plan)
-
-        paid_at = datetime.now(timezone.utc)
         new_expires_at = paid_at + timedelta(days=30)
 
         sub = db.query(Subscription).filter(Subscription.tenant_id == billing.tenant_id).one_or_none()
