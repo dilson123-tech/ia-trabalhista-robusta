@@ -40,6 +40,8 @@ def _get_or_create_case_analysis_record(
     if analysis_record:
         return analysis_record
 
+    enforce_plan_limits(db, current_user["tenant_id"], PlanAction.AI_ANALYSIS_CREATE)
+
     analysis = analyze_case(
 
           case_number=case.case_number,
@@ -286,7 +288,7 @@ def analyze_case_endpoint(
         db.delete(existing_analysis)
         db.commit()
 
-
+    enforce_plan_limits(db, current_user["tenant_id"], PlanAction.AI_ANALYSIS_CREATE)
 
     analysis = analyze_case(
 
