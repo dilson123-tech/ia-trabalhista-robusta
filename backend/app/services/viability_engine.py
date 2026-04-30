@@ -176,7 +176,7 @@ def calculate_viability(analysis: Dict) -> Dict:
         probability = None
         label = "Dados insuficientes para estimativa"
         complexity = "Indefinida por insuficiência de dados"
-        estimated_time = "Indisponível por insuficiência de dados"
+        estimated_time = "Depende da complexidade, da fase processual, da prova disponível e do juízo competente."
         recommendation = (
             "Complementar fatos, documentos, datas e base mínima de prova antes de qualquer estimativa de viabilidade."
         )
@@ -202,16 +202,15 @@ def calculate_viability(analysis: Dict) -> Dict:
         score = max(0, min(100, score))
         probability = round(score / 100, 2)
 
-        # Complexidade e tempo seguem o risco técnico.
+        # Complexidade segue o risco técnico.
         if risk_level == "low":
             complexity = "Baixa"
-            estimated_time = "6-12 meses"
         elif risk_level == "medium":
             complexity = "Média"
-            estimated_time = "12-24 meses"
         else:
             complexity = "Alta"
-            estimated_time = "24+ meses"
+
+        estimated_time = "Depende da complexidade, da fase processual, da prova disponível e do juízo competente."
 
         # Leitura premium: separa direito forte de prova fraca.
         if legal_strength >= 4 and evidence_gaps >= 3:

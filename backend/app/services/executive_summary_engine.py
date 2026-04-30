@@ -66,6 +66,16 @@ def _is_insufficient_data(analysis: Dict, viability: Dict, decision: Dict) -> bo
         "sem base jurídica",
         "sem base juridica",
         "sem base factual",
+        "informação insuficiente para diagnóstico",
+        "informacao insuficiente para diagnostico",
+        "ausência de causa de pedir",
+        "ausencia de causa de pedir",
+        "pedido definido",
+        "insuficiência probatória",
+        "insuficiencia probatoria",
+        "inexistência de marco temporal",
+        "inexistencia de marco temporal",
+        "legitimidade ativa e passiva",
     )
     if any(marker in analysis_issues for marker in hard_markers):
         return True
@@ -82,7 +92,7 @@ def _is_insufficient_data(analysis: Dict, viability: Dict, decision: Dict) -> bo
     )
     soft_hits = sum(1 for marker in soft_markers if marker in analysis_issues)
 
-    if soft_hits >= 2 and float(score or 0) < 55:
+    if soft_hits >= 2:
         return True
 
     return False
@@ -104,12 +114,12 @@ def generate_executive_summary(
 
     if _is_insufficient_data(analysis, viability, decision):
         complexity = _complexity_label(viability.get("complexity", "Indefinida por insuficiência de dados"))
-        estimated_time = viability.get("estimated_time", "Indisponível por insuficiência de dados")
+        estimated_time = "Depende da complexidade, da fase processual, da prova disponível e do juízo competente."
         executive_text = (
             "Caso com dados insuficientes para prognóstico confiável. "
             f"Nível de risco: {risk_level}. "
             f"Complexidade: {complexity}. "
-            f"Tempo estimado: {estimated_time}. "
+            f"Perspectiva de tramitação: Depende da complexidade, da fase processual, da prova disponível e do juízo competente.. "
             f"Direcionamento: {recommendation}."
         )
         return {
@@ -125,7 +135,7 @@ def generate_executive_summary(
     score = viability.get("score", 0)
     probability = viability.get("probability", 0) or 0
     complexity = _complexity_label(viability.get("complexity", "Indefinida"))
-    estimated_time = viability.get("estimated_time", "Indefinido")
+    estimated_time = "Depende da complexidade, da fase processual, da prova disponível e do juízo competente."
     status_phrase = _status_phrase(final_status)
     probability_percent = int(round(float(probability) * 100))
 
@@ -133,7 +143,7 @@ def generate_executive_summary(
         f"{status_phrase.capitalize()}, com probabilidade estimada de êxito em {probability_percent}%. "
         f"Nível de risco: {risk_level}. "
         f"Complexidade: {complexity}. "
-        f"Tempo estimado: {estimated_time}. "
+        f"Perspectiva de tramitação: Depende da complexidade, da fase processual, da prova disponível e do juízo competente.. "
         f"Direcionamento: {recommendation}."
     )
 

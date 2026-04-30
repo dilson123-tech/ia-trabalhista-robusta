@@ -25,6 +25,16 @@ def _is_insufficient_data(viability: Dict, analysis: Dict) -> bool:
         "sem base jurídica",
         "sem base juridica",
         "sem base factual",
+        "informação insuficiente para diagnóstico",
+        "informacao insuficiente para diagnostico",
+        "ausência de causa de pedir",
+        "ausencia de causa de pedir",
+        "pedido definido",
+        "insuficiência probatória",
+        "insuficiencia probatoria",
+        "inexistência de marco temporal",
+        "inexistencia de marco temporal",
+        "legitimidade ativa e passiva",
     )
     if any(marker in analysis_issues for marker in hard_markers):
         return True
@@ -41,7 +51,7 @@ def _is_insufficient_data(viability: Dict, analysis: Dict) -> bool:
     )
     soft_hits = sum(1 for marker in soft_markers if marker in analysis_issues)
 
-    if soft_hits >= 2 and float(score or 0) < 55:
+    if soft_hits >= 2:
         return True
 
     return False
@@ -116,7 +126,7 @@ def generate_decision(analysis: Dict, viability: Dict) -> Dict:
             "executive_recommendation": recommendation or "Complementar dados antes de qualquer conclusão executiva",
             "estimated_complexity": complexity or "Indefinida por insuficiência de dados",
             "complexity": complexity or "Indefinida por insuficiência de dados",
-            "estimated_time": estimated_time or "Indisponível por insuficiência de dados",
+            "estimated_time": "Depende da complexidade, da fase processual, da prova disponível e do juízo competente.",
             "executive_summary": build_executive_summary(viability, analysis),
         }
 
@@ -155,6 +165,6 @@ def generate_decision(analysis: Dict, viability: Dict) -> Dict:
         "executive_recommendation": recommendation or "Sem recomendação executiva definida",
         "estimated_complexity": complexity or "Indefinida",
         "complexity": complexity or "Indefinida",
-        "estimated_time": estimated_time or "Indefinido",
+        "estimated_time": "Depende da complexidade, da fase processual, da prova disponível e do juízo competente.",
         "executive_summary": build_executive_summary(viability, analysis),
     }
