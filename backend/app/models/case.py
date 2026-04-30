@@ -21,6 +21,8 @@ class Case(Base):
     case_number: Mapped[str] = mapped_column(String(50), nullable=False)
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    legal_area: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    action_type: Mapped[str | None] = mapped_column(String(120), nullable=True)
     status: Mapped[str] = mapped_column(
         String(30), nullable=False, default="draft"
     )
