@@ -11,6 +11,52 @@ import {
   type EditableDocumentItem,
 } from '../../services/api'
 
+const EDITOR_SUPPORTED_AREAS = [
+  { value: 'trabalhista', label: 'Trabalhista' },
+  { value: 'civil_ambiental', label: 'Civil/Ambiental' },
+  { value: 'consumidor', label: 'Consumidor' },
+  { value: 'previdenciario', label: 'Previdenciário' },
+] as const
+
+const EDITOR_SUPPORTED_AREA_VALUES = new Set(
+  EDITOR_SUPPORTED_AREAS.map((item) => item.value),
+)
+
+const normalizeEditorArea = (area: string | null | undefined): string => {
+  const normalized = (area || '').trim().toLowerCase()
+  return EDITOR_SUPPORTED_AREA_VALUES.has(
+    normalized as (typeof EDITOR_SUPPORTED_AREAS)[number]['value']
+  )
+    ? normalized
+    : 'trabalhista'
+}
+
+const isEditorAreaSupported = (area: string | null | undefined): boolean => {
+  const normalized = (area || '').trim().toLowerCase()
+  return EDITOR_SUPPORTED_AREA_VALUES.has(
+    normalized as (typeof EDITOR_SUPPORTED_AREAS)[number]['value']
+  )
+}
+
+const getAreaLabel = (area: string | null | undefined): string => {
+  const normalized = (area || '').trim().toLowerCase()
+  const labels: Record<string, string> = {
+    trabalhista: 'Trabalhista',
+    civel: 'Cível',
+    civil_ambiental: 'Civil/Ambiental',
+    criminal: 'Criminal',
+    consumidor: 'Consumidor',
+    familia: 'Família',
+    previdenciario: 'Previdenciário',
+    empresarial: 'Empresarial',
+    tributario: 'Tributário',
+    administrativo: 'Administrativo',
+    imobiliario: 'Imobiliário',
+    outro: 'Outro',
+  }
+  return labels[normalized] || (area && area.trim() ? area : 'não informada')
+}
+
 const getSectionPlaceholder = (sectionKey: string | null | undefined): string => {
   switch (sectionKey) {
     case 'resumo_fatico':
@@ -140,13 +186,13 @@ export function EditorModulePanel({ token, selectedCaseId, selectedCaseArea, pie
   const [saveEditLoading, setSaveEditLoading] = useState(false)
   const [newDocumentTitle, setNewDocumentTitle] = useState('')
   const [newDocumentType, setNewDocumentType] = useState('peticao_inicial')
-  const [newDocumentArea, setNewDocumentArea] = useState(selectedCaseArea || 'trabalhista')
+  const [newDocumentArea, setNewDocumentArea] = useState(normalizeEditorArea(selectedCaseArea))
   const [guidedInputs, setGuidedInputs] = useState<Record<string, string>>({})
   const handledPieceReadyRequestRef = useRef(0)
 
   useEffect(() => {
     if (!showCreateForm) return
-    setNewDocumentArea(selectedCaseArea || 'trabalhista')
+    setNewDocumentArea(normalizeEditorArea(selectedCaseArea))
   }, [selectedCaseArea, showCreateForm])
 
 
@@ -206,7 +252,7 @@ export function EditorModulePanel({ token, selectedCaseId, selectedCaseArea, pie
       if (!documentId) {
         createdDetail = await createEditableDocument(token, {
           case_id: selectedCaseId,
-          area: selectedCaseArea || 'trabalhista',
+          area: normalizeEditorArea(selectedCaseArea),
           document_type: 'peticao_inicial',
           title: `Peça pronta — Caso #${selectedCaseId}`,
           notes: 'Documento base criado automaticamente pelo fluxo Gerar peça pronta.',
@@ -623,6 +669,14 @@ export function EditorModulePanel({ token, selectedCaseId, selectedCaseArea, pie
   async function handleCreateDocument() {
     if (!token.trim() || !selectedCaseId || !newDocumentTitle.trim()) return
 
+    if (!isEditorAreaSupported(selectedCaseArea)) {
+      setCreateError(
+        `Novo documento editável ainda não disponível para a área ${getAreaLabel(selectedCaseArea)}.`
+      )
+      setCreateSuccess('')
+      return
+    }
+
     setCreateLoading(true)
     setCreateError('')
     setCreateSuccess('')
@@ -673,7 +727,7 @@ export function EditorModulePanel({ token, selectedCaseId, selectedCaseArea, pie
       setShowCreateForm(false)
       setNewDocumentTitle('')
       setNewDocumentType('peticao_inicial')
-      setNewDocumentArea(selectedCaseArea || 'trabalhista')
+      setNewDocumentArea(normalizeEditorArea(selectedCaseArea))
       setCreateSuccess(`Documento "${created.title}" criado com sucesso.`)
     } catch (err) {
       if (err instanceof ApiError) {
@@ -960,16 +1014,35 @@ export function EditorModulePanel({ token, selectedCaseId, selectedCaseArea, pie
 
         <button
           type="button"
-          className={`btn ${showCreateForm ? 'btn-secondary' : 'btn-primary'}`}
+          className={`btn ${!isEditorAreaSupported(selectedCaseArea) ? 'btn-muted' : showCreateForm ? 'btn-secondary' : 'btn-primary'}`}
           onClick={() => {
+            if (!isEditorAreaSupported(selectedCaseArea)) return
             setShowCreateForm((prev) => !prev)
             setCreateError('')
             setCreateSuccess('')
           }}
+          disabled={!isEditorAreaSupported(selectedCaseArea)}
+          title={
+            isEditorAreaSupported(selectedCaseArea)
+              ? 'Criar novo documento editável'
+              : `Editor estruturado ainda não disponível para a área ${getAreaLabel(selectedCaseArea)}`
+          }
         >
           {showCreateForm ? 'Ocultar criação' : 'Novo documento editável'}
         </button>
       </div>
+
+      {!isEditorAreaSupported(selectedCaseArea) ? (
+        <article className="info-card" style={{ marginBottom: '16px' }}>
+          <p className="info-text">
+            <strong>Área do caso:</strong> {getAreaLabel(selectedCaseArea)}
+          </p>
+          <p className="body-text">
+            O editor jurídico estruturado ainda não está liberado para esta área neste painel.
+            Áreas disponíveis hoje: {EDITOR_SUPPORTED_AREAS.map((item) => item.label).join(', ')}.
+          </p>
+        </article>
+      ) : null}
 
       {showCreateForm ? (
         <article className="info-card" style={{ marginBottom: '16px' }}>
@@ -997,10 +1070,11 @@ export function EditorModulePanel({ token, selectedCaseId, selectedCaseArea, pie
               value={newDocumentArea}
               onChange={(e) => setNewDocumentArea(e.target.value)}
             >
-              <option value="trabalhista">Trabalhista</option>
-              <option value="civil_ambiental">Civil/Ambiental</option>
-              <option value="consumidor">Consumidor</option>
-              <option value="previdenciario">Previdenciário</option>
+              {EDITOR_SUPPORTED_AREAS.map((item) => (
+                <option key={item.value} value={item.value}>
+                  {item.label}
+                </option>
+              ))}
             </select>
 
             <div className="actions-row">
