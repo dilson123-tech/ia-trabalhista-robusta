@@ -99,7 +99,9 @@ def build_analysis_foundations(
     viability: dict[str, Any],
     decision: dict[str, Any],
 ) -> dict[str, Any]:
-    legal_area = case.get("legal_area")
+    legal_area = case.get("legal_area") or technical.get("legal_area")
+    if isinstance(legal_area, str):
+        legal_area = legal_area.strip().lower() or None
     final_status = str(decision.get("final_status") or "").strip()
     probability_percent = decision.get("probability_percent")
 
