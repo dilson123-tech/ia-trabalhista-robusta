@@ -22,13 +22,13 @@ def _risk_label(value) -> str:
 
 
 def _probability_pct(executive_data: dict) -> str:
-    probability = executive_data.get("viability", {}).get("probability", None)
-    if probability is None:
-        return "Não informado"
+    decision_probability = (executive_data.get("decision") or {}).get("probability_percent", None)
+    if decision_probability is None:
+        return "Não estimada por insuficiência de dados"
     try:
-        return f"{float(probability) * 100:.0f}%"
+        return f"{int(decision_probability)}%"
     except Exception:
-        return "Não informado"
+        return "Não estimada por insuficiência de dados"
 
 
 def _pdf_via_fpdf2(case_data: dict, executive_data: dict) -> bytes:
@@ -47,9 +47,10 @@ def _pdf_via_fpdf2(case_data: dict, executive_data: dict) -> bytes:
     final_status = _safe(decision.get("final_status")) or "Indefinido"
     risk_level = _risk_label(executive_data.get("technical", {}).get("risk_level") or strategic.get("risk_level") or strategic.get("financial_risk"))
     complexity = _safe(viability.get("complexity")) or "Indefinida"
-    estimated_time = _safe(viability.get("estimated_time")) or "Indefinido"
+    estimated_time = "Depende da complexidade, da fase processual, da prova disponível e do juízo competente."
     recommendation = _safe(viability.get("recommendation")) or "Sem recomendação"
-    score_label = "Não informado" if viability.get("score") is None else f'{viability.get("score")}/100'
+    decision_score = decision.get("score")
+    score_label = "Não estimado" if decision_score is None else f"{decision_score}/100"
 
     pdf = FPDF(format="A4")
     pdf.set_auto_page_break(auto=True, margin=15)
@@ -85,7 +86,7 @@ def _pdf_via_fpdf2(case_data: dict, executive_data: dict) -> bytes:
     pdf.cell(0, 7, f"Score: {score_label}", ln=True)
     pdf.cell(0, 7, f"Nivel de risco: {risk_level}", ln=True)
     pdf.cell(0, 7, f"Complexidade: {complexity}", ln=True)
-    pdf.cell(0, 7, f"Tempo estimado: {estimated_time}", ln=True)
+    pdf.multi_cell(0, 6, f"Perspectiva de tramitação: {estimated_time}")
     pdf.multi_cell(0, 6, f"Recomendacao: {recommendation}")
     pdf.ln(3)
 
@@ -122,6 +123,7 @@ def generate_executive_pdf(case_data: dict, executive_data: dict) -> bytes:
 
         generated_at = datetime.now().strftime("%d/%m/%Y %H:%M")
         probability_pct = _probability_pct(executive_data)
+        time_perspective = "Depende da complexidade, da fase processual, da prova disponível e do juízo competente."
 
         html_content = f"""
         <html>
@@ -245,15 +247,15 @@ def generate_executive_pdf(case_data: dict, executive_data: dict) -> bytes:
                 </div>
                 <div class="card">
                   <span class="label">Score</span>
-                  <span class="value">{"Não informado" if viability.get("score") is None else str(viability.get("score")) + "/100"}</span>
+                  <span class="value">{"Não estimado" if decision.get("score") is None else str(decision.get("score")) + "/100"}</span>
                 </div>
                 <div class="card">
                   <span class="label">Complexidade</span>
                   <span class="value">{_safe(viability.get("complexity")) or "Indefinida"}</span>
                 </div>
                 <div class="card">
-                  <span class="label">Tempo estimado</span>
-                  <span class="value">{_safe(viability.get("estimated_time")) or "Indefinido"}</span>
+                  <span class="label">Perspectiva de tramitação</span>
+                  <span class="value">{time_perspective}</span>
                 </div>
                 <div class="card">
                   <span class="label">Recomendação</span>

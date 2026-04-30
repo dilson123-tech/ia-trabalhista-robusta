@@ -18,15 +18,22 @@ def generate_report_html(case: Dict, analysis: Dict, viability: Dict, executive_
     issues = analysis.get("issues") or []
     next_steps = analysis.get("next_steps") or []
 
-    probability = viability.get("probability", None)
+    decision_probability = (executive_decision or {}).get("probability_percent")
     try:
         probability_pct = (
-            "Não informado"
-            if probability is None
-            else f"{float(probability) * 100:.0f}%"
+            "Não estimada por insuficiência de dados"
+            if decision_probability is None
+            else f"{int(decision_probability)}%"
         )
     except Exception:
-        probability_pct = "Não informado"
+        probability_pct = "Não estimada por insuficiência de dados"
+
+    score_value = (executive_decision or {}).get("score")
+    if score_value is None:
+        score_value = viability.get("score")
+    score_label = "Não estimado" if score_value is None else f"{score_value}/100"
+
+    time_perspective = "Depende da complexidade, da fase processual, da prova disponível e do juízo competente."
 
     issues_html = "".join(f"<li>{item}</li>" for item in issues) or "<li>Nenhum ponto crítico identificado.</li>"
     next_steps_html = "".join(f"<li>{item}</li>" for item in next_steps) or "<li>Sem próximos passos sugeridos.</li>"
@@ -160,7 +167,7 @@ def generate_report_html(case: Dict, analysis: Dict, viability: Dict, executive_
                 <div class=\"grid\">
                     <div class=\"card\">
                         <span class=\"label\">Score</span>
-                        <span class=\"value\">{("Não informado" if viability.get("score") is None else str(viability.get("score")) + "/100")}</span>
+                        <span class=\"value\">{score_label}</span>
                     </div>
                     <div class=\"card\">
                         <span class=\"label\">Probabilidade estimada</span>
@@ -175,8 +182,8 @@ def generate_report_html(case: Dict, analysis: Dict, viability: Dict, executive_
                         <span class=\"value\">{viability.get("complexity") or "Indefinida"}</span>
                     </div>
                     <div class=\"card\">
-                        <span class=\"label\">Tempo estimado</span>
-                        <span class=\"value\">{viability.get("estimated_time") or "Indefinido"}</span>
+                        <span class=\"label\">Perspectiva de tramitação</span>
+                        <span class=\"value\">{time_perspective}</span>
                     </div>
                     <div class=\"card\">
                         <span class=\"label\">Recomendação</span>
