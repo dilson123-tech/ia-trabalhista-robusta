@@ -6,6 +6,8 @@ class CaseBase(BaseModel):
     case_number: str
     title: str
     description: str | None = None
+    legal_area: str | None = None
+    action_type: str | None = None
     status: str = "draft"
 
 
