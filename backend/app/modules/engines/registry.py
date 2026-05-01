@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+from app.modules.engines.civil_ambiental import CivilAmbientalEngine
 from app.modules.engines.trabalhista import TrabalhistaEngine
 
 
 _ENGINE_REGISTRY = {
+    "civel": CivilAmbientalEngine,
+    "civil_ambiental": CivilAmbientalEngine,
     "trabalhista": TrabalhistaEngine,
 }
 
