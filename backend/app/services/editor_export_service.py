@@ -141,16 +141,37 @@ def generate_editor_pdf(html: str) -> bytes:
         return HTML(string=html).write_pdf()
     except (ImportError, OSError):
         from fpdf import FPDF
+        import re
+        import unicodedata
+
+        def _pdf_safe_text(value: str) -> str:
+            normalized = (
+                value.replace("—", "-")
+                .replace("–", "-")
+                .replace("“", '"')
+                .replace("”", '"')
+                .replace("‘", "'")
+                .replace("’", "'")
+                .replace("•", "-")
+                .replace("\u00a0", " ")
+            )
+            normalized = unicodedata.normalize("NFKD", normalized)
+            return normalized.encode("latin-1", "ignore").decode("latin-1")
 
         pdf = FPDF()
+        pdf.set_auto_page_break(auto=True, margin=15)
         pdf.add_page()
-        pdf.set_font("Arial", size=10)
+        pdf.set_font("Helvetica", size=10)
 
-        # fallback simples: remove tags básicas
-        import re
         clean = re.sub("<[^<]+?>", "", html)
+        clean = _pdf_safe_text(clean)
 
-        for line in clean.split("\n"):
+        for raw_line in clean.split("\n"):
+            line = raw_line.strip()
+            if not line:
+                pdf.ln(2)
+                continue
             pdf.multi_cell(0, 5, line)
 
-        return bytes(pdf.output(dest="S"))
+        output = pdf.output(dest="S")
+        return output if isinstance(output, bytes) else output.encode("latin-1", "ignore")
