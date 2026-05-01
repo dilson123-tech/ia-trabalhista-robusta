@@ -501,7 +501,7 @@ def _build_assisted_sections(db: Session, case: Case, analysis_record, tenant_id
         [
             (
                 "I. Do cabimento da pretensão. À luz do quadro fático descrito, a demanda deve ser estruturada para cessar a lesão narrada, recompor o status jurídico violado e prevenir a reiteração dos impactos ao direito material discutido."
-                if normalized_area == "civil_ambiental"
+                if normalized_area in {"civel", "civil_ambiental"}
                 else "I. Do cabimento da pretensão. À luz do quadro fático narrado, a demanda deve ser estruturada para tutelar o direito material afirmado e enfrentar a controvérsia central com base na prova já disponível."
             ),
             _series_block("II. Dos fundamentos normativos aplicáveis:", normative_basis, limit=5),
@@ -524,13 +524,13 @@ def _build_assisted_sections(db: Session, case: Case, analysis_record, tenant_id
         [
             (
                 "I. Requer-se, em tutela provisória de urgência, quando presentes os requisitos legais, a imediata cessação, redução ou mitigação dos impactos narrados, inclusive por obrigação de fazer e/ou não fazer."
-                if normalized_area == "civil_ambiental"
+                if normalized_area in {"civel", "civil_ambiental"}
                 else "I. Requer-se, quando presentes os requisitos legais, a concessão da tutela provisória cabível para resguardar desde logo a utilidade do provimento final."
             ),
             _series_block("II. Pedidos principais sugeridos para a minuta final:", issues, limit=5),
             (
                 "III. Requer-se, ao final, a procedência dos pedidos principais, com imposição das obrigações materiais compatíveis com a narrativa, a prova produzida e a extensão do dano demonstrado."
-                if normalized_area == "civil_ambiental"
+                if normalized_area in {"civel", "civil_ambiental"}
                 else "III. Requer-se, ao final, a procedência dos pedidos compatíveis com os fatos narrados, a tese sustentada e a prova disponível."
             ),
             "IV. Requer-se, ainda, a citação da parte ré, a produção de prova documental, testemunhal e pericial, bem como os requerimentos acessórios pertinentes ao rito e à estratégia processual adotada.",
@@ -547,7 +547,7 @@ def _build_assisted_sections(db: Session, case: Case, analysis_record, tenant_id
         [
             (
                 f"EXCELENTÍSSIMO(A) SENHOR(A) DOUTOR(A) JUIZ(A) DE DIREITO DE UMA DAS VARAS CÍVEIS DA COMARCA DE {case_comarca}."
-                if normalized_area == "civil_ambiental"
+                if normalized_area in {"civel", "civil_ambiental"}
                 else f"EXCELENTÍSSIMO(A) SENHOR(A) DOUTOR(A) JUIZ(A) DE DIREITO DO JUÍZO COMPETENTE DA COMARCA DE {case_comarca}."
             ),
             "Na versão final, o advogado deverá confirmar a competência territorial, o órgão jurisdicional, eventual prevenção e o rito adequado antes do protocolo.",
@@ -567,7 +567,7 @@ def _build_assisted_sections(db: Session, case: Case, analysis_record, tenant_id
             "Requer-se a produção de todos os meios de prova em direito admitidos, especialmente documental, testemunhal e pericial, conforme a natureza das controvérsias identificadas.",
             (
                 "Na versão final, devem ser especificados os documentos já existentes, a necessidade de prova técnica ambiental/acústica, eventual inspeção judicial e o fundamento da tutela de urgência."
-                if normalized_area == "civil_ambiental"
+                if normalized_area in {"civel", "civil_ambiental"}
                 else "Na versão final, devem ser especificados os documentos já existentes, a prova técnica pertinente e os requerimentos probatórios adequados ao caso."
             ),
             "Também devem ser ajustados os requerimentos acessórios, a intimação da parte contrária e as providências processuais cabíveis ao rito escolhido.",
