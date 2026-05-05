@@ -18,20 +18,7 @@ def generate_report_html(case: Dict, analysis: Dict, viability: Dict, executive_
     issues = analysis.get("issues") or []
     next_steps = analysis.get("next_steps") or []
 
-    decision_probability = (executive_decision or {}).get("probability_percent")
-    try:
-        probability_pct = (
-            "Não estimada por insuficiência de dados"
-            if decision_probability is None
-            else f"{int(decision_probability)}%"
-        )
-    except Exception:
-        probability_pct = "Não estimada por insuficiência de dados"
-
-    score_value = (executive_decision or {}).get("score")
-    if score_value is None:
-        score_value = viability.get("score")
-    score_label = "Não estimado" if score_value is None else f"{score_value}/100"
+    assessment_note = "Avaliação qualitativa, sem previsão percentual de resultado judicial"
 
     time_perspective = "Depende da complexidade, da fase processual, da prova disponível e do juízo competente."
 
@@ -166,12 +153,12 @@ def generate_report_html(case: Dict, analysis: Dict, viability: Dict, executive_
                 <h2>Indicadores Estratégicos</h2>
                 <div class=\"grid\">
                     <div class=\"card\">
-                        <span class=\"label\">Score</span>
-                        <span class=\"value\">{score_label}</span>
+                        <span class=\"label\">Classificação estratégica</span>
+                        <span class=\"value\">{viability.get("label") or "Indefinida"}</span>
                     </div>
                     <div class=\"card\">
-                        <span class=\"label\">Probabilidade estimada</span>
-                        <span class=\"value\">{probability_pct}</span>
+                        <span class=\"label\">Confiança da análise</span>
+                        <span class=\"value\">{assessment_note}</span>
                     </div>
                     <div class=\"card\">
                         <span class=\"label\">Nível de risco</span>

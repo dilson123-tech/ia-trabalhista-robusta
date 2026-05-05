@@ -43,18 +43,22 @@ def _pdf_via_fpdf2(case_data: dict, executive_data: dict) -> bytes:
     strategic = executive_data.get("strategic", {}) or {}
 
     summary = _safe(decision.get("executive_summary")) or "(sem resumo executivo)"
-    probability_pct = _probability_pct(executive_data)
     final_status = _safe(decision.get("final_status")) or "Indefinido"
     risk_level = _risk_label(executive_data.get("technical", {}).get("risk_level") or strategic.get("risk_level") or strategic.get("financial_risk"))
     complexity = _safe(viability.get("complexity")) or "Indefinida"
     estimated_time = "Depende da complexidade, da fase processual, da prova disponível e do juízo competente."
     recommendation = _safe(viability.get("recommendation")) or "Sem recomendação"
-    decision_score = decision.get("score")
-    score_label = "Não estimado" if decision_score is None else f"{decision_score}/100"
+    assessment_note = "Avaliação qualitativa, sem previsão percentual de resultado judicial"
 
     pdf = FPDF(format="A4")
     pdf.set_auto_page_break(auto=True, margin=15)
     pdf.add_page()
+
+    def safe_multi_cell(height: float, text: str) -> None:
+        pdf.set_x(pdf.l_margin)
+        usable_width = pdf.w - pdf.l_margin - pdf.r_margin
+        pdf.multi_cell(usable_width, height, text)
+        pdf.set_x(pdf.l_margin)
 
     pdf.set_font("Helvetica", "B", 16)
     pdf.cell(0, 10, "Plataforma Jurídica Multiárea", ln=True)
@@ -67,27 +71,27 @@ def _pdf_via_fpdf2(case_data: dict, executive_data: dict) -> bytes:
     pdf.set_font("Helvetica", "B", 12)
     pdf.cell(0, 8, "Dados do Caso", ln=True)
     pdf.set_font("Helvetica", "", 11)
-    pdf.multi_cell(0, 6, f"Processo: {case_number}")
+    safe_multi_cell(6, f"Processo: {case_number}")
     pdf.set_x(pdf.l_margin)
-    pdf.multi_cell(0, 6, f"Titulo: {title}")
+    safe_multi_cell(6, f"Titulo: {title}")
     pdf.ln(2)
 
     pdf.set_font("Helvetica", "B", 12)
     pdf.cell(0, 8, "Resumo Executivo", ln=True)
     pdf.set_font("Helvetica", "", 11)
-    pdf.multi_cell(0, 6, summary)
+    safe_multi_cell(6, summary)
     pdf.ln(2)
 
     pdf.set_font("Helvetica", "B", 12)
     pdf.cell(0, 8, "Indicadores Estrategicos", ln=True)
     pdf.set_font("Helvetica", "", 11)
     pdf.cell(0, 7, f"Classificacao final: {final_status}", ln=True)
-    pdf.cell(0, 7, f"Probabilidade estimada: {probability_pct}", ln=True)
-    pdf.cell(0, 7, f"Score: {score_label}", ln=True)
+    safe_multi_cell(6, f"Confianca da analise: {assessment_note}")
+    pdf.set_x(pdf.l_margin)
     pdf.cell(0, 7, f"Nivel de risco: {risk_level}", ln=True)
     pdf.cell(0, 7, f"Complexidade: {complexity}", ln=True)
-    pdf.multi_cell(0, 6, f"Perspectiva de tramitação: {estimated_time}")
-    pdf.multi_cell(0, 6, f"Recomendacao: {recommendation}")
+    safe_multi_cell(6, f"Perspectiva de tramitação: {estimated_time}")
+    safe_multi_cell(6, f"Recomendacao: {recommendation}")
     pdf.ln(3)
 
     pdf.set_font("Helvetica", "B", 12)
@@ -101,7 +105,7 @@ def _pdf_via_fpdf2(case_data: dict, executive_data: dict) -> bytes:
 
     pdf.ln(5)
     pdf.set_font("Helvetica", "", 9)
-    pdf.multi_cell(0, 5, "Documento gerado automaticamente pelo sistema Plataforma Jurídica Multiárea.")
+    safe_multi_cell(5, "Documento gerado automaticamente pelo sistema Plataforma Jurídica Multiárea.")
 
     return bytes(pdf.output(dest="S"))
 
@@ -238,16 +242,16 @@ def generate_executive_pdf(case_data: dict, executive_data: dict) -> bytes:
                   <span class="value">{_safe(decision.get("final_status")) or "Indefinido"}</span>
                 </div>
                 <div class="card">
-                  <span class="label">Probabilidade estimada</span>
-                  <span class="value">{probability_pct}</span>
+                  <span class="label">Confiança da análise</span>
+                  <span class="value">Avaliação qualitativa, sem previsão percentual de resultado judicial</span>
                 </div>
                 <div class="card">
                   <span class="label">Nível de risco</span>
                   <span class="value">{_risk_label(executive_data.get("technical", {}).get("risk_level") or strategic.get("risk_level") or strategic.get("financial_risk"))}</span>
                 </div>
                 <div class="card">
-                  <span class="label">Score</span>
-                  <span class="value">{"Não estimado" if decision.get("score") is None else str(decision.get("score")) + "/100"}</span>
+                  <span class="label">Critério de uso</span>
+                  <span class="value">Apoio técnico sujeito à revisão profissional</span>
                 </div>
                 <div class="card">
                   <span class="label">Complexidade</span>

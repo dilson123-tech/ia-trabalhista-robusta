@@ -50,6 +50,8 @@ def test_executive_outputs_contract_and_missing_case(monkeypatch):
         "case_number": f"EXEC-{uuid.uuid4()}",
         "title": "Caso executivo de contrato",
         "description": "Teste de summary, report e pdf.",
+        "legal_area": "civel",
+        "action_type": "Ação de Cobrança",
         "status": "draft",
     }
 
@@ -100,6 +102,8 @@ def test_executive_pdf_refreshes_stale_executive_data_before_generating(monkeypa
         "case_number": f"EXEC-STALE-{uuid.uuid4()}",
         "title": "Caso com executive_data legado",
         "description": "Teste de refresh de executive_data stale antes do PDF.",
+        "legal_area": "civel",
+        "action_type": "Ação de Cobrança",
         "status": "draft",
     }
 
@@ -158,8 +162,12 @@ def test_executive_pdf_refreshes_stale_executive_data_before_generating(monkeypa
     assert pdf.content.startswith(b"%PDF-1.4 regression")
 
     refreshed = captured["executive_data"]
-    assert refreshed["decision"]["executive_summary"]
-    assert refreshed["decision"]["probability_percent"] is not None
+    executive_summary = refreshed["decision"]["executive_summary"]
+    assert executive_summary
+    assert refreshed["decision"]["final_status"] is not None
+    assert "probabilidade estimada" not in executive_summary.lower()
+    assert "score" not in executive_summary.lower()
+    assert "/100" not in executive_summary.lower()
     assert refreshed["strategic"]["financial_risk"] in {"baixo", "medio", "alto"}
 
 

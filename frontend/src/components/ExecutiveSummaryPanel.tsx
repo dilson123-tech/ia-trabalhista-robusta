@@ -52,12 +52,8 @@ export function ExecutiveSummaryPanel({
           </p>
 
           <p className="info-text">
-            <strong>Probabilidade estimada:</strong>{' '}
-            {typeof executiveSummaryData.executive_decision?.probability_percent === 'number'
-              ? `${executiveSummaryData.executive_decision.probability_percent}%`
-              : typeof executiveSummaryData.viability?.probability === 'number'
-                ? `${Math.round(executiveSummaryData.viability.probability * 100)}%`
-                : 'Não informado'}
+            <strong>Confiança da análise:</strong>{' '}
+            Avaliação estratégica qualitativa, sem previsão percentual de resultado judicial.
           </p>
 
           <p className="info-text">
@@ -122,14 +118,8 @@ export function ExecutiveSummaryPanel({
               <li>Risco financeiro: {executiveSummaryData.strategic_analysis?.financial_risk || 'Não informado'}</li>
               <li>Complexidade: {executiveSummaryData.viability?.complexity || executiveSummaryData.strategic_analysis?.complexity || 'Não informada'}</li>
               <li>Tempo estimado: {executiveSummaryData.executive_decision?.estimated_time || executiveSummaryData.viability?.estimated_time || 'Não informado'}</li>
-              <li>
-                Score:{' '}
-                {typeof executiveSummaryData.viability?.score === 'number'
-                  ? `${executiveSummaryData.viability.score}/100`
-                  : typeof executiveSummaryData.executive_decision?.score === 'number'
-                    ? `${executiveSummaryData.executive_decision.score}/100`
-                    : 'Não informado'}
-              </li>
+              <li>Classificação estratégica: {executiveSummaryData.viability?.label || executiveSummaryData.executive_decision?.final_status || 'Não informada'}</li>
+              <li>Critério de uso: apoio técnico sujeito à revisão profissional antes de qualquer protocolo.</li>
             </ul>
           </div>
 

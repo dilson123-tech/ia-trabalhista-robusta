@@ -102,9 +102,10 @@ def build_executive_summary(viability: Dict, analysis: Dict) -> str:
     direction = recommendation or "avaliar estratégia antes de avançar"
 
     return (
-        f"{status.capitalize()}, com probabilidade estimada de êxito em {probability}%. "
+        f"{status.capitalize()}. "
         f"Nível de risco: {risk_label}. "
-        f"Direcionamento: {direction}."
+        f"Direcionamento: {direction}. "
+        "Avaliação estratégica qualitativa, condicionada à prova documental, cálculo atualizado e revisão profissional antes do protocolo."
     )
 
 

@@ -140,11 +140,12 @@ def generate_executive_summary(
     probability_percent = int(round(float(probability) * 100))
 
     executive_text = (
-        f"{status_phrase.capitalize()}, com probabilidade estimada de êxito em {probability_percent}%. "
+        f"{status_phrase.capitalize()}. "
         f"Nível de risco: {risk_level}. "
         f"Complexidade: {complexity}. "
-        f"Perspectiva de tramitação: Depende da complexidade, da fase processual, da prova disponível e do juízo competente.. "
-        f"Direcionamento: {recommendation}."
+        f"Perspectiva de tramitação: Depende da complexidade, da fase processual, da prova disponível e do juízo competente. "
+        f"Direcionamento: {recommendation}. "
+        "Avaliação estratégica qualitativa, condicionada à prova documental, cálculo atualizado e revisão profissional antes do protocolo."
     )
 
     return {

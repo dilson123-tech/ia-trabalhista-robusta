@@ -44,6 +44,8 @@ def test_editable_documents_authenticated_flow(monkeypatch):
         "case_number": f"EDOC-{uuid.uuid4().hex[:8]}",
         "title": "Caso de teste do editor persistido",
         "description": "Validação do Editor Jurídico Vivo persistido.",
+        "legal_area": "trabalhista",
+        "action_type": "Petição Inicial Trabalhista",
         "status": "draft",
     }
 
@@ -154,3 +156,124 @@ def test_editable_documents_authenticated_flow(monkeypatch):
     assert len(detail["versions"]) == 2
     assert detail["versions"][0]["version_number"] == 1
     assert detail["versions"][1]["version_number"] == 2
+
+
+def test_civel_cobranca_assisted_draft_uses_collection_specific_guardrails(monkeypatch):
+    headers = _auth_headers(monkeypatch)
+
+    create_case_payload = {
+        "case_number": f"COBRANCA-{uuid.uuid4().hex[:8]}",
+        "title": "Cobrança de contrato de prestação de serviços inadimplido",
+        "description": (
+            "A empresa autora foi contratada para executar serviços de manutenção elétrica "
+            "no valor total de R$ 18.500,00. A primeira parcela de R$ 6.500,00 foi paga, "
+            "mas duas parcelas vencidas em 25/02/2026 e 05/03/2026 permaneceram inadimplidas, "
+            "totalizando saldo contratual de R$ 12.000,00. Há contrato assinado, comprovante "
+            "de pagamento parcial, relatório técnico de execução dos serviços, fotografias, "
+            "mensagens de WhatsApp com reconhecimento da dívida, notificação extrajudicial "
+            "e planilha de cálculo com multa de 2%, juros de 1% ao mês e correção monetária. "
+            "O objetivo é propor ação de cobrança contratual, sem pedido de dano moral."
+        ),
+        "legal_area": "civel",
+        "action_type": "Ação de Cobrança",
+        "status": "draft",
+    }
+
+    r_case = client.post("/api/v1/cases", json=create_case_payload, headers=headers)
+    assert r_case.status_code == 200
+    case_id = r_case.json()["id"]
+
+    create_document_payload = {
+        "case_id": case_id,
+        "area": "civel",
+        "document_type": "peticao_inicial",
+        "title": "Petição Inicial — Ação de Cobrança Contratual",
+        "notes": "Documento criado para regressão de guardrails de cobrança.",
+        "metadata": {
+            "source": "test_civel_cobranca_guardrails",
+        },
+        "sections": [
+            {
+                "key": "resumo_fatico",
+                "title": "Resumo Fático",
+                "content": "",
+                "source": "manual",
+                "status": "draft",
+                "metadata": {},
+            },
+            {
+                "key": "fundamentacao",
+                "title": "Fundamentação",
+                "content": "",
+                "source": "manual",
+                "status": "draft",
+                "metadata": {},
+            },
+            {
+                "key": "pedidos",
+                "title": "Pedidos",
+                "content": "",
+                "source": "manual",
+                "status": "draft",
+                "metadata": {},
+            },
+        ],
+    }
+
+    r_create_doc = client.post(
+        "/api/v1/editable-documents",
+        json=create_document_payload,
+        headers=headers,
+    )
+    assert r_create_doc.status_code == 200
+    document_id = r_create_doc.json()["id"]
+
+    r_generate = client.post(
+        f"/api/v1/editable-documents/{document_id}/generate-assisted-draft",
+        headers=headers,
+    )
+    assert r_generate.status_code == 200
+
+    generated = r_generate.json()
+    assert generated["current_version_number"] == 2
+
+    latest_version = max(generated["versions"], key=lambda item: item["version_number"])
+    combined_text = "\n".join(
+        (section.get("content") or "")
+        for section in latest_version["sections"]
+    ).lower()
+
+    required_terms = [
+        "ação de cobrança",
+        "saldo contratual",
+        "multa",
+        "juros",
+        "correção monetária",
+        "honorários",
+        "contrato",
+        "planilha de cálculo",
+    ]
+    for term in required_terms:
+        assert term in combined_text
+
+    forbidden_terms = [
+        "ambiental",
+        "acústica",
+        "acustica",
+        "mitigação",
+        "mitigacao",
+        "obrigação de fazer",
+        "obrigacao de fazer",
+        "não fazer",
+        "nao fazer",
+        "cessar a lesão",
+        "impactos narrados",
+        "reiteração dos impactos",
+        "persistência da conduta",
+        "probabilidade estimada",
+        "probabilidade estimada de êxito",
+        "score",
+        "/100",
+    ]
+    for term in forbidden_terms:
+        assert term not in combined_text
