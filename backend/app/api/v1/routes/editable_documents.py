@@ -382,10 +382,74 @@ def _build_assisted_sections(db: Session, case: Case, analysis_record, tenant_id
     executive_summary = _safe_text(
         decision.get("executive_summary") if isinstance(decision, dict) else ""
     )
+    if executive_summary:
+        import re as _re
+
+        executive_summary = _re.sub(
+            r",?\s*com probabilidade estimada de êxito em\s+\d+%\.?",
+            ".",
+            executive_summary,
+            flags=_re.IGNORECASE,
+        )
+        executive_summary = _re.sub(
+            r"probabilidade estimada\s*:?\s*\d+%\.?",
+            "avaliação qualitativa, sem previsão percentual de resultado judicial.",
+            executive_summary,
+            flags=_re.IGNORECASE,
+        )
+        executive_summary = executive_summary.replace("..", ".").strip()
+
     final_status = _safe_text(decision.get("final_status") if isinstance(decision, dict) else "")
     normalized_area = str(getattr(case, "legal_area", "") or "").strip().lower()
+    normalized_action_type = str(getattr(case, "action_type", "") or "").strip().lower()
+    case_search_text = " ".join(
+        [
+            str(getattr(case, "title", "") or ""),
+            str(getattr(case, "description", "") or ""),
+            normalized_action_type,
+        ]
+    ).lower()
+    is_civel_area = normalized_area in {"civel", "civil_ambiental"}
+    is_civel_cobranca = is_civel_area and any(
+        marker in case_search_text
+        for marker in ["cobran", "inadimpl", "dívida", "divida", "saldo contratual", "contrato de prestação"]
+    )
     controverted_points = list(dict.fromkeys([item for item in [*issues, *critical_points] if item]))
     proof_checklist = list(dict.fromkeys([item for item in [*probative_gaps, *next_steps] if item]))
+
+    if is_civel_cobranca:
+        cleaned_proof_checklist = []
+        for item in proof_checklist:
+            item_text = str(item or "").strip()
+            item_lower = item_text.lower()
+
+            if "persistência da conduta" in item_lower:
+                cleaned_proof_checklist.append(
+                    "Necessidade de cronologia objetiva dos vencimentos, pagamentos realizados, mora, tentativas de cobrança e saldo atualizado."
+                )
+                continue
+
+            if any(
+                forbidden in item_lower
+                for forbidden in [
+                    "ambiental",
+                    "acústica",
+                    "acustica",
+                    "mitigação",
+                    "mitigacao",
+                    "obrigação de fazer",
+                    "obrigacao de fazer",
+                    "não fazer",
+                    "nao fazer",
+                    "impactos narrados",
+                    "reiteração dos impactos",
+                ]
+            ):
+                continue
+
+            cleaned_proof_checklist.append(item_text)
+
+        proof_checklist = list(dict.fromkeys([item for item in cleaned_proof_checklist if item]))
 
     active_parties = _load_case_active_parties(db, tenant_id, case.id)
     state_metadata = _load_case_state_metadata(db, tenant_id, case.id)
@@ -500,11 +564,19 @@ def _build_assisted_sections(db: Session, case: Case, analysis_record, tenant_id
     fundamentacao = _paragraphs(
         [
             (
-                "I. Do cabimento da pretensão. À luz do quadro fático descrito, a demanda deve ser estruturada para cessar a lesão narrada, recompor o status jurídico violado e prevenir a reiteração dos impactos ao direito material discutido."
-                if normalized_area in {"civel", "civil_ambiental"}
-                else "I. Do cabimento da pretensão. À luz do quadro fático narrado, a demanda deve ser estruturada para tutelar o direito material afirmado e enfrentar a controvérsia central com base na prova já disponível."
+                "I. Do cabimento da pretensão. À luz do quadro fático descrito, a demanda deve ser estruturada como ação de cobrança contratual, voltada à condenação da parte ré ao pagamento do saldo inadimplido, com os encargos contratuais e legais cabíveis."
+                if is_civel_cobranca
+                else (
+                    "I. Do cabimento da pretensão. À luz do quadro fático descrito, a demanda deve ser estruturada para cessar a lesão narrada, recompor o status jurídico violado e prevenir a reiteração dos impactos ao direito material discutido."
+                    if normalized_area in {"civel", "civil_ambiental"}
+                    else "I. Do cabimento da pretensão. À luz do quadro fático narrado, a demanda deve ser estruturada para tutelar o direito material afirmado e enfrentar a controvérsia central com base na prova já disponível."
+                )
             ),
-            _series_block("II. Dos fundamentos normativos aplicáveis:", normative_basis, limit=5),
+            (
+                "II. Dos fundamentos jurídicos da cobrança. A pretensão deve se apoiar na existência de relação contratual, no cumprimento da prestação pela parte autora, no inadimplemento das parcelas vencidas pela parte ré, na mora e na responsabilidade pelo pagamento do principal, multa, juros, correção monetária, custas e honorários."
+                if is_civel_cobranca
+                else _series_block("II. Dos fundamentos normativos aplicáveis:", normative_basis, limit=5)
+            ),
             (
                 f"III. Da estratégia jurídica sugerida. {recommended_strategy}"
                 if recommended_strategy
@@ -523,23 +595,47 @@ def _build_assisted_sections(db: Session, case: Case, analysis_record, tenant_id
     pedidos = _paragraphs(
         [
             (
-                "I. Requer-se, em tutela provisória de urgência, quando presentes os requisitos legais, a imediata cessação, redução ou mitigação dos impactos narrados, inclusive por obrigação de fazer e/ou não fazer."
-                if normalized_area in {"civel", "civil_ambiental"}
-                else "I. Requer-se, quando presentes os requisitos legais, a concessão da tutela provisória cabível para resguardar desde logo a utilidade do provimento final."
+                "I. Requer-se a citação da parte ré para, querendo, apresentar contestação, sob pena de revelia e confissão quanto à matéria de fato."
+                if is_civel_cobranca
+                else (
+                    "I. Requer-se, em tutela provisória de urgência, quando presentes os requisitos legais, a imediata cessação, redução ou mitigação dos impactos narrados, inclusive por obrigação de fazer e/ou não fazer."
+                    if normalized_area in {"civel", "civil_ambiental"}
+                    else "I. Requer-se, quando presentes os requisitos legais, a concessão da tutela provisória cabível para resguardar desde logo a utilidade do provimento final."
+                )
             ),
-            _series_block("II. Pedidos principais sugeridos para a minuta final:", issues, limit=5),
             (
-                "III. Requer-se, ao final, a procedência dos pedidos principais, com imposição das obrigações materiais compatíveis com a narrativa, a prova produzida e a extensão do dano demonstrado."
-                if normalized_area in {"civel", "civil_ambiental"}
-                else "III. Requer-se, ao final, a procedência dos pedidos compatíveis com os fatos narrados, a tese sustentada e a prova disponível."
+                "II. Requer-se a condenação da parte ré ao pagamento do saldo contratual inadimplido, acrescido de multa contratual, juros de mora, correção monetária, custas processuais e honorários advocatícios."
+                if is_civel_cobranca
+                else _series_block("II. Pedidos principais sugeridos para a minuta final:", issues, limit=5)
             ),
-            "IV. Requer-se, ainda, a citação da parte ré, a produção de prova documental, testemunhal e pericial, bem como os requerimentos acessórios pertinentes ao rito e à estratégia processual adotada.",
             (
-                f"V. O enquadramento provisório da análise indica a seguinte diretriz para fechamento dos pedidos: {final_status}."
-                if final_status and "dados insuficientes" not in final_status.lower()
-                else ""
+                "III. Requer-se que os encargos de mora sejam calculados a partir do vencimento de cada parcela inadimplida, observando-se a cláusula contratual aplicável e a planilha de cálculo a ser juntada na versão final."
+                if is_civel_cobranca
+                else (
+                    "III. Requer-se, ao final, a procedência dos pedidos principais, com imposição das obrigações materiais compatíveis com a narrativa, a prova produzida e a extensão do dano demonstrado."
+                    if normalized_area in {"civel", "civil_ambiental"}
+                    else "III. Requer-se, ao final, a procedência dos pedidos compatíveis com os fatos narrados, a tese sustentada e a prova disponível."
+                )
             ),
-            "VI. Antes do protocolo definitivo, o advogado deverá revisar a aderência entre pedidos, causa de pedir, prova disponível, tutela de urgência e liquidez dos danos postulados.",
+            (
+                "IV. Requer-se a produção de prova documental suplementar, testemunhal e demais meios de prova em direito admitidos, especialmente contrato, comprovantes de pagamento, relatório técnico, fotografias, mensagens, notificação extrajudicial, e-mails e planilha de cálculo."
+                if is_civel_cobranca
+                else "IV. Requer-se, ainda, a citação da parte ré, a produção de prova documental, testemunhal e pericial, bem como os requerimentos acessórios pertinentes ao rito e à estratégia processual adotada."
+            ),
+            (
+                "V. Requer-se a condenação da parte ré ao pagamento das custas processuais e honorários advocatícios, nos termos da legislação processual aplicável."
+                if is_civel_cobranca
+                else (
+                    f"V. O enquadramento provisório da análise indica a seguinte diretriz para fechamento dos pedidos: {final_status}."
+                    if final_status and "dados insuficientes" not in final_status.lower()
+                    else ""
+                )
+            ),
+            (
+                "VI. Antes do protocolo definitivo, o advogado deverá revisar valor da causa, memória de cálculo, índice de correção monetária, competência territorial e documentos comprobatórios do inadimplemento."
+                if is_civel_cobranca
+                else "VI. Antes do protocolo definitivo, o advogado deverá revisar a aderência entre pedidos, causa de pedir, prova disponível, tutela de urgência e liquidez dos danos postulados."
+            ),
         ]
     )
 
@@ -566,11 +662,19 @@ def _build_assisted_sections(db: Session, case: Case, analysis_record, tenant_id
         [
             "Requer-se a produção de todos os meios de prova em direito admitidos, especialmente documental, testemunhal e pericial, conforme a natureza das controvérsias identificadas.",
             (
-                "Na versão final, devem ser especificados os documentos já existentes, a necessidade de prova técnica ambiental/acústica, eventual inspeção judicial e o fundamento da tutela de urgência."
-                if normalized_area in {"civel", "civil_ambiental"}
-                else "Na versão final, devem ser especificados os documentos já existentes, a prova técnica pertinente e os requerimentos probatórios adequados ao caso."
+                "Na versão final, devem ser especificados e anexados os documentos de cobrança: contrato assinado, comprovante de pagamento parcial, relatório de execução dos serviços, fotografias, mensagens de reconhecimento da dívida, notificação extrajudicial, e-mails e planilha de cálculo atualizada."
+                if is_civel_cobranca
+                else (
+                    "Na versão final, devem ser especificados os documentos já existentes, a necessidade de prova técnica ambiental/acústica, eventual inspeção judicial e o fundamento da tutela de urgência."
+                    if normalized_area in {"civel", "civil_ambiental"}
+                    else "Na versão final, devem ser especificados os documentos já existentes, a prova técnica pertinente e os requerimentos probatórios adequados ao caso."
+                )
             ),
-            "Também devem ser ajustados os requerimentos acessórios, a intimação da parte contrária e as providências processuais cabíveis ao rito escolhido.",
+            (
+                "Também devem ser ajustados os requerimentos acessórios, especialmente valor da causa, memória de cálculo, índice de correção monetária, comprovação de mora e eventual tentativa extrajudicial de composição."
+                if is_civel_cobranca
+                else "Também devem ser ajustados os requerimentos acessórios, a intimação da parte contrária e as providências processuais cabíveis ao rito escolhido."
+            ),
         ]
     )
 
