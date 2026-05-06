@@ -41,6 +41,40 @@ def _has_substantive_issue_term(issues, term: str) -> bool:
     return False
 
 
+def _is_strong_collection_case(combined: str, risk_level: str) -> bool:
+    """
+    Detecta cobrança contratual documentalmente forte.
+
+    Não promete êxito; apenas evita recomendação pessimista quando há sinais
+    consistentes de contrato, saldo inadimplido, pagamento parcial,
+    reconhecimento/notificação e baixo risco técnico.
+    """
+    risk = (risk_level or "").strip().lower()
+    if risk not in {"low", "medium", "baixo", "medio", "médio"}:
+        return False
+
+    collection_terms = [
+        "ação de cobrança",
+        "cobrança contratual",
+        "saldo inadimplido",
+        "saldo principal inadimplido",
+        "saldo líquido",
+        "saldo remanescente",
+    ]
+    contract_terms = ["contrato assinado", "obrigação contratual", "relação contratual"]
+    partial_payment_terms = ["pagamento parcial", "pagamentos efetuados", "parcelas adimplidas", "comprovantes de pagamento"]
+    recognition_terms = ["reconhecimento de dívida", "reconhece a dívida", "notificação extrajudicial", "recebida sem quitação"]
+    amount_terms = ["multa", "juros", "correção monetária", "planilha de cálculo"]
+
+    return (
+        any(term in combined for term in collection_terms)
+        and any(term in combined for term in contract_terms)
+        and any(term in combined for term in partial_payment_terms)
+        and any(term in combined for term in recognition_terms)
+        and any(term in combined for term in amount_terms)
+    )
+
+
 def calculate_viability(analysis: Dict) -> Dict:
     """
     Motor premium de viabilidade processual.
@@ -228,6 +262,15 @@ def calculate_viability(analysis: Dict) -> Dict:
         else:
             label = "Baixa prontidão estratégica"
             recommendation = "Segurar ajuizamento e priorizar obtenção de provas e saneamento de riscos"
+
+        if _is_strong_collection_case(combined, risk_level):
+            score = max(score, 62)
+            probability = round(score / 100, 2)
+            label = "Viabilidade moderada com prova documental relevante"
+            recommendation = (
+                "Prosseguir com preparação do ajuizamento, após conferência documental, "
+                "cálculo atualizado e validação profissional final"
+            )
 
     return {
         "score": score,
