@@ -101,6 +101,38 @@ def _ensure_case_not_archived(case: Case):
         )
 
 
+_PUBLIC_ANALYSIS_FORBIDDEN_KEYS = {
+    "score",
+    "probability",
+    "probability_percent",
+    "success_probability",
+    "confidence_level",
+}
+
+
+def _sanitize_public_analysis_payload(payload):
+    """
+    Remove métricas numéricas de prognóstico das respostas públicas da API.
+
+    Regra de produto:
+    - interno/banco/motor: pode manter score/probabilidade para cálculo;
+    - API pública/frontend/PDF/peça: não deve expor score, probabilidade,
+      confidence_level ou equivalentes como previsão de resultado judicial.
+    """
+    if isinstance(payload, dict):
+        sanitized = {}
+        for key, value in payload.items():
+            if str(key).lower() in _PUBLIC_ANALYSIS_FORBIDDEN_KEYS:
+                continue
+            sanitized[key] = _sanitize_public_analysis_payload(value)
+        return sanitized
+
+    if isinstance(payload, list):
+        return [_sanitize_public_analysis_payload(item) for item in payload]
+
+    return payload
+
+
 @router.get(
     "",
     response_model=list[CaseOut],
@@ -280,7 +312,7 @@ def analyze_case_endpoint(
         return {
             "case_id": case.id,
             "analysis_id": existing_analysis.id,
-            "analysis": existing_analysis.analysis,
+            "analysis": _sanitize_public_analysis_payload(existing_analysis.analysis),
             "source": "cache",
         }
 
@@ -357,7 +389,7 @@ def analyze_case_endpoint(
     return {
         "case_id": case.id,
         "analysis_id": record.id,
-        "analysis": record.analysis,
+        "analysis": _sanitize_public_analysis_payload(record.analysis),
         "source": "fresh",
     }
 
@@ -457,10 +489,10 @@ def get_executive_summary(
             "case_number": case.case_number,
             "title": case.title,
         },
-        "technical_analysis": technical,
-        "strategic_analysis": strategic,
-        "viability": viability,
-        "executive_decision": decision,
+        "technical_analysis": _sanitize_public_analysis_payload(technical),
+        "strategic_analysis": _sanitize_public_analysis_payload(strategic),
+        "viability": _sanitize_public_analysis_payload(viability),
+        "executive_decision": _sanitize_public_analysis_payload(decision),
         "analysis_foundations": foundations,
     }
 
@@ -519,7 +551,7 @@ def get_executive_report(
 
     return {
         "case_id": case.id,
-        "executive_decision": decision,
+        "executive_decision": _sanitize_public_analysis_payload(decision),
         "analysis_foundations": foundations,
         "report_html": html,
     }

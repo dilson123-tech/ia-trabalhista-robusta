@@ -219,3 +219,61 @@ def test_pdf_fallback_uses_financial_risk_when_risk_level_is_missing(monkeypatch
     assert pdf_bytes.startswith(b"%PDF")
     assert any("Nivel de risco: Alto" in item for item in captured)
 
+
+
+def test_public_executive_outputs_do_not_expose_numeric_prediction_fields(monkeypatch):
+    headers = _auth_headers(monkeypatch)
+
+    create_payload = {
+        "case_number": f"PUB-NOSCORE-{uuid.uuid4().hex[:8]}",
+        "title": "Caso público sem exposição de prognóstico numérico",
+        "description": (
+            "Caso cível de cobrança contratual com contrato assinado, pagamento parcial, "
+            "saldo inadimplido, notificação extrajudicial e documentos de suporte."
+        ),
+        "legal_area": "civel",
+        "action_type": "Ação de Cobrança",
+        "status": "draft",
+    }
+
+    create_resp = client.post("/api/v1/cases", json=create_payload, headers=headers)
+    assert create_resp.status_code == 200
+    case_id = create_resp.json()["id"]
+
+    forbidden_keys = {
+        "score",
+        "probability",
+        "probability_percent",
+        "success_probability",
+        "confidence_level",
+    }
+
+    forbidden_text_fragments = [
+        "probabilidade estimada",
+        "/100",
+    ]
+
+    def assert_no_public_prediction_fields(payload):
+        def walk(obj):
+            if isinstance(obj, dict):
+                for key, value in obj.items():
+                    assert key not in forbidden_keys
+                    walk(value)
+            elif isinstance(obj, list):
+                for item in obj:
+                    walk(item)
+            elif isinstance(obj, str):
+                lowered = obj.lower()
+                for fragment in forbidden_text_fragments:
+                    assert fragment not in lowered
+
+        walk(payload)
+
+    for path in [
+        f"/api/v1/cases/{case_id}/analysis",
+        f"/api/v1/cases/{case_id}/executive-summary",
+        f"/api/v1/cases/{case_id}/executive-report",
+    ]:
+        response = client.get(path, headers=headers)
+        assert response.status_code == 200
+        assert_no_public_prediction_fields(response.json())
