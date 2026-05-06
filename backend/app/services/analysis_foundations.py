@@ -103,7 +103,6 @@ def build_analysis_foundations(
     if isinstance(legal_area, str):
         legal_area = legal_area.strip().lower() or None
     final_status = str(decision.get("final_status") or "").strip()
-    probability_percent = decision.get("probability_percent")
 
     disclaimer = (
         "Saída estruturada a partir dos fatos informados, base normativa aplicável à área selecionada "
@@ -117,8 +116,8 @@ def build_analysis_foundations(
         "analysis_context": {
             "legal_area": legal_area,
             "final_status": final_status,
-            "probability_percent": probability_percent,
             "viability_label": viability.get("label"),
+            "assessment_mode": "qualitative",
         },
         "disclaimer": disclaimer,
     }
