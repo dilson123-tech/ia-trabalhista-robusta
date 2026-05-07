@@ -49,68 +49,138 @@ def build_editor_html(document: dict, version: dict) -> str:
             <meta charset="utf-8">
             <title>{title}</title>
             <style>
+                @page {{
+                    size: A4;
+                    margin: 22mm 18mm 20mm 18mm;
+
+                    @bottom-right {{
+                        content: "Página " counter(page) " de " counter(pages);
+                        color: #6b7280;
+                        font-size: 9px;
+                    }}
+
+                    @bottom-left {{
+                        content: "Editor Jurídico Vivo";
+                        color: #6b7280;
+                        font-size: 9px;
+                    }}
+                }}
+
+                * {{
+                    box-sizing: border-box;
+                }}
+
                 body {{
-                    font-family: Arial, Helvetica, sans-serif;
-                    color: #111;
-                    background: #fff;
+                    font-family: "Times New Roman", Georgia, serif;
+                    color: #111827;
+                    background: #ffffff;
                     margin: 0;
-                    padding: 40px;
-                    line-height: 1.65;
-                    font-size: 12px;
+                    padding: 0;
+                    line-height: 1.72;
+                    font-size: 12.2px;
+                    text-rendering: optimizeLegibility;
                 }}
 
                 .doc-shell {{
-                    max-width: 860px;
+                    width: 100%;
                     margin: 0 auto;
                 }}
 
                 .doc-header {{
-                    border-bottom: 2px solid #111;
-                    padding-bottom: 16px;
-                    margin-bottom: 28px;
+                    border-top: 4px solid #0f2f4a;
+                    border-bottom: 1px solid #d1d5db;
+                    padding: 14px 0 18px 0;
+                    margin-bottom: 26px;
+                    position: relative;
+                }}
+
+                .doc-header::after {{
+                    content: "";
+                    display: block;
+                    width: 110px;
+                    height: 3px;
+                    background: #b08d2f;
+                    margin-top: 14px;
                 }}
 
                 .doc-kicker {{
-                    font-size: 11px;
+                    font-family: Arial, Helvetica, sans-serif;
+                    font-size: 9.5px;
                     text-transform: uppercase;
-                    letter-spacing: 0.08em;
+                    letter-spacing: 0.16em;
+                    color: #0f2f4a;
+                    font-weight: 700;
                     margin-bottom: 8px;
                 }}
 
                 h1 {{
-                    font-size: 24px;
-                    margin: 0 0 10px 0;
+                    font-size: 21px;
+                    line-height: 1.25;
+                    margin: 0 0 12px 0;
+                    font-weight: 700;
+                    color: #111827;
                 }}
 
                 .doc-meta {{
-                    font-size: 11px;
-                    color: #333;
+                    display: inline-block;
+                    font-family: Arial, Helvetica, sans-serif;
+                    font-size: 10.2px;
+                    color: #374151;
+                    background: #f8fafc;
+                    border: 1px solid #e5e7eb;
+                    border-left: 3px solid #b08d2f;
+                    padding: 7px 10px;
+                    border-radius: 2px;
                 }}
 
                 .doc-section {{
-                    margin-bottom: 24px;
+                    margin-bottom: 25px;
+                    page-break-inside: auto;
+                    break-inside: auto;
                 }}
 
                 .doc-section h2 {{
-                    font-size: 15px;
-                    margin: 0 0 10px 0;
+                    font-family: Arial, Helvetica, sans-serif;
+                    font-size: 12.5px;
+                    line-height: 1.35;
+                    margin: 0 0 11px 0;
+                    padding: 7px 10px;
+                    color: #0f172a;
+                    background: #f9fafb;
+                    border-left: 4px solid #0f2f4a;
+                    border-bottom: 1px solid #e5e7eb;
+                    text-transform: uppercase;
+                    letter-spacing: 0.035em;
+                }}
+
+                .doc-content {{
+                    white-space: pre-line;
+                    text-align: justify;
+                    orphans: 3;
+                    widows: 3;
                 }}
 
                 .doc-content p {{
-                    margin: 0 0 12px 0;
+                    margin: 0 0 11px 0;
                 }}
 
                 .doc-content ul,
                 .doc-content ol {{
-                    margin: 0 0 12px 20px;
+                    margin: 0 0 12px 22px;
+                    padding-left: 12px;
+                }}
+
+                .doc-content li {{
+                    margin-bottom: 6px;
                 }}
 
                 .doc-footer {{
-                    border-top: 1px solid #bbb;
-                    margin-top: 32px;
-                    padding-top: 12px;
-                    font-size: 10px;
-                    color: #555;
+                    border-top: 1px solid #d1d5db;
+                    margin-top: 34px;
+                    padding-top: 10px;
+                    font-family: Arial, Helvetica, sans-serif;
+                    font-size: 9.5px;
+                    color: #6b7280;
                 }}
             </style>
         </head>
