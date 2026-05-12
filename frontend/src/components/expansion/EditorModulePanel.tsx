@@ -656,10 +656,29 @@ export function EditorModulePanel({ token, selectedCaseId, selectedCaseArea, pie
 
       const blob = await response.blob()
       const blobUrl = window.URL.createObjectURL(blob)
-      window.open(blobUrl, '_blank', 'noopener,noreferrer')
-      window.setTimeout(() => window.URL.revokeObjectURL(blobUrl), 60000)
 
-      setVersionSuccess(`Exportação ${format.toUpperCase()} iniciada com sucesso.`)
+      const extension = format === 'pdf' ? 'pdf' : 'html'
+      const safeTitle =
+        (selectedDocument?.title ?? 'documento_editor_juridico')
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .replace(/[^a-zA-Z0-9]+/g, '_')
+          .replace(/^_+|_+$/g, '')
+          .toLowerCase() || 'documento_editor_juridico'
+      const fileName = `${safeTitle}_v${approvedVersion.version_number}.${extension}`
+
+      const downloadLink = document.createElement('a')
+      downloadLink.href = blobUrl
+      downloadLink.download = fileName
+      downloadLink.rel = 'noopener'
+      document.body.appendChild(downloadLink)
+      downloadLink.click()
+      downloadLink.remove()
+
+      window.open(blobUrl, '_blank', 'noopener,noreferrer')
+      window.setTimeout(() => window.URL.revokeObjectURL(blobUrl), 120000)
+
+      setVersionSuccess(`Exportação ${format.toUpperCase()} concluída. Arquivo: ${fileName}`)
     } catch (err) {
       setVersionError(err instanceof Error ? err.message : 'Não foi possível exportar o documento.')
     } finally {

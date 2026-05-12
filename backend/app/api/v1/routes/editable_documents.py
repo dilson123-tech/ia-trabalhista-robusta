@@ -508,6 +508,19 @@ def _build_assisted_sections(db: Session, case: Case, analysis_record, tenant_id
     signature_local = _safe_text(state_metadata.get("signature_local")) or "[Local]"
     signature_date = _safe_text(state_metadata.get("signature_date")) or "[data]"
 
+    normalized_area_text = f"{normalized_area}".lower()
+    is_labor_case = (
+        is_trabalhista_area
+        or is_trabalhista_insalubridade_periculosidade
+        or "trabalh" in normalized_area_text
+        or "reclamação trabalhista" in case_search_text
+        or "reclamacao trabalhista" in case_search_text
+        or "vara do trabalho" in case_search_text
+        or "adicional de insalubridade" in case_search_text
+        or "adicional de periculosidade" in case_search_text
+        or ("reclamante" in case_search_text and "reclamada" in case_search_text)
+    )
+
     active_parties = _load_case_active_parties(db, tenant_id, case.id)
     author_party = _select_primary_party(
         active_parties,
@@ -735,12 +748,12 @@ def _build_assisted_sections(db: Session, case: Case, analysis_record, tenant_id
         ]
     )
 
-    if is_trabalhista_area:
+    if is_labor_case:
         labor_jurisdiction = "JOINVILLE/SC" if "joinville" in case_search_text else "[LOCALIDADE A DEFINIR]"
         enderecamento = _paragraphs(
             [
                 f"EXCELENTÍSSIMO(A) SENHOR(A) DOUTOR(A) JUIZ(A) DA ___ VARA DO TRABALHO DE {labor_jurisdiction}.",
-                "Na versão final, o advogado deverá confirmar a competência territorial, a unidade judiciária competente, o rito aplicável e eventual necessidade de adequação do endereçamento antes do protocolo.",
+                "Na versão final, o advogado deverá confirmar a competência territorial, a Vara do Trabalho competente, o rito aplicável e eventual necessidade de adequação do endereçamento antes do protocolo.",
             ]
         )
 
@@ -779,6 +792,65 @@ def _build_assisted_sections(db: Session, case: Case, analysis_record, tenant_id
                 "Requer-se a realização de perícia técnica para aferir a exposição a calor, proximidade com metal em fusão, condições ambientais do setor de fusão, fornecimento, adequação e eficácia dos EPIs.",
                 "Requer-se que a reclamada seja intimada a apresentar PPP, LTCAT, PGR, PCMSO, mapa de riscos, ficha de entrega de EPI, registros de treinamento, holerites, documentos ambientais e demais registros ocupacionais do período contratual.",
                 "Na versão final, o advogado deverá ajustar valor da causa, memória de cálculo, reflexos trabalhistas, grau de insalubridade eventualmente postulado e eventual pedido subsidiário de periculosidade conforme a prova disponível.",
+            ]
+        )
+
+
+
+    # PATCH: labor_insalubridade_final_text_v1
+    if is_trabalhista_insalubridade_periculosidade:
+        resumo_fatico = _paragraphs(
+            [
+                f"Trata-se de reclamação trabalhista relacionada ao caso {case.case_number} — {case.title}, voltada à apuração de eventual direito ao adicional de insalubridade por exposição ocupacional ao calor e, de forma subsidiária, ao adicional de periculosidade, conforme as condições reais de trabalho a serem demonstradas nos autos.",
+                "O reclamante afirma ter laborado em ambiente industrial ligado ao setor de fusão, com possível exposição habitual a calor intenso, proximidade de fontes térmicas relevantes e processo produtivo envolvendo metal em fusão em temperatura aproximada de 1.500°C. Ressalta-se que essa referência diz respeito à temperatura do processo industrial, não significando, por si só, a temperatura efetivamente suportada pelo trabalhador, circunstância que deverá ser apurada por prova técnica.",
+                "Segundo a narrativa apresentada, durante o contrato de trabalho não teria havido pagamento de adicional de insalubridade ou periculosidade relacionado às condições ambientais do setor de fusão, embora o reclamante alegue ter exercido suas atividades em ambiente potencialmente agressivo à saúde e/ou à integridade física.",
+                "A controvérsia principal consiste em verificar se as condições reais de trabalho caracterizavam exposição ocupacional a calor acima dos limites juridicamente toleráveis, apta a ensejar o pagamento de adicional de insalubridade. De forma subsidiária, deverá ser analisada eventual periculosidade, caso a prova técnica identifique situação de risco acentuado juridicamente enquadrável.",
+                "Para adequada apuração dos fatos, mostra-se necessária a análise de documentos trabalhistas e ocupacionais, tais como holerites, contrato de trabalho, PPP, LTCAT, PGR, PCMSO, mapa de riscos, fichas de entrega de EPI, registros de treinamento, bem como a produção de prova testemunhal e pericial, a fim de verificar a rotina efetiva de trabalho, a frequência da exposição, a proximidade das fontes de calor, as pausas existentes, o fornecimento e a eficácia dos equipamentos de proteção.",
+            ]
+        )
+
+        pedidos = _paragraphs(
+            [
+                "Diante do exposto, requer o reclamante:",
+                "I. O reconhecimento do labor em condições insalubres, em razão da exposição ocupacional habitual a calor intenso no setor de fusão da reclamada, com condenação da reclamada ao pagamento do adicional de insalubridade em grau a ser definido por prova técnica, observados os parâmetros legais, regulamentares e periciais aplicáveis.",
+                "II. A condenação da reclamada ao pagamento das diferenças de adicional de insalubridade relativas ao período contratual indicado na narrativa fática, ou outro período que vier a ser confirmado nos autos, com apuração em liquidação de sentença.",
+                "III. De forma subsidiária, caso a prova técnica conclua pelo enquadramento da atividade em situação de risco acentuado juridicamente caracterizável como perigosa, requer o reconhecimento do direito ao adicional de periculosidade, observada a impossibilidade de cumulação automática entre os adicionais de insalubridade e periculosidade, com adoção do adicional cabível ou mais favorável, conforme validação judicial e profissional.",
+                "IV. A condenação da reclamada ao pagamento dos reflexos do adicional eventualmente reconhecido em férias acrescidas de 1/3, 13º salário, FGTS, aviso-prévio, quando cabível, e demais verbas trabalhistas de natureza salarial que sejam juridicamente aplicáveis ao caso concreto.",
+                "V. A determinação de realização de perícia técnica no ambiente de trabalho, ou por meio técnico equivalente caso inviável a inspeção direta, a fim de apurar a exposição ocupacional ao calor, a intensidade e habitualidade da exposição, a proximidade das fontes térmicas, a existência de pausas, a taxa metabólica da atividade, as condições reais do setor de fusão e a eventual neutralização do agente nocivo por equipamentos de proteção.",
+                "VI. A intimação da reclamada para apresentar todos os documentos ambientais, ocupacionais e trabalhistas relacionados ao período contratual, especialmente PPP, LTCAT, PGR, PCMSO, mapa de riscos, laudos ambientais, fichas de entrega de EPI, certificados de aprovação dos equipamentos fornecidos, registros de treinamento, registros de fiscalização de uso de EPI, holerites, contrato de trabalho, controles de jornada e demais documentos necessários à completa elucidação dos fatos.",
+                "VII. O reconhecimento de que a simples apresentação de fichas de entrega de EPI não comprova, por si só, a efetiva neutralização do agente nocivo, devendo ser analisadas a adequação, certificação, regularidade de entrega, substituição, fiscalização, treinamento e eficácia real dos equipamentos nas condições concretas de trabalho.",
+                "VIII. A autorização para produção de todos os meios de prova em direito admitidos, especialmente prova documental, testemunhal, pericial técnica e demais provas que se fizerem necessárias durante a instrução processual.",
+                "IX. A condenação da reclamada ao pagamento das parcelas deferidas com juros, correção monetária e demais acréscimos legais aplicáveis, na forma definida pela legislação e pela jurisprudência vigente no momento da liquidação.",
+                "X. A condenação da reclamada ao pagamento de honorários advocatícios sucumbenciais, nos termos da legislação trabalhista aplicável.",
+                "XI. A atribuição à causa de valor provisório a ser definido pelo advogado responsável, com possibilidade de posterior adequação após apresentação de cálculo trabalhista, documentos complementares e conclusão da prova técnica.",
+                "XII. Ao final, requer a procedência dos pedidos, nos limites da prova produzida, reconhecendo-se o direito do reclamante ao adicional cabível e às respectivas diferenças e reflexos trabalhistas.",
+            ]
+        )
+
+        provas_requerimentos = _paragraphs(
+            [
+                "Requer o reclamante a produção de todos os meios de prova em direito admitidos, especialmente prova documental, testemunhal, pericial técnica e demais provas que se fizerem necessárias no curso da instrução.",
+                "Requer, de forma específica, a realização de perícia técnica no ambiente de trabalho, ou por meio técnico equivalente caso a inspeção direta se torne inviável, a fim de apurar as condições reais de trabalho no setor de fusão da reclamada, especialmente quanto à exposição ocupacional ao calor, proximidade de fontes térmicas, habitualidade da exposição, intensidade do agente, existência de pausas, taxa metabólica da atividade, medidas de controle adotadas e eventual neutralização por equipamentos de proteção.",
+                "Requer que a perícia avalie, de forma expressa, se a exposição ocupacional ao calor ultrapassava os limites juridicamente toleráveis, observando os critérios técnicos aplicáveis, inclusive medições ambientais, parâmetros reconhecidos de avaliação térmica, rotina efetiva de trabalho e demais elementos necessários à correta caracterização da condição laboral.",
+                "Requer, ainda, que a reclamada seja intimada a apresentar todos os documentos ambientais, ocupacionais e trabalhistas relacionados ao período contratual, especialmente PPP, LTCAT, PGR, PCMSO, mapa de riscos, laudos ambientais, fichas de entrega de EPI, certificados de aprovação dos equipamentos fornecidos, registros de treinamento, registros de fiscalização de uso de EPI, controles de jornada, holerites, contrato de trabalho e demais documentos relacionados à saúde e segurança do trabalho.",
+                "Requer que seja analisada a efetiva adequação dos equipamentos de proteção eventualmente fornecidos, considerando não apenas a existência de ficha de entrega, mas também a compatibilidade do equipamento com o agente nocivo, sua certificação, periodicidade de substituição, treinamento, fiscalização de uso e capacidade real de neutralização ou redução da exposição nas condições concretas de trabalho.",
+                "Requer a oitiva de testemunhas que possam esclarecer a rotina laboral do reclamante, a frequência da exposição ao calor, a proximidade das fontes térmicas, as condições do setor de fusão, o uso ou não de equipamentos de proteção, a existência de pausas, a fiscalização pela reclamada e demais fatos relevantes à apuração da insalubridade ou, subsidiariamente, da periculosidade.",
+                "Requer que eventual ausência, incompletude ou inconsistência dos documentos ambientais e ocupacionais seja considerada na valoração da prova, especialmente quando tais documentos estiverem sob guarda ou responsabilidade da reclamada.",
+                "Por fim, requer que todas as provas produzidas sejam analisadas em conjunto, a fim de permitir a correta apuração das condições reais de trabalho, do adicional eventualmente devido, dos reflexos trabalhistas cabíveis e dos valores a serem apurados em liquidação, sempre com observância da prova técnica, documental e testemunhal produzida nos autos.",
+            ]
+        )
+
+        fechamento = _paragraphs(
+            [
+                "Diante de todo o exposto, requer o reclamante o regular processamento da presente reclamação trabalhista, com a citação da reclamada para, querendo, apresentar defesa, sob pena de revelia e confissão quanto à matéria de fato, na forma da legislação aplicável.",
+                "Requer, ao final, sejam julgados procedentes os pedidos formulados, reconhecendo-se o direito do reclamante ao adicional de insalubridade por exposição ocupacional ao calor, em grau a ser apurado por prova técnica, ou, subsidiariamente, ao adicional de periculosidade, caso constatado enquadramento jurídico próprio, com o pagamento das diferenças correspondentes e respectivos reflexos trabalhistas.",
+                "Requer, ainda, a produção de todos os meios de prova em direito admitidos, especialmente prova documental, testemunhal e pericial técnica, sem prejuízo de outras provas que se mostrarem necessárias no curso da instrução processual.",
+                f"Dá-se à causa o valor provisório de R$ {cause_value}, sujeito a posterior adequação conforme memória de cálculo, documentos complementares, prova técnica e liquidação dos pedidos.",
+                f"Por fim, requer que todas as intimações e publicações sejam realizadas em nome de {lawyer_name}, inscrito na OAB/{lawyer_uf} sob o nº {lawyer_oab}, sob pena de nulidade, caso aplicável.",
+                "Termos em que,",
+                "Pede deferimento.",
+                f"{signature_local}, {signature_date}.",
+                f"{lawyer_name}\nOAB/{lawyer_uf} {lawyer_oab}",
             ]
         )
 

@@ -83,6 +83,7 @@ def build_editor_html(document: dict, version: dict) -> str:
 
                 .doc-shell {{
                     width: 100%;
+                    max-width: 168mm;
                     margin: 0 auto;
                 }}
 
@@ -174,6 +175,22 @@ def build_editor_html(document: dict, version: dict) -> str:
                     margin-bottom: 6px;
                 }}
 
+                @media screen {{
+                    body {{
+                        background: #e5e7eb !important;
+                        padding: 28px 0 !important;
+                    }}
+
+                    .doc-shell {{
+                        background: #ffffff;
+                        width: 794px;
+                        max-width: calc(100vw - 32px);
+                        min-height: 1123px;
+                        padding: 56px 64px;
+                        box-shadow: 0 18px 45px rgba(15, 23, 42, 0.18);
+                    }}
+                }}
+
                 .doc-footer {{
                     border-top: 1px solid #d1d5db;
                     margin-top: 34px;
@@ -228,8 +245,9 @@ def generate_editor_pdf(html: str) -> bytes:
             normalized = unicodedata.normalize("NFKD", normalized)
             return normalized.encode("latin-1", "ignore").decode("latin-1")
 
-        pdf = FPDF()
-        pdf.set_auto_page_break(auto=True, margin=15)
+        pdf = FPDF(format="A4")
+        pdf.set_margins(18, 22, 18)
+        pdf.set_auto_page_break(auto=True, margin=18)
         pdf.add_page()
         pdf.set_font("Helvetica", size=10)
 
@@ -241,7 +259,9 @@ def generate_editor_pdf(html: str) -> bytes:
             if not line:
                 pdf.ln(2)
                 continue
-            pdf.multi_cell(0, 5, line)
+            usable_width = pdf.w - pdf.l_margin - pdf.r_margin
+            pdf.multi_cell(usable_width, 5, line)
+            pdf.set_x(pdf.l_margin)
 
         output = pdf.output(dest="S")
         return output if isinstance(output, bytes) else output.encode("latin-1", "ignore")
