@@ -410,9 +410,27 @@ def _build_assisted_sections(db: Session, case: Case, analysis_record, tenant_id
         ]
     ).lower()
     is_civel_area = normalized_area in {"civel", "civil_ambiental"}
+    is_trabalhista_area = normalized_area in {"trabalhista", "trabalho", "laboral"}
     is_civel_cobranca = is_civel_area and any(
         marker in case_search_text
         for marker in ["cobran", "inadimpl", "dívida", "divida", "saldo contratual", "contrato de prestação"]
+    )
+    is_trabalhista_insalubridade_periculosidade = is_trabalhista_area and any(
+        marker in case_search_text
+        for marker in [
+            "insalubr",
+            "periculos",
+            "calor",
+            "fusão",
+            "fusao",
+            "metal em fusão",
+            "metal em fusao",
+            "epi",
+            "ppp",
+            "ltcat",
+            "pgr",
+            "pcmso",
+        ]
     )
     controverted_points = list(dict.fromkeys([item for item in [*issues, *critical_points] if item]))
     proof_checklist = list(dict.fromkeys([item for item in [*probative_gaps, *next_steps] if item]))
@@ -450,6 +468,34 @@ def _build_assisted_sections(db: Session, case: Case, analysis_record, tenant_id
             cleaned_proof_checklist.append(item_text)
 
         proof_checklist = list(dict.fromkeys([item for item in cleaned_proof_checklist if item]))
+
+    if is_trabalhista_insalubridade_periculosidade:
+        labor_proof_checklist = []
+        for item in proof_checklist:
+            item_text = str(item or "").strip()
+            item_lower = item_text.lower()
+
+            if "laudo/relatório médico" in item_lower or "relatório médico" in item_lower:
+                labor_proof_checklist.append(
+                    "Necessidade de prova técnica ambiental/pericial para aferir exposição a calor, proximidade com metal em fusão, condições do setor de fusão e eventual neutralização por EPI."
+                )
+                continue
+
+            if "persistência da conduta" in item_lower:
+                labor_proof_checklist.append(
+                    "Necessidade de confirmação da rotina real de trabalho, frequência da exposição, distância da fonte de calor, EPIs fornecidos e eficácia da proteção."
+                )
+                continue
+
+            labor_proof_checklist.append(item_text)
+
+        labor_proof_checklist.extend(
+            [
+                "Necessidade de obtenção e análise de PPP, LTCAT, PGR, PCMSO, mapa de riscos e ficha de entrega de EPI.",
+                "Necessidade de cálculo trabalhista preliminar considerando adicional de insalubridade em grau eventualmente apurado, ou periculosidade de forma subsidiária, com reflexos em férias + 1/3, 13º salário, FGTS e demais verbas cabíveis.",
+            ]
+        )
+        proof_checklist = list(dict.fromkeys([item for item in labor_proof_checklist if item]))
 
     active_parties = _load_case_active_parties(db, tenant_id, case.id)
     state_metadata = _load_case_state_metadata(db, tenant_id, case.id)
@@ -688,6 +734,54 @@ def _build_assisted_sections(db: Session, case: Case, analysis_record, tenant_id
             f"{lawyer_name} — OAB/{lawyer_uf} {lawyer_oab}.",
         ]
     )
+
+    if is_trabalhista_area:
+        labor_jurisdiction = "JOINVILLE/SC" if "joinville" in case_search_text else "[LOCALIDADE A DEFINIR]"
+        enderecamento = _paragraphs(
+            [
+                f"EXCELENTÍSSIMO(A) SENHOR(A) DOUTOR(A) JUIZ(A) DA ___ VARA DO TRABALHO DE {labor_jurisdiction}.",
+                "Na versão final, o advogado deverá confirmar a competência territorial, a unidade judiciária competente, o rito aplicável e eventual necessidade de adequação do endereçamento antes do protocolo.",
+            ]
+        )
+
+    if is_trabalhista_insalubridade_periculosidade:
+        fundamentacao = _paragraphs(
+            [
+                "I. Do cabimento da pretensão trabalhista. À luz do quadro fático narrado, a demanda deve ser estruturada como reclamação trabalhista voltada à apuração de adicional de insalubridade por exposição a calor intenso e, de forma subsidiária, adicional de periculosidade caso a prova técnica demonstre risco acentuado juridicamente enquadrável.",
+                "II. Dos fundamentos normativos aplicáveis. A pretensão deve observar a CLT, a Constituição Federal, as Normas Regulamentadoras de saúde e segurança do trabalho, especialmente os parâmetros técnicos relacionados à insalubridade, periculosidade, fornecimento de EPI, prova pericial e documentação ambiental/ocupacional.",
+                "III. Da estratégia jurídica sugerida. A condução da tese deve priorizar prova técnica, documentação ocupacional e cálculo trabalhista preliminar, sem promessa de resultado judicial e com validação profissional antes do protocolo.",
+                _series_block("IV. Dos pontos controvertidos que exigem enfrentamento direto:", controverted_points, limit=6),
+                _series_block("V. Das lacunas probatórias a suprir antes do protocolo definitivo:", proof_checklist, limit=6),
+                (
+                    f"VI. Da síntese conclusiva considerada na redação. {executive_summary}"
+                    if executive_summary and "dados insuficientes" not in executive_summary.lower()
+                    else ""
+                ),
+            ]
+        )
+
+        pedidos = _paragraphs(
+            [
+                "I. Requer-se o reconhecimento do direito ao adicional de insalubridade, em grau a ser apurado por prova técnica, em razão da exposição habitual a calor intenso no setor de fusão.",
+                "II. Subsidiariamente, caso a prova técnica indique enquadramento em situação de risco acentuado, requer-se a análise do adicional de periculosidade, observada a impossibilidade de cumulação entre insalubridade e periculosidade.",
+                "III. Requer-se a condenação da reclamada ao pagamento das diferenças de adicional eventualmente reconhecidas no período contratual indicado na narrativa fática.",
+                "IV. Requer-se a condenação da reclamada ao pagamento dos reflexos do adicional reconhecido em férias acrescidas de 1/3, 13º salário, FGTS e demais verbas trabalhistas cabíveis, conforme cálculo a ser apresentado e revisado pelo advogado.",
+                "V. Requer-se a produção de prova pericial técnica no ambiente de trabalho, ou por meio técnico equivalente, a fim de verificar exposição a calor, condições do setor de fusão, fornecimento e eficácia dos EPIs.",
+                "VI. Requer-se que a reclamada apresente PPP, LTCAT, PGR, PCMSO, mapa de riscos, ficha de entrega de EPI, registros de treinamento, holerites e demais documentos ambientais e ocupacionais relacionados ao período contratual.",
+                "VII. Requer-se a produção de prova documental, testemunhal e pericial, sem prejuízo de outros meios de prova admitidos em direito.",
+                "VIII. Requer-se, ao final, a procedência dos pedidos, nos limites da prova produzida, com juros, correção monetária, custas e demais cominações legais aplicáveis.",
+            ]
+        )
+
+        provas_requerimentos = _paragraphs(
+            [
+                "Requer-se a produção de todos os meios de prova em direito admitidos, especialmente prova documental, testemunhal e pericial técnica.",
+                "Requer-se a realização de perícia técnica para aferir a exposição a calor, proximidade com metal em fusão, condições ambientais do setor de fusão, fornecimento, adequação e eficácia dos EPIs.",
+                "Requer-se que a reclamada seja intimada a apresentar PPP, LTCAT, PGR, PCMSO, mapa de riscos, ficha de entrega de EPI, registros de treinamento, holerites, documentos ambientais e demais registros ocupacionais do período contratual.",
+                "Na versão final, o advogado deverá ajustar valor da causa, memória de cálculo, reflexos trabalhistas, grau de insalubridade eventualmente postulado e eventual pedido subsidiário de periculosidade conforme a prova disponível.",
+            ]
+        )
+
 
     return [
         {

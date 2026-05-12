@@ -277,3 +277,112 @@ def test_civel_cobranca_assisted_draft_uses_collection_specific_guardrails(monke
     ]
     for term in forbidden_terms:
         assert term not in combined_text
+
+
+def test_trabalhista_insalubridade_assisted_draft_uses_labor_template(monkeypatch):
+    headers = _auth_headers(monkeypatch)
+
+    create_case_payload = {
+        "case_number": f"TRAB-INSAL-{uuid.uuid4().hex[:8]}",
+        "title": "Adicional de insalubridade/periculosidade — setor de fusão",
+        "description": (
+            "Parte reclamante trabalhou para Tupy S.A., em Joinville/SC, no setor de fusão, "
+            "com processo produtivo envolvendo metal em fusão e exposição a calor intenso. "
+            "O período trabalhado foi de fevereiro de 2024 a julho de 2024, com salário de "
+            "R$ 2.200,00. A pretensão envolve adicional de insalubridade por calor e, "
+            "subsidiariamente, periculosidade, com necessidade de PPP, LTCAT, PGR, PCMSO, "
+            "ficha de EPI, perícia técnica, prova testemunhal e reflexos em férias, 13º e FGTS."
+        ),
+        "legal_area": "trabalhista",
+        "action_type": "Reclamação trabalhista — adicional de insalubridade/periculosidade",
+        "status": "draft",
+    }
+
+    r_case = client.post("/api/v1/cases", json=create_case_payload, headers=headers)
+    assert r_case.status_code == 200
+    case_id = r_case.json()["id"]
+
+    create_document_payload = {
+        "case_id": case_id,
+        "area": "trabalhista",
+        "document_type": "peticao_inicial",
+        "title": "Reclamação Trabalhista — Adicional de Insalubridade/Periculosidade",
+        "notes": "Documento criado para regressão de template trabalhista.",
+        "metadata": {"source": "test_trabalhista_insalubridade_template"},
+        "sections": [
+            {
+                "key": "resumo_fatico",
+                "title": "Resumo Fático",
+                "content": "",
+                "source": "manual",
+                "status": "draft",
+                "metadata": {},
+            },
+            {
+                "key": "fundamentacao",
+                "title": "Fundamentação",
+                "content": "",
+                "source": "manual",
+                "status": "draft",
+                "metadata": {},
+            },
+            {
+                "key": "pedidos",
+                "title": "Pedidos",
+                "content": "",
+                "source": "manual",
+                "status": "draft",
+                "metadata": {},
+            },
+        ],
+    }
+
+    r_create_doc = client.post(
+        "/api/v1/editable-documents",
+        json=create_document_payload,
+        headers=headers,
+    )
+    assert r_create_doc.status_code == 200
+    document_id = r_create_doc.json()["id"]
+
+    r_generate = client.post(
+        f"/api/v1/editable-documents/{document_id}/generate-assisted-draft",
+        headers=headers,
+    )
+    assert r_generate.status_code == 200
+
+    generated = r_generate.json()
+    latest_version = max(generated["versions"], key=lambda item: item["version_number"])
+    combined_text = "\\n".join(
+        (section.get("content") or "")
+        for section in latest_version["sections"]
+    ).lower()
+
+    required_terms = [
+        "vara do trabalho",
+        "reclamação trabalhista",
+        "insalubridade",
+        "periculosidade",
+        "perícia técnica",
+        "ppp",
+        "ltcat",
+        "pgr",
+        "pcmso",
+        "epi",
+        "fgts",
+        "13º",
+    ]
+    for term in required_terms:
+        assert term in combined_text
+
+    forbidden_terms = [
+        "juiz(a) de direito",
+        "vara cível",
+        "varas cíveis",
+        "ação de cobrança",
+        "saldo contratual",
+        "alfa reformas",
+        "beta comércio",
+    ]
+    for term in forbidden_terms:
+        assert term not in combined_text
