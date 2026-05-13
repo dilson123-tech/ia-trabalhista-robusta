@@ -32,28 +32,69 @@ def _base_normativa_for_area(legal_area: str | None) -> list[str]:
 
 def _elementos_faticos(case: dict[str, Any], technical: dict[str, Any]) -> list[str]:
     description = str(case.get("description") or "").lower()
-    summary = str(technical.get("summary") or "")
+    legal_area = str(case.get("legal_area") or technical.get("legal_area") or "").strip().lower()
     elements: list[str] = []
 
-    keyword_map = [
-        ("poeira", "Relato de emissão de poeira/material particulado no imóvel vizinho."),
-        ("cimento", "Indicação de poeira de cimento associada à atividade industrial da parte ré."),
-        ("ruído", "Relato de ruído contínuo com impacto no sossego e no repouso."),
-        ("barulho", "Relato de perturbação sonora associada à atividade da ré."),
-        ("visibilidade", "Relato de obstrução de visibilidade e interferência na segurança da via."),
-        ("veículos", "Relato de veículos/materiais posicionados de forma potencialmente lesiva à segurança."),
-        ("muro", "Relato de ausência de muro/barreira física entre os imóveis."),
-        ("barreira", "Relato de ausência de barreira física de contenção."),
-        ("idosa", "Presença de pessoa idosa entre os afetados pelo caso."),
-        ("pulmon", "Indicação de problema pulmonar relevante para urgência e nexo de dano."),
-        ("notificação", "Existência de tentativa prévia extrajudicial narrada no caso."),
-        ("extrajudicial", "Tentativa extrajudicial prévia considerada na leitura estratégica."),
-    ]
-
-    for key, label in keyword_map:
-        if key in description and label not in elements:
+    def add_when(term: str, label: str) -> None:
+        if term in description and label not in elements:
             elements.append(label)
 
+    if legal_area == "civil_ambiental":
+        civil_environmental_map = [
+            ("poeira", "Relato de emissão de poeira/material particulado no imóvel vizinho."),
+            ("cimento", "Indicação de poeira de cimento associada à atividade industrial da parte ré."),
+            ("ruído", "Relato de ruído contínuo com impacto no sossego e no repouso."),
+            ("barulho", "Relato de perturbação sonora associada à atividade da ré."),
+            ("visibilidade", "Relato de obstrução de visibilidade e interferência na segurança da via."),
+            ("veículos", "Relato de veículos/materiais posicionados de forma potencialmente lesiva à segurança."),
+            ("muro", "Relato de ausência de muro/barreira física entre os imóveis."),
+            ("barreira", "Relato de ausência de barreira física de contenção."),
+            ("idosa", "Presença de pessoa idosa entre os afetados pelo caso."),
+            ("pulmon", "Indicação de problema pulmonar relevante para urgência e nexo de dano."),
+            ("notificação", "Existência de tentativa prévia extrajudicial narrada no caso."),
+            ("extrajudicial", "Tentativa extrajudicial prévia considerada na leitura estratégica."),
+        ]
+
+        for key, label in civil_environmental_map:
+            add_when(key, label)
+
+    elif legal_area == "trabalhista":
+        labor_map = [
+            ("fgts não recolhido", "Relato de possível ausência ou irregularidade nos depósitos de FGTS."),
+            ("fgts nao recolhido", "Relato de possível ausência ou irregularidade nos depósitos de FGTS."),
+            ("extrato analítico", "Indicação de necessidade de confronto com extrato analítico do FGTS."),
+            ("extrato analitico", "Indicação de necessidade de confronto com extrato analítico do FGTS."),
+            ("conta vinculada", "Discussão relacionada à regularidade da conta vinculada do FGTS."),
+            ("gfip", "Necessidade de conferência de GFIP/SEFIP/eSocial ou comprovantes de recolhimento."),
+            ("sefip", "Necessidade de conferência de GFIP/SEFIP/eSocial ou comprovantes de recolhimento."),
+            ("esocial", "Necessidade de conferência de GFIP/SEFIP/eSocial ou comprovantes de recolhimento."),
+            ("horas extras", "Relato de possível jornada extraordinária não quitada integralmente."),
+            ("jornada", "Discussão relacionada à jornada efetivamente cumprida."),
+            ("intervalo intrajornada", "Relato de possível irregularidade no intervalo intrajornada."),
+            ("controle de ponto", "Necessidade de conferência dos controles de ponto e registros de jornada."),
+            ("verbas rescisórias", "Discussão relacionada a verbas rescisórias possivelmente inadimplidas."),
+            ("verbas rescisorias", "Discussão relacionada a verbas rescisórias possivelmente inadimplidas."),
+            ("dispensa sem justa causa", "Relato de dispensa sem justa causa com possíveis efeitos rescisórios."),
+            ("insalubridade", "Discussão relacionada a possível adicional de insalubridade."),
+            ("periculosidade", "Discussão relacionada a possível adicional de periculosidade."),
+            ("calor", "Relato de possível exposição ocupacional a calor."),
+        ]
+
+        for key, label in labor_map:
+            add_when(key, label)
+
+    else:
+        generic_map = [
+            ("contrato", "Existência de relação contratual narrada no caso."),
+            ("pagamento", "Discussão relacionada a pagamentos, valores ou inadimplemento."),
+            ("notificação", "Existência de tentativa prévia extrajudicial narrada no caso."),
+            ("extrajudicial", "Tentativa extrajudicial prévia considerada na leitura estratégica."),
+        ]
+
+        for key, label in generic_map:
+            add_when(key, label)
+
+    summary = str(technical.get("summary") or "")
     if summary and "tutela de urgência" in summary.lower():
         elements.append("A análise técnica identificou plausibilidade de tutela de urgência conforme os fatos narrados.")
 
@@ -61,7 +102,6 @@ def _elementos_faticos(case: dict[str, Any], technical: dict[str, Any]) -> list[
         elements.append("Foram considerados os fatos narrados no cadastro do caso e na síntese técnica consolidada.")
 
     return elements[:6]
-
 
 def _lacunas_probatorias(technical: dict[str, Any]) -> list[str]:
     issues = [str(item).strip() for item in (technical.get("issues") or []) if str(item).strip()]
