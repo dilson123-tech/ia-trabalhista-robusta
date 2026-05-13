@@ -470,33 +470,41 @@ def _build_assisted_sections(db: Session, case: Case, analysis_record, tenant_id
         proof_checklist = list(dict.fromkeys([item for item in cleaned_proof_checklist if item]))
 
 
-    is_trabalhista_verbas_rescisorias = is_trabalhista_area and any(
-        term in case_search_text
-        for term in [
-            "verbas rescisórias",
-            "verbas rescisorias",
-            "rescisão",
-            "rescisao",
-            "rescisórias",
-            "rescisorias",
-            "dispensa sem justa causa",
-            "saldo de salário",
-            "saldo de salario",
-            "aviso-prévio",
-            "aviso previo",
-            "13º salário",
-            "13o salario",
-            "multa de 40",
-            "multa rescisória",
-            "multa rescisoria",
-            "art. 477",
-            "art. 467",
-            "seguro-desemprego",
-            "seguro desemprego",
-            "trct",
-        ]
+    is_trabalhista_verbas_rescisorias = is_trabalhista_area and (
+        any(
+            term in case_search_text
+            for term in [
+                "verbas rescisórias",
+                "verbas rescisorias",
+                "dispensa sem justa causa",
+                "saldo de salário",
+                "saldo de salario",
+                "aviso-prévio",
+                "aviso previo",
+                "aviso prévio",
+                "13º salário",
+                "13o salario",
+                "art. 477",
+                "art. 467",
+            ]
+        )
+        or (
+            ("rescisão" in case_search_text or "rescisao" in case_search_text)
+            and any(
+                term in case_search_text
+                for term in [
+                    "saldo de salário",
+                    "saldo de salario",
+                    "aviso-prévio",
+                    "aviso previo",
+                    "férias proporcionais",
+                    "ferias proporcionais",
+                    "13º salário",
+                    "13o salario",
+                ]
+            )
+        )
     )
-
 
     is_trabalhista_horas_extras = is_trabalhista_area and any(
         term in case_search_text
@@ -520,6 +528,39 @@ def _build_assisted_sections(db: Session, case: Case, analysis_record, tenant_id
             "adicional de horas extras",
             "escala de trabalho",
             "escalas de trabalho",
+        ]
+    )
+
+
+    is_trabalhista_fgts_nao_recolhido = is_trabalhista_area and any(
+        term in case_search_text
+        for term in [
+            "fgts não recolhido",
+            "fgts nao recolhido",
+            "depósitos de fgts",
+            "depositos de fgts",
+            "depósitos mensais de fgts",
+            "depositos mensais de fgts",
+            "depósitos parciais",
+            "depositos parciais",
+            "depósitos irregulares",
+            "depositos irregulares",
+            "ausência de depósitos",
+            "ausencia de depositos",
+            "extrato analítico do fgts",
+            "extrato analitico do fgts",
+            "extrato do fgts",
+            "conta vinculada",
+            "saldo fundiário",
+            "saldo fundiario",
+            "regularização de depósitos",
+            "regularizacao de depositos",
+            "diferenças de fgts",
+            "diferencas de fgts",
+            "gfip",
+            "sefip",
+            "esocial",
+            "recolhimento de fgts",
         ]
     )
 
@@ -581,6 +622,13 @@ def _build_assisted_sections(db: Session, case: Case, analysis_record, tenant_id
         or "jornada excedente" in case_search_text
         or "intervalo intrajornada" in case_search_text
         or "controle de ponto" in case_search_text
+        or "fgts não recolhido" in case_search_text
+        or "fgts nao recolhido" in case_search_text
+        or "extrato analítico do fgts" in case_search_text
+        or "extrato analitico do fgts" in case_search_text
+        or "depósitos de fgts" in case_search_text
+        or "depositos de fgts" in case_search_text
+        or "conta vinculada" in case_search_text
         or ("reclamante" in case_search_text and "reclamada" in case_search_text)
     )
 
@@ -1050,6 +1098,74 @@ def _build_assisted_sections(db: Session, case: Case, analysis_record, tenant_id
                 "Diante de todo o exposto, requer o reclamante o regular processamento da presente reclamação trabalhista, com a citação da reclamada para, querendo, apresentar defesa, sob pena de revelia e confissão quanto à matéria de fato, na forma da legislação aplicável.",
                 "Requer, ao final, sejam julgados procedentes os pedidos formulados, condenando-se a reclamada ao pagamento das horas extras devidas, diferenças de jornada, intervalo intrajornada irregular, reflexos trabalhistas e demais parcelas reconhecidas nos autos.",
                 "Requer, ainda, a produção de todos os meios de prova em direito admitidos, especialmente prova documental, testemunhal e depoimento pessoal da reclamada, sem prejuízo de outras provas que se mostrarem necessárias no curso da instrução.",
+                f"Dá-se à causa o valor provisório de R$ {cause_value}, sujeito a posterior adequação conforme memória de cálculo, documentos complementares e liquidação dos pedidos.",
+                f"Por fim, requer que todas as intimações e publicações sejam realizadas em nome de {lawyer_name}, inscrito na OAB/{lawyer_uf} sob o nº {lawyer_oab}, sob pena de nulidade, caso aplicável.",
+                "Termos em que,",
+                "Pede deferimento.",
+                f"{signature_local}, {signature_date}.",
+                f"{lawyer_name}\nOAB/{lawyer_uf} {lawyer_oab}",
+            ]
+        )
+
+
+    # PATCH: labor_fgts_nao_recolhido_final_text_v1
+    if is_trabalhista_fgts_nao_recolhido:
+        resumo_fatico = _paragraphs(
+            [
+                f"Trata-se de reclamação trabalhista relacionada ao caso {case.case_number} — {case.title}, voltada à cobrança, regularização ou indenização de depósitos de FGTS não recolhidos, recolhidos parcialmente ou realizados de forma irregular durante o contrato de trabalho.",
+                "Segundo a narrativa apresentada, o reclamante afirma que, ao consultar o extrato analítico da conta vinculada do FGTS, identificou ausência de depósitos em determinados meses do contrato, valores inferiores aos devidos ou períodos sem movimentação compatível com a remuneração recebida.",
+                "O reclamante sustenta que a irregularidade no recolhimento do FGTS prejudicou a formação do saldo fundiário e a regularidade das obrigações trabalhistas da empregadora, sendo necessária a conferência mês a mês entre remuneração, holerites, extrato analítico e comprovantes de recolhimento.",
+                "De forma subsidiária ou condicionada, caso confirmada dispensa sem justa causa, deverá ser analisada eventual diferença na multa rescisória de 40% sobre o FGTS, limitada ao saldo e às diferenças efetivamente reconhecidas.",
+                "A controvérsia principal consiste em verificar se houve ausência total ou parcial de depósitos de FGTS, se os valores recolhidos correspondem à remuneração mensal devida, quais competências apresentam inconsistência e se há diferenças a serem recolhidas, regularizadas ou indenizadas.",
+                "Para adequada apuração dos fatos, mostra-se necessária a análise de CTPS ou contrato de trabalho, holerites, extrato analítico completo do FGTS, comprovantes de pagamento salarial, documentos rescisórios, GFIP, SEFIP, eSocial, comprovantes de recolhimento e demais documentos sob guarda da empregadora.",
+            ]
+        )
+
+        fundamentacao = _paragraphs(
+            [
+                "I. Do cabimento da reclamação trabalhista. À luz do quadro fático narrado, a demanda deve ser estruturada como reclamação trabalhista voltada à apuração de depósitos de FGTS não recolhidos, recolhidos parcialmente ou realizados de forma irregular durante o contrato de trabalho.",
+                "II. Da obrigação de recolhimento do FGTS. O empregador possui dever de realizar os depósitos fundiários incidentes sobre a remuneração do empregado, cabendo apurar, por documentos e cálculo técnico, se houve regularidade dos recolhimentos durante todo o período contratual discutido.",
+                "III. Das diferenças de FGTS. A existência de diferenças deve ser verificada mediante confronto entre extrato analítico da conta vinculada, holerites, remuneração mensal, comprovantes de recolhimento, documentos fiscais/trabalhistas e demais registros apresentados pelas partes.",
+                "IV. Da exibição documental. Considerando que documentos como GFIP, SEFIP, eSocial, comprovantes de recolhimento, fichas financeiras e registros funcionais podem estar sob guarda da reclamada, mostra-se cabível requerer sua apresentação para completa apuração das competências e valores devidos.",
+                "V. Da multa rescisória de 40%, se cabível. A multa de 40% sobre o FGTS somente deverá ser analisada caso confirmada a modalidade rescisória que a autorize, especialmente dispensa sem justa causa, e deverá incidir sobre o saldo e diferenças efetivamente reconhecidos, conforme cálculo trabalhista.",
+                "VI. Da necessidade de cálculo trabalhista. A quantificação depende de cálculo mês a mês, com apuração das competências sem recolhimento, valores recolhidos a menor, base remuneratória, atualização, juros e eventual repercussão na multa rescisória, quando cabível.",
+                "VII. Da síntese da tese. A pretensão deve ser conduzida com cautela técnica, sem promessa de resultado judicial, condicionando a conclusão à prova documental, ao extrato analítico completo, à exibição de documentos pela reclamada e à validação profissional antes do protocolo definitivo.",
+            ]
+        )
+
+        pedidos = _paragraphs(
+            [
+                "Diante do exposto, requer o reclamante:",
+                "I. O reconhecimento da existência de ausência, insuficiência ou irregularidade nos depósitos de FGTS durante o contrato de trabalho, conforme apuração documental e cálculo trabalhista.",
+                "II. A condenação da reclamada ao recolhimento, regularização ou pagamento indenizado das diferenças de FGTS devidas no período contratual, conforme competências apuradas e valores identificados no extrato analítico da conta vinculada.",
+                "III. A determinação para que a reclamada apresente comprovantes de recolhimento de FGTS, GFIP, SEFIP, eSocial, fichas financeiras, registros funcionais, holerites, recibos salariais e demais documentos necessários à conferência das competências discutidas.",
+                "IV. A condenação da reclamada ao pagamento das diferenças de FGTS apuradas mês a mês, considerando a remuneração devida, verbas salariais integrantes da base de cálculo e valores já eventualmente recolhidos.",
+                "V. Caso confirmada dispensa sem justa causa ou hipótese legal equivalente, a condenação da reclamada ao pagamento das diferenças da multa rescisória de 40% sobre o FGTS, calculada sobre o saldo e as diferenças reconhecidas.",
+                "VI. A regularização da conta vinculada do FGTS do reclamante, quando tecnicamente possível, ou, subsidiariamente, o pagamento indenizado das diferenças correspondentes.",
+                "VII. A produção de prova documental, contábil, testemunhal e demais meios de prova admitidos em direito, especialmente para apuração da remuneração, das competências sem recolhimento e dos valores devidos.",
+                "VIII. A condenação da reclamada ao pagamento das parcelas deferidas com juros, correção monetária e demais acréscimos legais aplicáveis, conforme critérios definidos na fase própria.",
+                "IX. A condenação da reclamada ao pagamento de honorários advocatícios sucumbenciais, nos termos da legislação trabalhista aplicável.",
+                "X. Ao final, requer a procedência dos pedidos, nos limites da prova produzida, com apuração dos valores em liquidação ou mediante cálculo trabalhista revisado.",
+            ]
+        )
+
+        provas_requerimentos = _paragraphs(
+            [
+                "Requer o reclamante a produção de todos os meios de prova em direito admitidos, especialmente prova documental, contábil, testemunhal, depoimento pessoal da reclamada e demais provas necessárias à apuração da regularidade dos depósitos de FGTS.",
+                "Requer a juntada e análise de CTPS ou contrato de trabalho, holerites, comprovantes de pagamento salarial, extrato analítico completo do FGTS, termo de rescisão, quando houver, comprovantes de recolhimento, GFIP, SEFIP, eSocial, fichas financeiras e demais documentos relacionados à remuneração e aos recolhimentos fundiários.",
+                "Requer que a reclamada seja intimada a apresentar todos os documentos sob sua guarda relacionados ao FGTS, inclusive comprovantes de recolhimento por competência, GFIP, SEFIP, eSocial, fichas financeiras, folhas de pagamento, registros funcionais e demais documentos necessários à conferência dos depósitos.",
+                "Requer que seja promovido cálculo trabalhista, ainda que preliminar, para apurar competências sem recolhimento, depósitos realizados a menor, base remuneratória, atualização, juros e eventual diferença de multa rescisória de 40%, se cabível.",
+                "Requer que eventual ausência, incompletude ou inconsistência dos comprovantes de recolhimento seja considerada na valoração da prova, especialmente quando tais documentos estiverem sob guarda ou responsabilidade da reclamada.",
+                "Requer a oitiva de testemunhas, caso necessário, para esclarecer a rotina contratual, remuneração, comunicações internas sobre FGTS e demais fatos relevantes, sem prejuízo da prioridade da prova documental e contábil.",
+                "Por fim, requer que todas as provas sejam analisadas em conjunto, a fim de permitir a correta apuração das diferenças de FGTS, da regularização da conta vinculada, dos valores indenizáveis e das parcelas acessórias eventualmente cabíveis.",
+            ]
+        )
+
+        fechamento = _paragraphs(
+            [
+                "Diante de todo o exposto, requer o reclamante o regular processamento da presente reclamação trabalhista, com a citação da reclamada para, querendo, apresentar defesa, sob pena de revelia e confissão quanto à matéria de fato, na forma da legislação aplicável.",
+                "Requer, ao final, sejam julgados procedentes os pedidos formulados, condenando-se a reclamada ao recolhimento, regularização ou pagamento indenizado das diferenças de FGTS devidas, bem como à diferença da multa rescisória de 40%, caso cabível e comprovada a hipótese legal correspondente.",
+                "Requer, ainda, a produção de todos os meios de prova em direito admitidos, especialmente prova documental, contábil, testemunhal e depoimento pessoal da reclamada, sem prejuízo de outras provas que se mostrarem necessárias no curso da instrução.",
                 f"Dá-se à causa o valor provisório de R$ {cause_value}, sujeito a posterior adequação conforme memória de cálculo, documentos complementares e liquidação dos pedidos.",
                 f"Por fim, requer que todas as intimações e publicações sejam realizadas em nome de {lawyer_name}, inscrito na OAB/{lawyer_uf} sob o nº {lawyer_oab}, sob pena de nulidade, caso aplicável.",
                 "Termos em que,",
