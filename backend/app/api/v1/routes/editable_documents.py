@@ -469,6 +469,35 @@ def _build_assisted_sections(db: Session, case: Case, analysis_record, tenant_id
 
         proof_checklist = list(dict.fromkeys([item for item in cleaned_proof_checklist if item]))
 
+
+    is_trabalhista_verbas_rescisorias = is_trabalhista_area and any(
+        term in case_search_text
+        for term in [
+            "verbas rescisórias",
+            "verbas rescisorias",
+            "rescisão",
+            "rescisao",
+            "rescisórias",
+            "rescisorias",
+            "dispensa sem justa causa",
+            "saldo de salário",
+            "saldo de salario",
+            "aviso-prévio",
+            "aviso previo",
+            "13º salário",
+            "13o salario",
+            "fgts",
+            "multa de 40",
+            "multa rescisória",
+            "multa rescisoria",
+            "art. 477",
+            "art. 467",
+            "seguro-desemprego",
+            "seguro desemprego",
+            "trct",
+        ]
+    )
+
     if is_trabalhista_insalubridade_periculosidade:
         labor_proof_checklist = []
         for item in proof_checklist:
@@ -518,6 +547,11 @@ def _build_assisted_sections(db: Session, case: Case, analysis_record, tenant_id
         or "vara do trabalho" in case_search_text
         or "adicional de insalubridade" in case_search_text
         or "adicional de periculosidade" in case_search_text
+        or "verbas rescisórias" in case_search_text
+        or "verbas rescisorias" in case_search_text
+        or "dispensa sem justa causa" in case_search_text
+        or "multa de 40" in case_search_text
+        or "trct" in case_search_text
         or ("reclamante" in case_search_text and "reclamada" in case_search_text)
     )
 
@@ -854,6 +888,78 @@ def _build_assisted_sections(db: Session, case: Case, analysis_record, tenant_id
             ]
         )
 
+
+
+    # PATCH: labor_verbas_rescisorias_final_text_v1
+    if is_trabalhista_verbas_rescisorias:
+        resumo_fatico = _paragraphs(
+            [
+                f"Trata-se de reclamação trabalhista relacionada ao caso {case.case_number} — {case.title}, voltada à cobrança de verbas rescisórias decorrentes de dispensa sem justa causa, conforme os fatos narrados e documentos a serem conferidos nos autos.",
+                "Segundo a narrativa apresentada, o reclamante laborou para a reclamada em período aproximado informado no cadastro do caso, exercendo função remunerada, tendo sido dispensado sem justa causa sem o recebimento integral e tempestivo das parcelas rescisórias que afirma serem devidas.",
+                "O reclamante alega que não foram pagos, ou foram pagos de forma incompleta, saldo de salário, aviso-prévio, férias vencidas e/ou proporcionais acrescidas de 1/3, 13º salário proporcional, depósitos de FGTS do período contratual e multa rescisória de 40% sobre o FGTS.",
+                "Também afirma que não recebeu corretamente as guias para saque do FGTS e habilitação no seguro-desemprego, ou que houve dificuldade para acessar tais direitos em razão de pendências atribuídas à empregadora.",
+                "A controvérsia principal consiste em verificar a data exata de admissão e desligamento, a modalidade de rescisão, os valores efetivamente pagos, a regularidade dos depósitos de FGTS, a entrega das guias rescisórias e a existência de diferenças trabalhistas a serem apuradas por cálculo técnico.",
+                "Para adequada apuração dos fatos, mostra-se necessária a análise de documentos como CTPS ou contrato de trabalho, TRCT, aviso de dispensa, holerites, comprovantes de pagamento, extrato analítico do FGTS, comunicações entre as partes e demais documentos relacionados à rescisão contratual.",
+            ]
+        )
+
+        fundamentacao = _paragraphs(
+            [
+                "I. Do cabimento da reclamação trabalhista. À luz do quadro fático narrado, a demanda deve ser estruturada como reclamação trabalhista voltada à cobrança de verbas rescisórias decorrentes de dispensa sem justa causa, com apuração documental e cálculo das parcelas efetivamente devidas.",
+                "II. Das verbas rescisórias em dispensa sem justa causa. Em regra, a dispensa sem justa causa pode gerar direito ao pagamento de saldo de salário, aviso-prévio, férias vencidas e proporcionais acrescidas de 1/3, 13º salário proporcional, liberação do FGTS, multa rescisória de 40% sobre o FGTS e demais parcelas cabíveis conforme o contrato e a prova documental.",
+                "III. Do prazo de pagamento e da multa do art. 477 da CLT. Deverá ser verificado se as verbas rescisórias foram pagas dentro do prazo legal aplicável. Caso constatado atraso ou inadimplemento injustificado, poderá ser analisado o cabimento da multa prevista no art. 477 da CLT, conforme validação profissional e prova dos autos.",
+                "IV. Da multa do art. 467 da CLT. Havendo verbas incontroversas não quitadas no momento processual adequado, deverá ser analisado o cabimento da multa prevista no art. 467 da CLT, especialmente quanto às parcelas reconhecidas como devidas e não pagas oportunamente.",
+                "V. Do FGTS, multa de 40% e guias rescisórias. A apuração deverá considerar o extrato analítico do FGTS, a regularidade dos depósitos durante o contrato, a incidência da multa rescisória de 40%, bem como eventual necessidade de expedição ou regularização das guias para saque do FGTS e habilitação no seguro-desemprego.",
+                "VI. Da necessidade de prova documental e cálculo trabalhista. A conclusão sobre valores depende da conferência de CTPS, contrato, TRCT, holerites, comprovantes de pagamento, extrato de FGTS, aviso de dispensa e demais documentos rescisórios, além de cálculo trabalhista preliminar revisado pelo advogado responsável.",
+                "VII. Da síntese da tese. A pretensão deve ser conduzida com cautela técnica, evitando promessa de resultado e condicionando a liquidação dos valores à prova documental, à memória de cálculo e à validação profissional antes do protocolo definitivo.",
+            ]
+        )
+
+        pedidos = _paragraphs(
+            [
+                "Diante do exposto, requer o reclamante:",
+                "I. O reconhecimento da dispensa sem justa causa, caso confirmada pela documentação trabalhista e rescisória, com a condenação da reclamada ao pagamento das verbas rescisórias devidas e não quitadas, ou quitadas de forma incompleta.",
+                "II. A condenação da reclamada ao pagamento de saldo de salário eventualmente devido, conforme dias trabalhados no mês da rescisão e apuração em cálculo trabalhista.",
+                "III. A condenação da reclamada ao pagamento de aviso-prévio indenizado ou diferenças de aviso-prévio, conforme modalidade de cumprimento, tempo de serviço e documentos rescisórios.",
+                "IV. A condenação da reclamada ao pagamento de férias vencidas e/ou proporcionais acrescidas de 1/3 constitucional, conforme período aquisitivo, período proporcional e valores já eventualmente pagos.",
+                "V. A condenação da reclamada ao pagamento de 13º salário proporcional e eventuais diferenças, conforme período trabalhado no ano da rescisão.",
+                "VI. A condenação da reclamada ao recolhimento ou pagamento das diferenças de FGTS do período contratual, com apresentação do extrato analítico e confrontação com os salários pagos.",
+                "VII. A condenação da reclamada ao pagamento da multa rescisória de 40% sobre o FGTS devido, caso confirmada a dispensa sem justa causa e constatada ausência ou insuficiência de pagamento.",
+                "VIII. A condenação da reclamada à entrega, regularização ou indenização substitutiva das guias necessárias ao saque do FGTS e à habilitação no seguro-desemprego, quando cabível e conforme prova documental.",
+                "IX. A condenação da reclamada ao pagamento da multa prevista no art. 477 da CLT, caso comprovado atraso ou ausência de pagamento tempestivo das verbas rescisórias no prazo legal.",
+                "X. A aplicação da multa prevista no art. 467 da CLT sobre verbas incontroversas, caso existentes e não quitadas no momento processual adequado.",
+                "XI. A condenação da reclamada ao pagamento das parcelas deferidas com juros, correção monetária e demais acréscimos legais aplicáveis, conforme critérios definidos na fase própria.",
+                "XII. A condenação da reclamada ao pagamento de honorários advocatícios sucumbenciais, nos termos da legislação trabalhista aplicável.",
+                "XIII. A produção de todos os meios de prova em direito admitidos, especialmente documental, testemunhal e depoimento pessoal da reclamada, sem prejuízo de outros meios necessários à completa apuração dos fatos.",
+                "XIV. Ao final, requer a procedência dos pedidos, nos limites da prova produzida, com apuração dos valores em liquidação ou mediante cálculo trabalhista revisado.",
+            ]
+        )
+
+        provas_requerimentos = _paragraphs(
+            [
+                "Requer o reclamante a produção de todos os meios de prova em direito admitidos, especialmente prova documental, testemunhal, depoimento pessoal da reclamada e demais provas que se fizerem necessárias durante a instrução.",
+                "Requer a juntada e análise de CTPS ou contrato de trabalho, termo de rescisão do contrato de trabalho, aviso de dispensa, holerites, comprovantes de pagamento, extrato analítico do FGTS, guias rescisórias, comunicações entre as partes e demais documentos relacionados à admissão, remuneração, jornada e rescisão contratual.",
+                "Requer que a reclamada seja intimada a apresentar documentos rescisórios e trabalhistas sob sua guarda, especialmente TRCT, recibos de pagamento, comprovantes de depósito de FGTS, comprovantes de entrega de guias, registros funcionais, ficha de empregado e demais documentos necessários à conferência das parcelas postuladas.",
+                "Requer que seja promovido cálculo trabalhista, ainda que preliminar, para apurar saldo de salário, aviso-prévio, férias vencidas e/ou proporcionais acrescidas de 1/3, 13º salário proporcional, FGTS, multa de 40%, multas legais eventualmente cabíveis, juros e correção monetária.",
+                "Requer a oitiva de testemunhas, caso necessário, para esclarecer a modalidade da dispensa, a data de desligamento, a entrega de documentos rescisórios, pagamentos realizados e demais circunstâncias relevantes à controvérsia.",
+                "Requer que eventual ausência, incompletude ou inconsistência dos documentos rescisórios seja considerada na valoração da prova, especialmente quando tais documentos estiverem sob guarda ou responsabilidade da reclamada.",
+                "Por fim, requer que todas as provas sejam analisadas em conjunto, a fim de permitir a correta apuração das verbas rescisórias, das diferenças de FGTS, das guias devidas e das multas legais eventualmente aplicáveis.",
+            ]
+        )
+
+        fechamento = _paragraphs(
+            [
+                "Diante de todo o exposto, requer o reclamante o regular processamento da presente reclamação trabalhista, com a citação da reclamada para, querendo, apresentar defesa, sob pena de revelia e confissão quanto à matéria de fato, na forma da legislação aplicável.",
+                "Requer, ao final, sejam julgados procedentes os pedidos formulados, condenando-se a reclamada ao pagamento das verbas rescisórias devidas, diferenças de FGTS, multa de 40%, guias rescisórias, multas legais eventualmente cabíveis e demais parcelas reconhecidas nos autos.",
+                "Requer, ainda, a produção de todos os meios de prova em direito admitidos, especialmente prova documental, testemunhal e depoimento pessoal da reclamada, sem prejuízo de outras provas que se mostrarem necessárias no curso da instrução.",
+                f"Dá-se à causa o valor provisório de R$ {cause_value}, sujeito a posterior adequação conforme memória de cálculo, documentos complementares e liquidação dos pedidos.",
+                f"Por fim, requer que todas as intimações e publicações sejam realizadas em nome de {lawyer_name}, inscrito na OAB/{lawyer_uf} sob o nº {lawyer_oab}, sob pena de nulidade, caso aplicável.",
+                "Termos em que,",
+                "Pede deferimento.",
+                f"{signature_local}, {signature_date}.",
+                f"{lawyer_name}\nOAB/{lawyer_uf} {lawyer_oab}",
+            ]
+        )
 
     return [
         {
