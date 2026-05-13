@@ -486,7 +486,6 @@ def _build_assisted_sections(db: Session, case: Case, analysis_record, tenant_id
             "aviso previo",
             "13º salário",
             "13o salario",
-            "fgts",
             "multa de 40",
             "multa rescisória",
             "multa rescisoria",
@@ -495,6 +494,32 @@ def _build_assisted_sections(db: Session, case: Case, analysis_record, tenant_id
             "seguro-desemprego",
             "seguro desemprego",
             "trct",
+        ]
+    )
+
+
+    is_trabalhista_horas_extras = is_trabalhista_area and any(
+        term in case_search_text
+        for term in [
+            "horas extras",
+            "hora extra",
+            "jornada excedente",
+            "jornada superior",
+            "jornada habitual",
+            "intervalo intrajornada",
+            "intervalo reduzido",
+            "intervalo irregular",
+            "controle de ponto",
+            "controles de ponto",
+            "cartão de ponto",
+            "cartao de ponto",
+            "cartões de ponto",
+            "cartoes de ponto",
+            "dsr",
+            "descanso semanal remunerado",
+            "adicional de horas extras",
+            "escala de trabalho",
+            "escalas de trabalho",
         ]
     )
 
@@ -552,6 +577,10 @@ def _build_assisted_sections(db: Session, case: Case, analysis_record, tenant_id
         or "dispensa sem justa causa" in case_search_text
         or "multa de 40" in case_search_text
         or "trct" in case_search_text
+        or "horas extras" in case_search_text
+        or "jornada excedente" in case_search_text
+        or "intervalo intrajornada" in case_search_text
+        or "controle de ponto" in case_search_text
         or ("reclamante" in case_search_text and "reclamada" in case_search_text)
     )
 
@@ -951,6 +980,75 @@ def _build_assisted_sections(db: Session, case: Case, analysis_record, tenant_id
             [
                 "Diante de todo o exposto, requer o reclamante o regular processamento da presente reclamação trabalhista, com a citação da reclamada para, querendo, apresentar defesa, sob pena de revelia e confissão quanto à matéria de fato, na forma da legislação aplicável.",
                 "Requer, ao final, sejam julgados procedentes os pedidos formulados, condenando-se a reclamada ao pagamento das verbas rescisórias devidas, diferenças de FGTS, multa de 40%, guias rescisórias, multas legais eventualmente cabíveis e demais parcelas reconhecidas nos autos.",
+                "Requer, ainda, a produção de todos os meios de prova em direito admitidos, especialmente prova documental, testemunhal e depoimento pessoal da reclamada, sem prejuízo de outras provas que se mostrarem necessárias no curso da instrução.",
+                f"Dá-se à causa o valor provisório de R$ {cause_value}, sujeito a posterior adequação conforme memória de cálculo, documentos complementares e liquidação dos pedidos.",
+                f"Por fim, requer que todas as intimações e publicações sejam realizadas em nome de {lawyer_name}, inscrito na OAB/{lawyer_uf} sob o nº {lawyer_oab}, sob pena de nulidade, caso aplicável.",
+                "Termos em que,",
+                "Pede deferimento.",
+                f"{signature_local}, {signature_date}.",
+                f"{lawyer_name}\nOAB/{lawyer_uf} {lawyer_oab}",
+            ]
+        )
+
+
+    # PATCH: labor_horas_extras_final_text_v1
+    if is_trabalhista_horas_extras:
+        resumo_fatico = _paragraphs(
+            [
+                f"Trata-se de reclamação trabalhista relacionada ao caso {case.case_number} — {case.title}, voltada à cobrança de horas extras, reflexos trabalhistas e eventuais diferenças decorrentes de jornada excedente e intervalo intrajornada irregular.",
+                "Segundo a narrativa apresentada, o reclamante afirma ter laborado em jornada habitual superior à contratual, com início das atividades por volta das 7h e encerramento por volta das 19h, de segunda a sábado, em rotina que teria extrapolado a jornada ordinária.",
+                "O reclamante também sustenta que o intervalo para refeição e descanso era frequentemente reduzido ou não concedido integralmente, circunstância que deverá ser apurada por meio de controles de ponto, escalas, mensagens, ordens de serviço, holerites e prova testemunhal.",
+                "Alega, ainda, que parte das horas extras realizadas não era registrada corretamente nos controles de ponto, ou era registrada apenas parcialmente, sem o pagamento integral do adicional de horas extras e dos reflexos trabalhistas correspondentes.",
+                "A controvérsia principal consiste em verificar a jornada contratual, a jornada efetivamente cumprida, a fidelidade dos controles de ponto, a regularidade do intervalo intrajornada, os pagamentos realizados e a existência de diferenças de horas extras a serem apuradas por cálculo trabalhista.",
+                "Para adequada apuração dos fatos, mostra-se necessária a análise de documentos como contrato de trabalho ou CTPS, holerites, controles de ponto, escalas, recibos de pagamento, mensagens, ordens de serviço e demais elementos capazes de demonstrar a rotina real de trabalho.",
+            ]
+        )
+
+        fundamentacao = _paragraphs(
+            [
+                "I. Do cabimento da reclamação trabalhista. À luz do quadro fático narrado, a demanda deve ser estruturada como reclamação trabalhista voltada à cobrança de horas extras, diferenças de jornada, intervalo intrajornada e reflexos trabalhistas, conforme prova documental, testemunhal e cálculo técnico.",
+                "II. Da jornada excedente e das horas extras. Caso comprovado que o reclamante laborava além da jornada legal ou contratual sem a correspondente quitação, serão devidas as diferenças de horas extras, com adicional legal, convencional ou contratual aplicável, observada a jornada efetivamente comprovada.",
+                "III. Dos controles de ponto e da prova da jornada. A apuração da jornada depende da análise dos controles de ponto, escalas, holerites, recibos de pagamento, mensagens, ordens de serviço e prova testemunhal. Caso os controles sejam ausentes, incompletos ou incompatíveis com a realidade laboral, a prova deverá ser valorada em conjunto.",
+                "IV. Do intervalo intrajornada. Havendo supressão ou concessão parcial do intervalo para refeição e descanso, deverá ser analisado o direito ao pagamento correspondente ao período irregular, conforme legislação trabalhista aplicável, prova da rotina e parâmetros de cálculo definidos na fase própria.",
+                "V. Dos reflexos trabalhistas. As horas extras habitualmente prestadas podem gerar reflexos em descanso semanal remunerado, férias acrescidas de 1/3, 13º salário, FGTS e demais parcelas juridicamente cabíveis, conforme habitualidade, base de cálculo e prova dos autos.",
+                "VI. Da necessidade de cálculo trabalhista. A quantificação das diferenças depende de cálculo técnico, com confrontação entre jornada alegada, cartões de ponto, holerites, valores pagos, adicionais aplicáveis, compensações eventualmente existentes e reflexos legais.",
+                "VII. Da síntese da tese. A pretensão deve ser conduzida com cautela técnica, sem promessa de resultado judicial, condicionando a liquidação dos valores à prova documental, testemunhal, memória de cálculo e validação profissional antes do protocolo definitivo.",
+            ]
+        )
+
+        pedidos = _paragraphs(
+            [
+                "Diante do exposto, requer o reclamante:",
+                "I. O reconhecimento da jornada extraordinária efetivamente prestada, conforme prova documental, controles de ponto, prova testemunhal e demais elementos produzidos nos autos.",
+                "II. A condenação da reclamada ao pagamento das horas extras laboradas além da jornada legal ou contratual, com o adicional legal, convencional ou contratual aplicável, conforme apuração em cálculo trabalhista.",
+                "III. A condenação da reclamada ao pagamento de diferenças de horas extras eventualmente quitadas a menor, mediante confronto entre controles de ponto, holerites, recibos e jornada efetivamente comprovada.",
+                "IV. A condenação da reclamada ao pagamento do período correspondente ao intervalo intrajornada suprimido ou concedido parcialmente, quando comprovada a irregularidade, com os reflexos cabíveis conforme legislação aplicável.",
+                "V. A condenação da reclamada ao pagamento dos reflexos das horas extras e diferenças reconhecidas em descanso semanal remunerado, férias acrescidas de 1/3, 13º salário, FGTS e demais verbas trabalhistas juridicamente cabíveis.",
+                "VI. A intimação da reclamada para apresentar controles de ponto, escalas de trabalho, registros de jornada, holerites, recibos de pagamento de horas extras, acordos de compensação ou banco de horas, caso existentes, e demais documentos relacionados à jornada do reclamante.",
+                "VII. O reconhecimento da invalidade ou insuficiência dos controles de ponto, caso sejam apresentados registros incompatíveis com a jornada efetivamente praticada, britânicos, incompletos ou sem correspondência com a realidade laboral, conforme prova produzida.",
+                "VIII. A produção de prova testemunhal para confirmação da jornada real, frequência das horas extras, rotina de intervalos, metas operacionais, fechamento de rotas e demais circunstâncias relevantes.",
+                "IX. A condenação da reclamada ao pagamento das parcelas deferidas com juros, correção monetária e demais acréscimos legais aplicáveis, conforme critérios definidos na fase própria.",
+                "X. A condenação da reclamada ao pagamento de honorários advocatícios sucumbenciais, nos termos da legislação trabalhista aplicável.",
+                "XI. Ao final, requer a procedência dos pedidos, nos limites da prova produzida, com apuração dos valores em liquidação ou mediante cálculo trabalhista revisado.",
+            ]
+        )
+
+        provas_requerimentos = _paragraphs(
+            [
+                "Requer o reclamante a produção de todos os meios de prova em direito admitidos, especialmente prova documental, testemunhal, depoimento pessoal da reclamada e demais provas necessárias à apuração da jornada efetivamente cumprida.",
+                "Requer a juntada e análise de contrato de trabalho ou CTPS, holerites, controles de ponto, cartões de ponto, escalas de trabalho, recibos de pagamento de horas extras, registros de banco de horas, acordos de compensação, mensagens, ordens de serviço, relatórios de rota, registros de metas e demais documentos relacionados à jornada.",
+                "Requer que a reclamada seja intimada a apresentar todos os controles de jornada do período contratual discutido, inclusive espelhos de ponto, registros eletrônicos, escalas, recibos de pagamento e documentos relativos a banco de horas ou compensação de jornada.",
+                "Requer que seja promovido cálculo trabalhista, ainda que preliminar, para apurar horas extras, adicional aplicável, intervalo intrajornada, reflexos em DSR, férias acrescidas de 1/3, 13º salário, FGTS, juros, correção monetária e compensação de valores eventualmente pagos.",
+                "Requer a oitiva de testemunhas que possam esclarecer a jornada real, o horário de entrada e saída, a frequência das horas extras, a regularidade dos intervalos, a existência de metas, carregamento, separação de mercadorias, fechamento de rotas e demais aspectos da rotina laboral.",
+                "Requer que eventual ausência, incompletude, inconsistência ou artificialidade dos controles de ponto seja considerada na valoração da prova, especialmente quando tais documentos estiverem sob guarda ou responsabilidade da reclamada.",
+                "Por fim, requer que todas as provas sejam analisadas em conjunto, a fim de permitir a correta apuração da jornada, das horas extras, dos intervalos irregulares, dos reflexos trabalhistas e dos valores devidos.",
+            ]
+        )
+
+        fechamento = _paragraphs(
+            [
+                "Diante de todo o exposto, requer o reclamante o regular processamento da presente reclamação trabalhista, com a citação da reclamada para, querendo, apresentar defesa, sob pena de revelia e confissão quanto à matéria de fato, na forma da legislação aplicável.",
+                "Requer, ao final, sejam julgados procedentes os pedidos formulados, condenando-se a reclamada ao pagamento das horas extras devidas, diferenças de jornada, intervalo intrajornada irregular, reflexos trabalhistas e demais parcelas reconhecidas nos autos.",
                 "Requer, ainda, a produção de todos os meios de prova em direito admitidos, especialmente prova documental, testemunhal e depoimento pessoal da reclamada, sem prejuízo de outras provas que se mostrarem necessárias no curso da instrução.",
                 f"Dá-se à causa o valor provisório de R$ {cause_value}, sujeito a posterior adequação conforme memória de cálculo, documentos complementares e liquidação dos pedidos.",
                 f"Por fim, requer que todas as intimações e publicações sejam realizadas em nome de {lawyer_name}, inscrito na OAB/{lawyer_uf} sob o nº {lawyer_oab}, sob pena de nulidade, caso aplicável.",
