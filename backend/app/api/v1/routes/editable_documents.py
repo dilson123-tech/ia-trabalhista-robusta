@@ -1,4 +1,6 @@
+import re
 import unicodedata
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import HTMLResponse
@@ -84,6 +86,249 @@ def _safe_text(value) -> str:
     if isinstance(value, str):
         return value.strip()
     return ""
+
+
+# PATCH: editor_fgts_claim_values_v1
+def _format_brl(value: Decimal) -> str:
+    rounded = value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    raw = f"{rounded:,.2f}"
+    return raw.replace(",", "X").replace(".", ",").replace("X", ".")
+
+
+def _parse_decimal_value(value) -> Decimal | None:
+    if value is None or value == "":
+        return None
+
+    if isinstance(value, Decimal):
+        return value
+
+    if isinstance(value, int):
+        return Decimal(value)
+
+    if isinstance(value, float):
+        return Decimal(str(value))
+
+    raw = str(value).strip()
+    if not raw:
+        return None
+
+    cleaned = re.sub(r"[^0-9,.\-]", "", raw)
+    if not cleaned:
+        return None
+
+    # Formato BR: 2.300,00
+    if "," in cleaned:
+        cleaned = cleaned.replace(".", "").replace(",", ".")
+    else:
+        # Formato simples/US: 2300.00
+        cleaned = cleaned
+
+    try:
+        return Decimal(cleaned)
+    except InvalidOperation:
+        return None
+
+
+def _parse_int_value(value) -> int | None:
+    if value is None or value == "":
+        return None
+    if isinstance(value, int):
+        return value if value >= 0 else None
+
+    match = re.search(r"\d+", str(value))
+    if not match:
+        return None
+
+    parsed = int(match.group(0))
+    return parsed if parsed >= 0 else None
+
+
+def _metadata_first_value(metadata: dict, keys: list[str]):
+    if not isinstance(metadata, dict):
+        return None
+
+    for key in keys:
+        if key in metadata and metadata.get(key) not in (None, ""):
+            return metadata.get(key)
+
+    # fallback tolerante para metadados com nomes próximos
+    lowered = {str(k).lower(): v for k, v in metadata.items()}
+    for key in keys:
+        normalized_key = key.lower()
+        if normalized_key in lowered and lowered[normalized_key] not in (None, ""):
+            return lowered[normalized_key]
+
+    return None
+
+
+def _case_combined_text(case, metadata: dict) -> str:
+    chunks = [
+        getattr(case, "case_number", "") or "",
+        getattr(case, "title", "") or "",
+        getattr(case, "description", "") or "",
+        str(metadata or ""),
+    ]
+    return " ".join(chunks).lower()
+
+
+def _extract_salary_from_text(text: str) -> Decimal | None:
+    patterns = [
+        r"sal[aá]rio(?:\s+mensal)?(?:\s+aproximad[ao])?\s*(?:de|:)?\s*r?\$?\s*([0-9][0-9\.\,]*)",
+        r"remunera[cç][aã]o(?:\s+mensal)?(?:\s+aproximad[ao])?\s*(?:de|:)?\s*r?\$?\s*([0-9][0-9\.\,]*)",
+        r"recebendo\s+remunera[cç][aã]o(?:\s+mensal)?(?:\s+aproximad[ao])?\s*(?:de|:)?\s*r?\$?\s*([0-9][0-9\.\,]*)",
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, text, flags=re.IGNORECASE)
+        if match:
+            parsed = _parse_decimal_value(match.group(1))
+            if parsed is not None:
+                return parsed
+    return None
+
+
+def _extract_fgts_missing_months_from_text(text: str) -> int | None:
+    patterns = [
+        r"(\d+)\s+(?:meses|compet[eê]ncias)\s+(?:sem|sem\s+dep[oó]sito|sem\s+recolhimento)\s+(?:de\s+)?fgts",
+        r"fgts\s+(?:n[aã]o\s+recolhido|sem\s+recolhimento)\s+(?:por|durante)\s+(\d+)\s+(?:meses|compet[eê]ncias)",
+        r"aus[eê]ncia\s+de\s+dep[oó]sitos?\s+(?:por|durante)\s+(\d+)\s+(?:meses|compet[eê]ncias)",
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, text, flags=re.IGNORECASE)
+        if match:
+            return int(match.group(1))
+    return None
+
+
+def _is_without_cause_dismissal(metadata: dict, text: str) -> bool:
+    value = _metadata_first_value(
+        metadata,
+        [
+            "dispensa_sem_justa_causa",
+            "houve_dispensa_sem_justa_causa",
+            "sem_justa_causa",
+            "dismissal_without_cause",
+            "modalidade_rescisao",
+            "tipo_rescisao",
+        ],
+    )
+
+    if isinstance(value, bool):
+        return value
+
+    value_text = str(value or "").lower()
+    combined = f"{value_text} {text}"
+
+    negative_markers = [
+        "pedido de demissão",
+        "pedido de demissao",
+        "justa causa",
+        "rescisão indireta",
+        "rescisao indireta",
+    ]
+    if any(marker in combined for marker in negative_markers) and "sem justa causa" not in combined:
+        return False
+
+    return "sem justa causa" in combined or "dispensado sem justa causa" in combined
+
+
+def _build_default_claim_values_section(cause_value: str) -> str:
+    return "\n\n".join(
+        [
+            "Os pedidos deverão ser acompanhados de indicação de valores estimados ou liquidados antes do protocolo, conforme os dados disponíveis no caso e a memória de cálculo revisada pelo advogado responsável.",
+            f"Valor da causa atualmente informado: R$ {cause_value}.",
+            "Caso ainda não exista memória de cálculo, recomenda-se inserir os valores por pedido antes do ajuizamento, com indicação expressa de eventual natureza estimativa/preliminar.",
+        ]
+    )
+
+
+def _build_fgts_claim_values_section(metadata: dict, case, cause_value: str) -> tuple[str, str | None]:
+    combined_text = _case_combined_text(case, metadata)
+
+    salary = _parse_decimal_value(
+        _metadata_first_value(
+            metadata,
+            [
+                "salario_mensal",
+                "salario",
+                "remuneracao_mensal",
+                "remuneração_mensal",
+                "monthly_salary",
+            ],
+        )
+    ) or _extract_salary_from_text(combined_text)
+
+    missing_months = _parse_int_value(
+        _metadata_first_value(
+            metadata,
+            [
+                "meses_sem_fgts",
+                "competencias_sem_fgts",
+                "meses_fgts_nao_recolhido",
+                "fgts_missing_months",
+            ],
+        )
+    ) or _extract_fgts_missing_months_from_text(combined_text)
+
+    deposited = _parse_decimal_value(
+        _metadata_first_value(
+            metadata,
+            [
+                "valor_fgts_depositado",
+                "fgts_depositado",
+                "valor_ja_depositado_fgts",
+                "fgts_already_deposited",
+            ],
+        )
+    ) or Decimal("0")
+
+    without_cause = _is_without_cause_dismissal(metadata, combined_text)
+
+    missing_items = []
+    if salary is None:
+        missing_items.append("Informar salário/remuneração mensal base para cálculo do FGTS.")
+    if missing_months is None:
+        missing_items.append("Informar quantidade de meses ou competências sem recolhimento de FGTS.")
+    missing_items.append("Anexar e conferir extrato analítico completo do FGTS.")
+    missing_items.append("Conferir holerites, CTPS/contrato, comprovantes de pagamento, GFIP, SEFIP/eSocial e documentos rescisórios, se houver.")
+    if not without_cause:
+        missing_items.append("Confirmar modalidade de rescisão para definir se há multa rescisória de 40%.")
+
+    if salary is None or missing_months is None:
+        pending_lines = "\n".join(f"- {item}" for item in missing_items)
+        content = "\n\n".join(
+            [
+                "Cálculo pendente para ajuizamento.",
+                "Ainda não há base numérica mínima suficiente para liquidar ou estimar com segurança as diferenças de FGTS diretamente na peça.",
+                f"Pendências de cálculo:\n{pending_lines}",
+                f"Valor da causa atualmente informado: R$ {cause_value}. Caso não haja valor definitivo, o advogado deverá inserir valor estimado por pedido antes do protocolo.",
+            ]
+        )
+        return content, None
+
+    fgts_due = (salary * Decimal("0.08") * Decimal(missing_months)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    fgts_difference = max(Decimal("0"), (fgts_due - deposited).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+    fgts_fine = (fgts_difference * Decimal("0.40")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP) if without_cause else Decimal("0")
+    total = (fgts_difference + fgts_fine).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+    fine_line = (
+        f"II. Diferença estimada da multa rescisória de 40% sobre o FGTS, considerada a hipótese de dispensa sem justa causa: R$ {_format_brl(fgts_fine)}."
+        if without_cause
+        else "II. Multa rescisória de 40% sobre o FGTS: pendente de confirmação da modalidade de rescisão, não somada ao valor estimado neste momento."
+    )
+
+    content = "\n\n".join(
+        [
+            "Memória preliminar de cálculo para ajuizamento, sujeita à revisão do advogado responsável, conferência documental e adequação antes do protocolo.",
+            f"Base informada/identificada: salário mensal de R$ {_format_brl(salary)} e {missing_months} competência(s)/mês(es) sem recolhimento integral de FGTS.",
+            f"I. Diferenças estimadas de FGTS não recolhido ou recolhido a menor: R$ {_format_brl(fgts_difference)}.",
+            fine_line,
+            "III. Honorários advocatícios sucumbenciais: a serem estimados ou requeridos conforme estratégia profissional e percentual aplicável, sem inclusão automática nesta memória preliminar.",
+            f"IV. Valor estimado da causa, limitado aos pedidos economicamente quantificados neste cálculo preliminar: R$ {_format_brl(total)}.",
+            "Observação técnica: os valores possuem natureza preliminar/estimativa e devem ser confrontados com extrato analítico do FGTS, holerites, CTPS/contrato, comprovantes de pagamento, GFIP, SEFIP/eSocial, documentos rescisórios e memória de cálculo revisada antes do ajuizamento.",
+        ]
+    )
+
+    return content, _format_brl(total)
 
 
 def _string_list(value) -> list[str]:
@@ -335,7 +580,13 @@ def _format_party_inline_qualification(
     return f"{name}, {nationality}, {civil_status}, {profession}, inscrito(a) no CPF nº {cpf} e RG nº {rg}, residente e domiciliado(a) em {address}"
 
 
-def _build_assisted_sections(db: Session, case: Case, analysis_record, tenant_id: int) -> list[dict]:
+def _build_assisted_sections(
+    db: Session,
+    case: Case,
+    analysis_record,
+    tenant_id: int,
+    document_metadata: dict | None = None,
+) -> list[dict]:
     full_analysis = analysis_record.analysis or {}
     executive_data = analysis_record.executive_data or {}
 
@@ -594,9 +845,17 @@ def _build_assisted_sections(db: Session, case: Case, analysis_record, tenant_id
 
     active_parties = _load_case_active_parties(db, tenant_id, case.id)
     state_metadata = _load_case_state_metadata(db, tenant_id, case.id)
+    # PATCH: pass_document_metadata_to_assisted_sections_v1
+    # Dados do documento aprovado/atual entram como complemento para cálculo e fechamento da peça.
+    if isinstance(document_metadata, dict) and document_metadata:
+        state_metadata = {
+            **state_metadata,
+            **document_metadata,
+        }
 
     case_comarca = _safe_text(state_metadata.get("case_comarca")) or "[COMARCA A DEFINIR PELO ADVOGADO]"
     cause_value = _safe_text(state_metadata.get("cause_value")) or "[valor a ser definido pelo advogado]"
+    pedidos_valores_estimados = _build_default_claim_values_section(cause_value)
     lawyer_name = _safe_text(state_metadata.get("lawyer_name")) or "[Nome do advogado]"
     lawyer_oab = _safe_text(state_metadata.get("lawyer_oab")) or "[número]"
     lawyer_uf = _safe_text(state_metadata.get("lawyer_uf")) or "[UF]"
@@ -1149,6 +1408,14 @@ def _build_assisted_sections(db: Session, case: Case, analysis_record, tenant_id
             ]
         )
 
+        pedidos_valores_estimados, calculated_cause_value = _build_fgts_claim_values_section(
+            state_metadata,
+            case,
+            cause_value,
+        )
+        if calculated_cause_value:
+            cause_value = calculated_cause_value
+
         provas_requerimentos = _paragraphs(
             [
                 "Requer o reclamante a produção de todos os meios de prova em direito admitidos, especialmente prova documental, contábil, testemunhal, depoimento pessoal da reclamada e demais provas necessárias à apuração da regularidade dos depósitos de FGTS.",
@@ -1234,6 +1501,18 @@ def _build_assisted_sections(db: Session, case: Case, analysis_record, tenant_id
                 "origin_sources": ["decision", "viability", "technical_analysis"],
                 "generation_mode": "assisted_draft_from_analysis",
                 "guardrail_status": "ok",
+            },
+        },
+        {
+            "key": "pedidos_valores_estimados",
+            "title": "Pedidos e Valores Estimados",
+            "content": pedidos_valores_estimados,
+            "source": "assisted_draft",
+            "status": "draft",
+            "metadata": {
+                "origin_sources": ["case", "calculation", "strategy"],
+                "generation_mode": "assisted_draft_from_analysis",
+                "guardrail_status": "requires_professional_review",
             },
         },
         {
@@ -1559,7 +1838,13 @@ def generate_assisted_draft(
         )
 
     analysis_record = _get_or_create_case_analysis_record(db=db, case=case, current_user=current_user)
-    assisted_sections = _build_assisted_sections(db, case, analysis_record, current_user["tenant_id"])
+    assisted_sections = _build_assisted_sections(
+        db,
+        case,
+        analysis_record,
+        current_user["tenant_id"],
+        document_metadata=document.document_metadata or {},
+    )
 
     current_user_id = _resolve_current_user_id(db, current_user)
     next_version_number = document.current_version_number + 1
