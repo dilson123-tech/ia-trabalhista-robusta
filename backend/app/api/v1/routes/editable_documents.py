@@ -510,8 +510,22 @@ def _select_primary_party(parties: list[dict], keywords: list[str]) -> dict | No
 
     for party in parties:
         role = _normalize_role_token(party.get("role"))
-        if any(keyword and keyword in role for keyword in normalized_keywords):
-            return party
+        role_tokens = set(role.split())
+
+        for keyword in normalized_keywords:
+            if not keyword:
+                continue
+
+            # PATCH: prevent_author_selected_as_defendant_v1
+            # Termos curtos como "ré" normalizam para "re" e não podem bater
+            # por substring dentro de palavras como "reclamante".
+            if len(keyword) <= 2:
+                if role == keyword or keyword in role_tokens:
+                    return party
+                continue
+
+            if keyword in role:
+                return party
 
     return None
 
@@ -578,6 +592,85 @@ def _format_party_inline_qualification(
     cpf = document_id if document_id else "[CPF a complementar]"
     rg = _safe_text(metadata.get("rg")) or "[RG a complementar]"
     return f"{name}, {nationality}, {civil_status}, {profession}, inscrito(a) no CPF nº {cpf} e RG nº {rg}, residente e domiciliado(a) em {address}"
+
+
+# PATCH: editor_extract_parties_from_description_v1
+def _extract_labor_parties_from_case_description(case_description: str) -> list[dict]:
+    """
+    Extrai partes mínimas da descrição quando ainda não há CasePartyState estruturado.
+
+    Não inventa CPF, CNPJ ou endereço completo. Apenas aproveita dados explícitos
+    do texto do caso para reduzir placeholders na peça.
+    """
+    text = _safe_text(case_description)
+    if not text:
+        return []
+
+    parties: list[dict] = []
+
+    author_match = re.search(
+        r"parte\s+reclamante\s*:\s*(?P<name>[^\n,\.]+)",
+        text,
+        flags=re.IGNORECASE,
+    )
+    profession_match = re.search(
+        r"exercendo\s+a\s+fun[cç][aã]o\s+de\s+(?P<profession>[^,\n\.]+)",
+        text,
+        flags=re.IGNORECASE,
+    )
+
+    if author_match:
+        author_name = author_match.group("name").strip(" .")
+        profession = (
+            profession_match.group("profession").strip(" .")
+            if profession_match
+            else ""
+        )
+        parties.append(
+            {
+                "name": author_name,
+                "role": "reclamante",
+                "party_type": "person",
+                "document_id": "",
+                "party_metadata": {
+                    "profissao": profession or "[profissão]",
+                    "qualificacao_source": "case_description_fallback",
+                },
+            }
+        )
+
+    defendant_match = re.search(
+        r"parte\s+reclamada\s*:\s*(?P<raw>[^\n]+)",
+        text,
+        flags=re.IGNORECASE,
+    )
+
+    if defendant_match:
+        raw_defendant = defendant_match.group("raw").strip(" .")
+        defendant_name = raw_defendant
+        address = "[endereço completo]"
+
+        if "," in raw_defendant:
+            first, rest = raw_defendant.split(",", 1)
+            defendant_name = first.strip(" .")
+            address_candidate = rest.strip(" .")
+            if address_candidate:
+                address = address_candidate
+
+        parties.append(
+            {
+                "name": defendant_name,
+                "role": "reclamada",
+                "party_type": "company",
+                "document_id": "",
+                "party_metadata": {
+                    "endereco": address,
+                    "qualificacao_source": "case_description_fallback",
+                },
+            }
+        )
+
+    return parties
 
 
 def _build_assisted_sections(
@@ -892,6 +985,9 @@ def _build_assisted_sections(
     )
 
     active_parties = _load_case_active_parties(db, tenant_id, case.id)
+    if not active_parties:
+        active_parties = _extract_labor_parties_from_case_description(case_description)
+
     author_party = _select_primary_party(
         active_parties,
         ["autor", "autora", "parte autora", "requerente", "demandante", "reclamante", "impetrante"],
@@ -904,7 +1000,7 @@ def _build_assisted_sections(
     if author_party is None and active_parties:
         author_party = active_parties[0]
 
-    if defendant_party is None:
+    if defendant_party is None or defendant_party is author_party:
         defendant_party = next((party for party in active_parties if party is not author_party), None)
 
     author_inline_qualification = _format_party_inline_qualification(
