@@ -10,16 +10,43 @@ def _normalize_html_text(value: str | None) -> str:
     return value.strip()
 
 
+# PATCH: hide_internal_sections_from_final_export_v1
+def _include_section_in_final_export(section: Dict) -> bool:
+    # PATCH: hide_protocol_checklist_by_key_v1
+    # Checklist de protocolo é controle interno do escritório, não conteúdo da petição final.
+    section_key = str(section.get("key") or "").strip().lower()
+    section_title = str(section.get("title") or "").strip().lower()
+
+    if section_key == "checklist_final_protocolo":
+        return False
+
+    if "checklist final para protocolo" in section_title:
+        return False
+
+    metadata = section.get("metadata") or {}
+    if not isinstance(metadata, dict):
+        return True
+
+    if metadata.get("include_in_final_pdf") is False:
+        return False
+
+    if metadata.get("export_visibility") == "internal":
+        return False
+
+    return True
+
+
 def build_editor_html(document: dict, version: dict) -> str:
     title = escape(document.get("title", "Documento Jurídico"))
     area = escape(document.get("area", "Jurídico"))
     document_type = escape(document.get("document_type", "Documento"))
     version_number = version.get("version_number", "-")
     sections: List[Dict] = version.get("sections", [])
+    export_sections = [section for section in sections if _include_section_in_final_export(section)]
 
     html_sections: list[str] = []
 
-    for index, section in enumerate(sections, start=1):
+    for index, section in enumerate(export_sections, start=1):
         section_title = escape(section.get("title", f"Seção {index}"))
         content = _normalize_html_text(section.get("content", ""))
 
