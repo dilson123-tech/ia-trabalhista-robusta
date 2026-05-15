@@ -1577,7 +1577,10 @@ def _build_assisted_sections(
 
 
     # PATCH: labor_fgts_nao_recolhido_final_text_v1
-    if is_trabalhista_fgts_nao_recolhido:
+    # PATCH: prevent_fgts_template_overriding_severance_v1
+    # Casos de verbas rescisórias podem mencionar FGTS/multa de 40% como pedidos acessórios,
+    # mas não devem ser roteados para o template principal de FGTS não recolhido.
+    if is_trabalhista_fgts_nao_recolhido and not is_trabalhista_verbas_rescisorias:
         resumo_fatico = _paragraphs(
             [
                 f"Trata-se de reclamação trabalhista relacionada ao caso {case.case_number} — {case.title}, voltada à cobrança, regularização ou indenização de depósitos de FGTS não recolhidos, recolhidos parcialmente ou realizados de forma irregular durante o contrato de trabalho.",
@@ -1660,7 +1663,7 @@ def _build_assisted_sections(
         signature_local=signature_local,
         signature_date=signature_date,
         cause_value=cause_value,
-        is_fgts_case=is_trabalhista_fgts_nao_recolhido,
+        is_fgts_case=is_trabalhista_fgts_nao_recolhido and not is_trabalhista_verbas_rescisorias,
     )
 
     return [
