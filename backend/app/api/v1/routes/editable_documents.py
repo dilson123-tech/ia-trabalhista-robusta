@@ -270,6 +270,90 @@ def _build_default_claim_values_section(cause_value: str) -> str:
     )
 
 
+# PATCH: editor_protocol_readiness_checklist_v1
+def _has_placeholder(value: str) -> bool:
+    normalized = _safe_text(value).lower()
+    return (
+        not normalized
+        or "[" in normalized
+        or "a complementar" in normalized
+        or "a definir" in normalized
+    )
+
+
+def _build_protocol_readiness_checklist_section(
+    *,
+    author_inline_qualification: str,
+    defendant_inline_qualification: str,
+    lawyer_name: str,
+    lawyer_oab: str,
+    lawyer_uf: str,
+    signature_local: str,
+    signature_date: str,
+    cause_value: str,
+    is_fgts_case: bool,
+) -> str:
+    pending_items: list[str] = []
+    ready_items: list[str] = []
+
+    if "[CPF a complementar]" in author_inline_qualification:
+        pending_items.append("Informar e conferir CPF do reclamante.")
+    if "[RG a complementar]" in author_inline_qualification:
+        pending_items.append("Informar e conferir RG/documento pessoal do reclamante, se necessário.")
+    if "[endereço completo]" in author_inline_qualification:
+        pending_items.append("Informar endereço completo do reclamante.")
+
+    if "[CNPJ a complementar]" in defendant_inline_qualification:
+        pending_items.append("Informar e conferir CNPJ da reclamada.")
+    if "[endereço completo]" in defendant_inline_qualification:
+        pending_items.append("Informar endereço completo da reclamada.")
+    elif "sede em" in defendant_inline_qualification.lower():
+        pending_items.append("Conferir se a sede/endereço da reclamada está completo para citação.")
+
+    if _has_placeholder(lawyer_name):
+        pending_items.append("Informar nome do advogado responsável.")
+    if _has_placeholder(lawyer_oab) or _has_placeholder(lawyer_uf):
+        pending_items.append("Informar OAB/UF do advogado responsável.")
+    if _has_placeholder(signature_local):
+        pending_items.append("Informar local de assinatura.")
+    if _has_placeholder(signature_date):
+        pending_items.append("Informar data de assinatura.")
+
+    if _has_placeholder(cause_value):
+        pending_items.append("Definir ou revisar valor da causa antes do protocolo.")
+    else:
+        ready_items.append(f"Valor da causa preenchido/revisável: R$ {cause_value}.")
+
+    if is_fgts_case:
+        pending_items.extend(
+            [
+                "Anexar extrato analítico completo do FGTS.",
+                "Anexar ou conferir holerites/recibos salariais do período discutido.",
+                "Anexar CTPS, contrato de trabalho ou documento equivalente.",
+                "Conferir documentos rescisórios, especialmente se houver pedido de multa de 40%.",
+                "Conferir GFIP, SEFIP, eSocial, fichas financeiras e comprovantes de recolhimento, quando disponíveis ou sob guarda da reclamada.",
+                "Revisar memória de cálculo das competências sem recolhimento antes do ajuizamento.",
+            ]
+        )
+
+    if not pending_items:
+        pending_items.append("Sem pendências automatizadas identificadas; manter revisão profissional final antes do protocolo.")
+
+    ready_items.append("Qualificação básica das partes gerada com os dados disponíveis no caso.")
+    ready_items.append("Peça gerada pelo Editor Jurídico Vivo sujeita à validação do advogado responsável.")
+
+    pending_block = "\n".join(f"- {item}" for item in dict.fromkeys(pending_items))
+    ready_block = "\n".join(f"- {item}" for item in dict.fromkeys(ready_items))
+
+    return "\n\n".join(
+        [
+            "Checklist interno de prontidão para protocolo. Este bloco serve como apoio operacional do escritório e deve ser revisado antes do ajuizamento.",
+            f"Pendências e conferências obrigatórias:\n{pending_block}",
+            f"Itens já tratados ou encaminhados pela peça:\n{ready_block}",
+        ]
+    )
+
+
 def _build_fgts_claim_values_section(metadata: dict, case, cause_value: str) -> tuple[str, str | None]:
     combined_text = _case_combined_text(case, metadata)
 
@@ -1567,6 +1651,18 @@ def _build_assisted_sections(
             ]
         )
 
+    protocolo_checklist = _build_protocol_readiness_checklist_section(
+        author_inline_qualification=author_inline_qualification,
+        defendant_inline_qualification=defendant_inline_qualification,
+        lawyer_name=lawyer_name,
+        lawyer_oab=lawyer_oab,
+        lawyer_uf=lawyer_uf,
+        signature_local=signature_local,
+        signature_date=signature_date,
+        cause_value=cause_value,
+        is_fgts_case=is_trabalhista_fgts_nao_recolhido,
+    )
+
     return [
         {
             "key": "enderecamento",
@@ -1662,6 +1758,20 @@ def _build_assisted_sections(
                 "origin_sources": ["strategy"],
                 "generation_mode": "assisted_draft_from_analysis",
                 "guardrail_status": "ok",
+            },
+        },
+        {
+            "key": "checklist_final_protocolo",
+            "title": "Checklist Final para Protocolo",
+            "content": protocolo_checklist,
+            "source": "assisted_draft",
+            "status": "draft",
+            "metadata": {
+                "origin_sources": ["case", "calculation", "strategy", "protocol_readiness"],
+                "generation_mode": "assisted_draft_from_analysis",
+                "guardrail_status": "requires_professional_review",
+                "export_visibility": "internal",
+                "include_in_final_pdf": False,
             },
         },
     ]
