@@ -88,6 +88,35 @@ def _safe_text(value) -> str:
     return ""
 
 
+# PATCH: editor_export_display_title_v1
+def _resolve_editor_export_title(
+    db: Session,
+    document: EditableDocument,
+    tenant_id: int,
+) -> str:
+    metadata = document.document_metadata or {}
+
+    for key in ("display_title", "editor_title", "export_title", "case_title"):
+        title = _safe_text(metadata.get(key))
+        if title:
+            return title
+
+    case = (
+        db.query(Case)
+        .filter(
+            Case.id == document.case_id,
+            Case.tenant_id == tenant_id,
+        )
+        .first()
+    )
+    if case:
+        case_title = _safe_text(case.title)
+        if case_title:
+            return case_title
+
+    return _safe_text(document.title) or "Documento Jurídico"
+
+
 # PATCH: editor_fgts_claim_values_v1
 def _format_brl(value: Decimal) -> str:
     rounded = value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
@@ -1823,7 +1852,7 @@ def export_editable_document_html(
 
     html = build_editor_html(
         {
-            "title": document.title,
+            "title": _resolve_editor_export_title(db, document, current_user["tenant_id"]),
             "area": document.area,
             "document_type": document.document_type,
         },
@@ -1875,7 +1904,7 @@ def export_editable_document_pdf(
 
     html = build_editor_html(
         {
-            "title": document.title,
+            "title": _resolve_editor_export_title(db, document, current_user["tenant_id"]),
             "area": document.area,
             "document_type": document.document_type,
         },
