@@ -165,14 +165,26 @@ def test_civel_cobranca_assisted_draft_uses_collection_specific_guardrails(monke
         "case_number": f"COBRANCA-{uuid.uuid4().hex[:8]}",
         "title": "Cobrança de contrato de prestação de serviços inadimplido",
         "description": (
-            "A empresa autora foi contratada para executar serviços de manutenção elétrica "
-            "no valor total de R$ 18.500,00. A primeira parcela de R$ 6.500,00 foi paga, "
-            "mas duas parcelas vencidas em 25/02/2026 e 05/03/2026 permaneceram inadimplidas, "
-            "totalizando saldo contratual de R$ 12.000,00. Há contrato assinado, comprovante "
-            "de pagamento parcial, relatório técnico de execução dos serviços, fotografias, "
-            "mensagens de WhatsApp com reconhecimento da dívida, notificação extrajudicial "
-            "e planilha de cálculo com multa de 2%, juros de 1% ao mês e correção monetária. "
-            "O objetivo é propor ação de cobrança contratual, sem pedido de dano moral."
+            "A empresa DLP Manutenção e Serviços Ltda. foi contratada pela empresa Restaurante Mar Azul Ltda. "
+            "para executar serviços de manutenção elétrica preventiva e corretiva no estabelecimento comercial "
+            "localizado em Itapoá/SC. "
+            "O contrato foi firmado em 10/02/2026, no valor total de R$ 18.500,00, com pagamento previsto em "
+            "três parcelas: R$ 6.500,00 na assinatura do contrato, R$ 6.000,00 após a conclusão da primeira etapa "
+            "e R$ 6.000,00 na entrega final dos serviços. "
+            "A contratada executou integralmente os serviços entre 12/02/2026 e 28/02/2026, incluindo troca de "
+            "disjuntores, revisão do quadro elétrico, substituição de fiação danificada, instalação de tomadas "
+            "industriais e emissão de relatório técnico de conclusão. "
+            "A primeira parcela de R$ 6.500,00 foi paga em 10/02/2026. Porém, as duas parcelas restantes, "
+            "vencidas em 25/02/2026 e 05/03/2026, não foram pagas, totalizando dívida principal de R$ 12.000,00. "
+            "A devedora reconheceu a dívida por mensagens de WhatsApp enviadas em 08/03/2026 e 15/03/2026, "
+            "alegando dificuldades financeiras e prometendo pagamento até 20/03/2026, o que não ocorreu. "
+            "Em 25/03/2026, foi enviada notificação extrajudicial por e-mail e WhatsApp, concedendo prazo de "
+            "cinco dias para pagamento. A notificação foi recebida, mas não houve quitação nem proposta formal "
+            "de acordo. "
+            "Documentos disponíveis: contrato assinado, comprovante de pagamento parcial, relatório técnico, "
+            "fotografias, mensagens, notificação extrajudicial, e-mails e planilha de cálculo. "
+            "Pedido pretendido: propor ação de cobrança contratual, sem pedido de dano moral. "
+            "Observação estratégica: a prova documental é considerada forte."
         ),
         "legal_area": "civel",
         "action_type": "Ação de Cobrança",
@@ -238,9 +250,16 @@ def test_civel_cobranca_assisted_draft_uses_collection_specific_guardrails(monke
     assert generated["current_version_number"] == 2
 
     latest_version = max(generated["versions"], key=lambda item: item["version_number"])
+    petition_sections = [
+        section
+        for section in latest_version["sections"]
+        if "checklist" not in (section.get("key") or "").lower()
+        and "checklist" not in (section.get("title") or "").lower()
+    ]
+
     combined_text = "\n".join(
         (section.get("content") or "")
-        for section in latest_version["sections"]
+        for section in petition_sections
     ).lower()
 
     required_terms = [
@@ -252,6 +271,13 @@ def test_civel_cobranca_assisted_draft_uses_collection_specific_guardrails(monke
         "honorários",
         "contrato",
         "planilha de cálculo",
+        "dlp manutenção e serviços",
+        "restaurante mar azul",
+        "itapoá/sc",
+        "r$ 12.000,00",
+        "pessoa jurídica de direito privado",
+        "vara cível",
+        "conjunto probatório documental robusto",
     ]
     for term in required_terms:
         assert term in combined_text
@@ -274,6 +300,30 @@ def test_civel_cobranca_assisted_draft_uses_collection_specific_guardrails(monke
         "probabilidade estimada de êxito",
         "score",
         "/100",
+        "documentos disponíveis",
+        "pedido pretendido",
+        "observação estratégica",
+        "estratégia jurídica sugerida",
+        "estratégia sugerida",
+        "lacunas probatórias",
+        "viabilidade moderada",
+        "risco baixo",
+        "complexidade baixa",
+        "título executivo extrajudicial probatório",
+        "titulo executivo extrajudicial probatorio",
+        "nome completo da parte autora",
+        "comarca a definir",
+        "fgts",
+        "clt",
+        "verbas rescisórias",
+        "horas extras",
+        "insalubridade",
+        "periculosidade",
+        "reclamação trabalhista",
+        "vara do trabalho",
+        "reclamante",
+        "reclamada",
+        "r$ 12.000,00.,",
     ]
     for term in forbidden_terms:
         assert term not in combined_text

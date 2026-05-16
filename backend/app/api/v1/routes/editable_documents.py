@@ -1327,6 +1327,134 @@ def _build_assisted_sections(
         ]
     )
 
+    if is_civel_cobranca:
+        import re
+
+        civil_case_comarca = case_comarca
+        if civil_case_comarca.startswith("[") and ("itapoá" in case_search_text or "itapoa" in case_search_text):
+            civil_case_comarca = "ITAPOÁ/SC"
+
+        civil_cause_value = cause_value
+        if civil_cause_value.startswith("["):
+            cause_match = re.search(
+                r"(?:saldo principal|d[ií]vida principal|valor principal)(?:[^R]{0,120})R\$\s*([\d\.\,]+)",
+                case_description,
+                flags=re.IGNORECASE,
+            )
+            if not cause_match:
+                cause_match = re.search(
+                    r"principal de R\$\s*([\d\.\,]+)",
+                    case_description,
+                    flags=re.IGNORECASE,
+                )
+            if cause_match:
+                civil_cause_value = cause_match.group(1).strip().rstrip(".;:")
+
+        company_match = re.search(
+            r"A empresa\s+(.+?)\s+foi contratada pela empresa\s+(.+?)\s+para",
+            case_description,
+            flags=re.IGNORECASE | re.DOTALL,
+        )
+        if company_match:
+            civil_author_name = _safe_text(company_match.group(1))
+            civil_defendant_name = _safe_text(company_match.group(2))
+            if civil_author_name:
+                author_inline_qualification = (
+                    f"{civil_author_name.upper()}, pessoa jurídica de direito privado, "
+                    "inscrita no CNPJ sob nº [CNPJ a complementar], com sede em [endereço completo a complementar], "
+                    "neste ato representada na forma de seu contrato social"
+                )
+            if civil_defendant_name:
+                defendant_inline_qualification = (
+                    f"{civil_defendant_name.upper()}, pessoa jurídica de direito privado, "
+                    "inscrita no CNPJ sob nº [CNPJ a complementar], com sede em [endereço completo a complementar]"
+                )
+
+        civil_summary = case_description.strip()
+        for marker in ("Documentos disponíveis:", "Pedido pretendido:", "Observação estratégica:"):
+            idx = civil_summary.lower().find(marker.lower())
+            if idx >= 0:
+                civil_summary = civil_summary[:idx].strip()
+                break
+
+        resumo_fatico = _paragraphs(
+            [
+                civil_summary,
+                "Diante do inadimplemento contratual e da ausência de solução extrajudicial, a presente ação busca a condenação da parte ré ao pagamento do saldo contratual devido, acrescido dos encargos contratuais e legais cabíveis, além de custas processuais e honorários advocatícios.",
+            ]
+        )
+
+        fundamentacao = _paragraphs(
+            [
+                "I. DA RELAÇÃO CONTRATUAL E DO CUMPRIMENTO DA OBRIGAÇÃO PELA AUTORA",
+                "Conforme demonstram os documentos que instruem a presente demanda, a parte autora foi contratada pela parte ré para a execução de serviços de manutenção elétrica preventiva e corretiva no estabelecimento comercial indicado no contrato.",
+                "A autora cumpriu integralmente a obrigação assumida, executando os serviços contratados, com emissão de relatório técnico de conclusão, fotografias do serviço realizado e demais documentos comprobatórios da efetiva prestação dos serviços.",
+                "Além disso, a própria ré efetuou o pagamento da primeira parcela contratual, o que reforça a existência da relação jurídica, a validade do ajuste firmado entre as partes e o início regular da execução contratual.",
+                "II. DO INADIMPLEMENTO CONTRATUAL DA RÉ",
+                "Embora a autora tenha cumprido sua obrigação contratual, a ré deixou de pagar as parcelas finais ajustadas, totalizando saldo principal inadimplido indicado na documentação do caso.",
+                "A inadimplência permaneceu mesmo após tentativas extrajudiciais de solução. A ré reconheceu a existência da dívida por mensagens de WhatsApp e, posteriormente, mesmo notificada, não realizou a quitação do débito nem apresentou proposta formal de acordo.",
+                "III. DA MORA E DOS ENCARGOS CONTRATUAIS E LEGAIS",
+                "O inadimplemento das parcelas vencidas colocou a ré em mora, tornando exigível o pagamento do saldo contratual em aberto, acrescido dos encargos previstos no contrato e dos consectários legais cabíveis.",
+                f"O débito principal corresponde a R$ {civil_cause_value}, sem prejuízo da incidência de multa contratual, juros de mora e correção monetária, conforme previsão contratual e memória de cálculo a ser atualizada até a data do ajuizamento.",
+                "Assim, a ré deve responder pelo pagamento do valor principal, acrescido de multa, juros, atualização monetária, custas processuais e honorários advocatícios, em razão do descumprimento da obrigação assumida.",
+                "IV. DA PROVA DOCUMENTAL DO DÉBITO",
+                "A pretensão da autora está amparada por conjunto probatório documental robusto, composto por contrato de prestação de serviços assinado pelas partes, comprovante de pagamento parcial, relatório técnico de execução, fotografias do serviço concluído, conversas de WhatsApp com reconhecimento da dívida, notificação extrajudicial, e-mails trocados entre as empresas e planilha de cálculo.",
+                "Tais documentos demonstram a existência da contratação, a efetiva execução dos serviços, o pagamento parcial, o inadimplemento das parcelas finais e a tentativa extrajudicial de recebimento do crédito.",
+                "Eventual alegação defensiva de vício no serviço, compensação ou discordância quanto à execução deverá ser comprovada pela ré, pois a documentação disponível indica que os serviços foram concluídos e que a dívida foi posteriormente reconhecida.",
+                "V. DO CABIMENTO DA AÇÃO DE COBRANÇA",
+                "Diante da existência de relação contratual, da execução dos serviços pela autora e do inadimplemento da ré, é cabível a presente ação de cobrança, com o objetivo de obter a condenação da parte ré ao pagamento do saldo contratual inadimplido.",
+                f"A demanda busca o recebimento do valor principal de R$ {civil_cause_value}, acrescido de multa contratual, juros de mora, correção monetária, custas processuais e honorários advocatícios, nos termos do contrato, da legislação civil aplicável e da prova documental juntada aos autos.",
+            ]
+        )
+
+        pedidos = _paragraphs(
+            [
+                "I. Requer-se a citação da parte ré para, querendo, apresentar contestação, sob pena de revelia e confissão quanto à matéria de fato.",
+                f"II. Requer-se a condenação da parte ré ao pagamento do saldo contratual inadimplido no valor principal de R$ {civil_cause_value}, acrescido de multa contratual, juros de mora, correção monetária, custas processuais e honorários advocatícios.",
+                "III. Requer-se que os encargos de mora sejam calculados a partir do vencimento de cada parcela inadimplida, observando-se a cláusula contratual aplicável e a planilha de cálculo a ser juntada aos autos.",
+                "IV. Requer-se a produção de prova documental suplementar, testemunhal e demais meios de prova em direito admitidos, especialmente contrato, comprovantes de pagamento, relatório técnico, fotografias, mensagens, notificação extrajudicial, e-mails e planilha de cálculo.",
+                "V. Requer-se a condenação da parte ré ao pagamento das custas processuais e honorários advocatícios, nos termos da legislação processual aplicável.",
+            ]
+        )
+
+        enderecamento = _paragraphs(
+            [
+                f"EXCELENTÍSSIMO(A) SENHOR(A) DOUTOR(A) JUIZ(A) DE DIREITO DA VARA CÍVEL DA COMARCA DE {civil_case_comarca}.",
+            ]
+        )
+
+        qualificacao_partes = _paragraphs(
+            [
+                f"{author_inline_qualification}, por seu advogado infra-assinado, vem, respeitosamente, à presença de Vossa Excelência, propor a presente AÇÃO DE COBRANÇA em face de {defendant_inline_qualification}, pelos fatos e fundamentos a seguir expostos.",
+            ]
+        )
+
+        pedidos_valores_estimados = _paragraphs(
+            [
+                f"O valor principal inadimplido corresponde a R$ {civil_cause_value}, referente ao saldo contratual em aberto indicado nos documentos do caso.",
+                "Sobre o valor principal deverão incidir multa contratual, juros de mora e correção monetária, conforme previsão contratual e memória de cálculo a ser revisada e atualizada até a data do ajuizamento.",
+                f"Dá-se à causa, para fins fiscais e processuais, o valor inicial de R$ {civil_cause_value}, correspondente ao saldo principal inadimplido, sem prejuízo da atualização por multa contratual, juros de mora e correção monetária conforme memória de cálculo a ser apresentada.",
+            ]
+        )
+
+        provas_requerimentos = _paragraphs(
+            [
+                "Requer-se a produção de todos os meios de prova em direito admitidos, especialmente prova documental suplementar e testemunhal.",
+                "Deverão instruir a demanda, conforme disponibilidade e conferência do advogado responsável, o contrato assinado, comprovante de pagamento parcial, relatório de execução dos serviços, fotografias, mensagens de reconhecimento da dívida, notificação extrajudicial, e-mails e planilha de cálculo atualizada.",
+            ]
+        )
+
+        fechamento = _paragraphs(
+            [
+                f"Ante o exposto, requer o regular processamento da presente demanda e, ao final, a total procedência dos pedidos, com a condenação da parte ré ao pagamento do saldo contratual inadimplido no valor principal de R$ {civil_cause_value}, acrescido de multa contratual, juros de mora, correção monetária, custas processuais e honorários advocatícios.",
+                "Requer-se a produção de todos os meios de prova em direito admitidos, especialmente prova documental suplementar, testemunhal e demais provas necessárias à demonstração da relação contratual, da execução dos serviços, do pagamento parcial, do inadimplemento e das tentativas extrajudiciais de cobrança.",
+                f"Dá-se à causa, para fins fiscais e processuais, o valor inicial de R$ {civil_cause_value}, correspondente ao saldo principal inadimplido, sem prejuízo da atualização por multa contratual, juros de mora e correção monetária conforme memória de cálculo a ser apresentada.",
+                "Termos em que, pede deferimento.",
+                f"{civil_case_comarca.replace('/Sc', '/SC').replace('/sc', '/SC').title().replace('/Sc', '/SC')}, {signature_date}.",
+                f"{lawyer_name} — OAB/{lawyer_uf} {lawyer_oab}.",
+            ]
+        )
+
     if is_labor_case:
         labor_jurisdiction = "JOINVILLE/SC" if "joinville" in case_search_text else "[LOCALIDADE A DEFINIR]"
         enderecamento = _paragraphs(
