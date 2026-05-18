@@ -503,13 +503,20 @@ def _build_missing_context_items(
     technical_summary: str,
     issues: list[str],
     next_steps: list[str],
+    *,
+    is_labor_case: bool = False,
 ) -> list[str]:
     missing: list[str] = []
 
     if len(case_description) < 80:
-        missing.append(
-            "detalhar fatos, período, jornada, pedidos pretendidos e provas disponíveis no cadastro do caso"
-        )
+        if is_labor_case:
+            missing.append(
+                "detalhar fatos, período, jornada, vínculo, pedidos pretendidos e provas disponíveis no cadastro do caso"
+            )
+        else:
+            missing.append(
+                "detalhar fatos, período/cronologia, contexto do conflito, pedidos pretendidos e provas disponíveis no cadastro do caso"
+            )
     if not technical_summary:
         missing.append("executar ou complementar a análise técnica do caso")
     if not issues:
@@ -520,21 +527,42 @@ def _build_missing_context_items(
     return missing
 
 
-def _build_insufficient_content(block_title: str, missing_items: list[str]) -> str:
-    block_guidance = {
-        "Resumo Fático": [
-            "Faltam elementos para narrar os fatos com segurança.",
-            "Complete datas, período, jornada, contexto do conflito e provas disponíveis para este bloco.",
-        ],
-        "Fundamentação": [
-            "Faltam elementos para sustentar a tese jurídica com segurança.",
-            "Complete controvérsia principal, violação legal, enquadramento jurídico e estratégia para este bloco.",
-        ],
-        "Pedidos": [
-            "Faltam elementos para estruturar os pedidos com segurança.",
-            "Complete pretensões principais, verbas buscadas, reflexos e requerimentos finais para este bloco.",
-        ],
-    }
+def _build_insufficient_content(
+    block_title: str,
+    missing_items: list[str],
+    *,
+    is_labor_case: bool = False,
+) -> str:
+    if is_labor_case:
+        block_guidance = {
+            "Resumo Fático": [
+                "Faltam elementos para narrar os fatos trabalhistas com segurança.",
+                "Complete datas, período, jornada, vínculo, contexto do conflito e provas disponíveis para este bloco.",
+            ],
+            "Fundamentação": [
+                "Faltam elementos para sustentar a tese jurídica trabalhista com segurança.",
+                "Complete controvérsia principal, violação legal, enquadramento jurídico, verbas discutidas e estratégia para este bloco.",
+            ],
+            "Pedidos": [
+                "Faltam elementos para estruturar os pedidos trabalhistas com segurança.",
+                "Complete pretensões principais, verbas buscadas, reflexos e requerimentos finais para este bloco.",
+            ],
+        }
+    else:
+        block_guidance = {
+            "Resumo Fático": [
+                "Faltam elementos para narrar os fatos cíveis com segurança.",
+                "Complete datas, período/cronologia, contexto do conflito, relação jurídica e provas disponíveis para este bloco.",
+            ],
+            "Fundamentação": [
+                "Faltam elementos para sustentar a tese jurídica cível com segurança.",
+                "Complete controvérsia principal, obrigação discutida, violação contratual/legal, enquadramento jurídico e estratégia para este bloco.",
+            ],
+            "Pedidos": [
+                "Faltam elementos para estruturar os pedidos cíveis com segurança.",
+                "Complete pretensões principais, valor envolvido, encargos, provas e requerimentos finais para este bloco.",
+            ],
+        }
 
     guidance = block_guidance.get(
         block_title,
@@ -1131,6 +1159,7 @@ def _build_assisted_sections(
         technical_summary=technical_summary,
         issues=issues,
         next_steps=next_steps,
+        is_labor_case=is_labor_case,
     )
 
     insufficient_context = (
@@ -1146,7 +1175,7 @@ def _build_assisted_sections(
             {
                 "key": "resumo_fatico",
                 "title": "Resumo Fático",
-                "content": _build_insufficient_content("Resumo Fático", missing_items),
+                "content": _build_insufficient_content("Resumo Fático", missing_items, is_labor_case=is_labor_case),
                 "source": "assisted_draft",
                 "status": "draft",
                 "metadata": {
@@ -1160,7 +1189,7 @@ def _build_assisted_sections(
             {
                 "key": "fundamentacao",
                 "title": "Fundamentação",
-                "content": _build_insufficient_content("Fundamentação", missing_items),
+                "content": _build_insufficient_content("Fundamentação", missing_items, is_labor_case=is_labor_case),
                 "source": "assisted_draft",
                 "status": "draft",
                 "metadata": {
@@ -1174,7 +1203,7 @@ def _build_assisted_sections(
             {
                 "key": "pedidos",
                 "title": "Pedidos",
-                "content": _build_insufficient_content("Pedidos", missing_items),
+                "content": _build_insufficient_content("Pedidos", missing_items, is_labor_case=is_labor_case),
                 "source": "assisted_draft",
                 "status": "draft",
                 "metadata": {
