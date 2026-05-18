@@ -1334,6 +1334,13 @@ def _build_assisted_sections(
         if civil_case_comarca.startswith("[") and ("itapoá" in case_search_text or "itapoa" in case_search_text):
             civil_case_comarca = "ITAPOÁ/SC"
 
+        def _parse_brl_amount(value: str) -> float:
+            return float(value.replace(".", "").replace(",", "."))
+
+        def _format_brl_amount(value: float) -> str:
+            formatted = f"{value:,.2f}"
+            return formatted.replace(",", "X").replace(".", ",").replace("X", ".")
+
         civil_cause_value = cause_value
         if civil_cause_value.startswith("["):
             cause_match = re.search(
@@ -1349,26 +1356,65 @@ def _build_assisted_sections(
                 )
             if cause_match:
                 civil_cause_value = cause_match.group(1).strip().rstrip(".;:")
+            else:
+                open_marker_match = re.search(
+                    r"(?:permaneceram em aberto|parcelas? em aberto|saldo em aberto)",
+                    case_description,
+                    flags=re.IGNORECASE,
+                )
+                if open_marker_match:
+                    open_window = case_description[
+                        open_marker_match.start() : open_marker_match.start() + 450
+                    ]
+                    installment_values = re.findall(
+                        r"R\$\s*([\d]{1,3}(?:\.\d{3})*,\d{2}|\d+,\d{2})",
+                        open_window,
+                        flags=re.IGNORECASE,
+                    )
+                    if installment_values:
+                        total = sum(_parse_brl_amount(item) for item in installment_values)
+                        civil_cause_value = _format_brl_amount(total)
 
         company_match = re.search(
             r"A empresa\s+(.+?)\s+foi contratada pela empresa\s+(.+?)\s+para",
             case_description,
             flags=re.IGNORECASE | re.DOTALL,
         )
+        structured_author_match = re.search(
+            r"^\s*Autor(?:a)?\s*:\s*(.+?)\s*$",
+            case_description,
+            flags=re.IGNORECASE | re.MULTILINE,
+        )
+        structured_defendant_match = re.search(
+            r"^\s*R[ée]u\s*:\s*(.+?)\s*$",
+            case_description,
+            flags=re.IGNORECASE | re.MULTILINE,
+        )
+
+        civil_author_name = ""
+        civil_defendant_name = ""
+
         if company_match:
             civil_author_name = _safe_text(company_match.group(1))
             civil_defendant_name = _safe_text(company_match.group(2))
-            if civil_author_name:
-                author_inline_qualification = (
-                    f"{civil_author_name.upper()}, pessoa jurídica de direito privado, "
-                    "inscrita no CNPJ sob nº [CNPJ a complementar], com sede em [endereço completo a complementar], "
-                    "neste ato representada na forma de seu contrato social"
-                )
-            if civil_defendant_name:
-                defendant_inline_qualification = (
-                    f"{civil_defendant_name.upper()}, pessoa jurídica de direito privado, "
-                    "inscrita no CNPJ sob nº [CNPJ a complementar], com sede em [endereço completo a complementar]"
-                )
+        elif structured_author_match or structured_defendant_match:
+            civil_author_name = _safe_text(structured_author_match.group(1)) if structured_author_match else ""
+            civil_defendant_name = _safe_text(structured_defendant_match.group(1)) if structured_defendant_match else ""
+
+        civil_author_name = civil_author_name.strip().rstrip(".;:")
+        civil_defendant_name = civil_defendant_name.strip().rstrip(".;:")
+
+        if civil_author_name:
+            author_inline_qualification = (
+                f"{civil_author_name.upper()}, pessoa jurídica de direito privado, "
+                "inscrita no CNPJ sob nº [CNPJ a complementar], com sede em [endereço completo a complementar], "
+                "neste ato representada na forma de seu contrato social"
+            )
+        if civil_defendant_name:
+            defendant_inline_qualification = (
+                f"{civil_defendant_name.upper()}, pessoa jurídica de direito privado, "
+                "inscrita no CNPJ sob nº [CNPJ a complementar], com sede em [endereço completo a complementar]"
+            )
 
         civil_summary = case_description.strip()
         for marker in ("Documentos disponíveis:", "Pedido pretendido:", "Observação estratégica:"):
@@ -1417,9 +1463,21 @@ def _build_assisted_sections(
             ]
         )
 
+        civil_has_defined_comarca = not civil_case_comarca.startswith("[")
+        civil_enderecamento_text = (
+            f"EXCELENTÍSSIMO(A) SENHOR(A) DOUTOR(A) JUIZ(A) DE DIREITO DA VARA CÍVEL DA COMARCA DE {civil_case_comarca}."
+            if civil_has_defined_comarca
+            else "EXCELENTÍSSIMO(A) SENHOR(A) DOUTOR(A) JUIZ(A) DE DIREITO DA VARA CÍVEL DA COMARCA COMPETENTE."
+        )
+        civil_signature_local = (
+            civil_case_comarca.replace("/Sc", "/SC").replace("/sc", "/SC").title().replace("/Sc", "/SC")
+            if civil_has_defined_comarca
+            else "[local a definir]"
+        )
+
         enderecamento = _paragraphs(
             [
-                f"EXCELENTÍSSIMO(A) SENHOR(A) DOUTOR(A) JUIZ(A) DE DIREITO DA VARA CÍVEL DA COMARCA DE {civil_case_comarca}.",
+                civil_enderecamento_text,
             ]
         )
 
@@ -1450,7 +1508,7 @@ def _build_assisted_sections(
                 "Requer-se a produção de todos os meios de prova em direito admitidos, especialmente prova documental suplementar, testemunhal e demais provas necessárias à demonstração da relação contratual, da execução dos serviços, do pagamento parcial, do inadimplemento e das tentativas extrajudiciais de cobrança.",
                 f"Dá-se à causa, para fins fiscais e processuais, o valor inicial de R$ {civil_cause_value}, correspondente ao saldo principal inadimplido, sem prejuízo da atualização por multa contratual, juros de mora e correção monetária conforme memória de cálculo a ser apresentada.",
                 "Termos em que, pede deferimento.",
-                f"{civil_case_comarca.replace('/Sc', '/SC').replace('/sc', '/SC').title().replace('/Sc', '/SC')}, {signature_date}.",
+                f"{civil_signature_local}, {signature_date}.",
                 f"{lawyer_name} — OAB/{lawyer_uf} {lawyer_oab}.",
             ]
         )
