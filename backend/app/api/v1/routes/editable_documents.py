@@ -1387,7 +1387,7 @@ def _build_assisted_sections(
         fundamentacao = _paragraphs(
             [
                 "I. DA RELAÇÃO CONTRATUAL E DO CUMPRIMENTO DA OBRIGAÇÃO PELA AUTORA",
-                "Conforme demonstram os documentos que instruem a presente demanda, a parte autora foi contratada pela parte ré para a execução de serviços de manutenção elétrica preventiva e corretiva no estabelecimento comercial indicado no contrato.",
+                "Conforme demonstram os documentos que instruem a presente demanda, a parte autora foi contratada pela parte ré para a execução dos serviços contratados descritos na narrativa fática e comprovados pelos documentos do caso.",
                 "A autora cumpriu integralmente a obrigação assumida, executando os serviços contratados, com emissão de relatório técnico de conclusão, fotografias do serviço realizado e demais documentos comprobatórios da efetiva prestação dos serviços.",
                 "Além disso, a própria ré efetuou o pagamento da primeira parcela contratual, o que reforça a existência da relação jurídica, a validade do ajuste firmado entre as partes e o início regular da execução contratual.",
                 "II. DO INADIMPLEMENTO CONTRATUAL DA RÉ",
