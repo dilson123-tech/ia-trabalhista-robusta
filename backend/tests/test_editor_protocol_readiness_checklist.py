@@ -51,3 +51,37 @@ def test_protocol_readiness_checklist_flags_missing_lawyer_signature_data():
     assert "Informar local de assinatura" in content
     assert "Informar data de assinatura" in content
     assert "Definir ou revisar valor da causa antes do protocolo" in content
+
+
+def test_protocol_readiness_checklist_uses_civil_party_labels():
+    content = _build_protocol_readiness_checklist_section(
+        author_inline_qualification=(
+            "DILSTECH SOLUÇÕES LTDA, pessoa jurídica de direito privado, "
+            "inscrita no CNPJ sob nº [CNPJ a complementar], "
+            "com sede em [endereço completo a complementar]"
+        ),
+        defendant_inline_qualification=(
+            "MERCADO COSTA NORTE LTDA, pessoa jurídica de direito privado, "
+            "inscrita no CNPJ sob nº [CNPJ a complementar], "
+            "com sede em [endereço completo a complementar]"
+        ),
+        lawyer_name="[Nome do advogado]",
+        lawyer_oab="[número]",
+        lawyer_uf="[UF]",
+        signature_local="Itapoá/SC",
+        signature_date="[data]",
+        cause_value="18.000,00",
+        is_fgts_case=False,
+        is_labor_case=False,
+    )
+
+    assert "Checklist interno de prontidão para protocolo" in content
+    assert "Informar e conferir CNPJ da parte ré" in content
+    assert "Informar endereço completo da parte ré" in content
+    assert "Informar nome do advogado responsável" in content
+    assert "Valor da causa preenchido/revisável: R$ 18.000,00" in content
+
+    assert "CNPJ da reclamada" not in content
+    assert "endereço da reclamada" not in content
+    assert "reclamante" not in content
+    assert "reclamada" not in content
