@@ -898,6 +898,7 @@ def _build_assisted_sections(
             normalized_action_type,
         ]
     ).lower()
+    is_civil_ambiental = normalized_area == "civil_ambiental"
     is_civel_area = normalized_area in {"civel", "civil_ambiental"}
     is_trabalhista_area = normalized_area in {"trabalhista", "trabalho", "laboral"}
     is_civel_cobranca = is_civel_area and any(
@@ -1359,6 +1360,188 @@ def _build_assisted_sections(
             f"{lawyer_name} — OAB/{lawyer_uf} {lawyer_oab}.",
         ]
     )
+
+    if is_civil_ambiental:
+        import re
+
+        def _first_match(patterns: list[str]) -> str:
+            for pattern in patterns:
+                match = re.search(pattern, case_description, flags=re.IGNORECASE | re.DOTALL | re.MULTILINE)
+                if match:
+                    return _safe_text(match.group(1)).strip().rstrip(".;:")
+            return ""
+
+        civil_amb_comarca = case_comarca
+        if civil_amb_comarca.startswith("[") and ("itapoá" in case_search_text or "itapoa" in case_search_text):
+            civil_amb_comarca = "ITAPOÁ/SC"
+
+        civil_amb_author_name = _first_match([
+            r"\bA autora\s+(.+?)\s+reside\b",
+            r"\bO autor\s+(.+?)\s+reside\b",
+            r"^\s*Autora?\s*:\s*(.+?)\s*$",
+            r"^\s*Autor\s*:\s*(.+?)\s*$",
+        ])
+
+        civil_amb_defendant_name = _first_match([
+            r"ao lado da empresa\s+(.+?),\s+que\s+explora",
+            r"ao lado da empresa\s+(.+?)\s*,",
+            r"^\s*R[ée]u\s*:\s*(.+?)\s*$",
+            r"^\s*Parte ré\s*:\s*(.+?)\s*$",
+        ])
+
+        if civil_amb_author_name:
+            author_inline_qualification = (
+                f"{civil_amb_author_name.upper()}, [nacionalidade], [estado civil], [profissão], "
+                "inscrita no CPF nº [CPF a complementar] e RG nº [RG a complementar], "
+                "residente e domiciliada em [endereço completo a complementar]"
+            )
+
+        if civil_amb_defendant_name:
+            defendant_inline_qualification = (
+                f"{civil_amb_defendant_name.upper()}, pessoa jurídica de direito privado, "
+                "inscrita no CNPJ sob nº [CNPJ a complementar], com sede em [endereço completo a complementar]"
+            )
+
+        civil_amb_signature_local = (
+            civil_amb_comarca.replace("/Sc", "/SC").replace("/sc", "/SC").title().replace("/Sc", "/SC")
+            if not civil_amb_comarca.startswith("[")
+            else "[local a definir]"
+        )
+
+        enderecamento = _paragraphs([
+            f"EXCELENTÍSSIMO(A) SENHOR(A) DOUTOR(A) JUIZ(A) DE DIREITO DA VARA CÍVEL DA COMARCA DE {civil_amb_comarca}.",
+        ])
+
+        qualificacao_partes = _paragraphs([
+            (
+                f"{author_inline_qualification}, por seu advogado infra-assinado, vem, respeitosamente, "
+                "à presença de Vossa Excelência, propor a presente "
+                "AÇÃO DE OBRIGAÇÃO DE FAZER E/OU NÃO FAZER C/C PEDIDO DE TUTELA DE URGÊNCIA "
+                f"E INDENIZAÇÃO POR DANOS MORAIS E MATERIAIS em face de {defendant_inline_qualification}, "
+                "pelos fatos e fundamentos a seguir expostos."
+            )
+        ])
+
+        resumo_fatico = _paragraphs([
+            case_description.strip(),
+            (
+                "A situação narrada indica uso potencialmente anormal da propriedade vizinha, com impactos "
+                "continuados ao sossego, à saúde, à segurança e ao uso regular do imóvel residencial da parte autora, "
+                "justificando a apreciação urgente das medidas de contenção e cessação dos danos."
+            ),
+        ])
+
+        fundamentacao = _paragraphs([
+            "I. DO USO ANORMAL DA PROPRIEDADE E DO DIREITO DE VIZINHANÇA",
+            (
+                "A controvérsia decorre da emissão de poeira de cimento, ruído contínuo, vibração diária, "
+                "obstrução da via e ausência de barreira física adequada entre o imóvel residencial da autora "
+                "e a atividade industrial exercida pela ré."
+            ),
+            (
+                "Nos termos do art. 1.277 do Código Civil, o proprietário ou possuidor tem direito de fazer cessar "
+                "interferências prejudiciais à segurança, ao sossego e à saúde dos que habitam o imóvel, quando "
+                "decorrentes da utilização anormal da propriedade vizinha."
+            ),
+            "II. DA RESPONSABILIDADE CIVIL E DA PROTEÇÃO À SAÚDE",
+            (
+                "A persistência de poeira, ruído e vibração, especialmente em imóvel ocupado por pessoa idosa com "
+                "problemas pulmonares, pode configurar conduta lesiva apta a gerar obrigação de cessação, mitigação, "
+                "reparação e prevenção de novos danos, observados os arts. 186, 187 e 927 do Código Civil."
+            ),
+            (
+                "A proteção ao meio ambiente equilibrado e à saúde também encontra amparo no art. 225 da Constituição "
+                "Federal, sem prejuízo da incidência das normas de proteção reforçada à pessoa idosa, quando demonstrada "
+                "situação de vulnerabilidade e risco agravado."
+            ),
+            "III. DA TUTELA DE URGÊNCIA",
+            (
+                "A tutela de urgência mostra-se juridicamente pertinente quando houver elementos que indiquem a "
+                "probabilidade do direito e o perigo de dano ou risco ao resultado útil do processo, especialmente "
+                "diante de impactos contínuos à saúde, ao repouso e ao uso regular da residência."
+            ),
+            (
+                "A medida urgente poderá abranger providências de contenção de poeira, redução de ruído e vibração, "
+                "instalação de barreira física, desobstrução da via e abstenção de práticas que agravem os impactos "
+                "narrados, sem prejuízo de fiscalização e multa diária em caso de descumprimento."
+            ),
+            "IV. DA NECESSIDADE DE PROVA TÉCNICA E DOCUMENTAL",
+            (
+                "A prova documental, fotográfica, audiovisual, testemunhal, médica e pericial é relevante para demonstrar "
+                "a extensão dos impactos, o nexo com a atividade da ré, a urgência das medidas e a existência de danos "
+                "morais e materiais eventualmente indenizáveis."
+            ),
+        ])
+
+        pedidos = _paragraphs([
+            "I. Requer-se a citação da parte ré para, querendo, apresentar contestação, sob pena de revelia e confissão quanto à matéria de fato.",
+            (
+                "II. Requer-se, em tutela de urgência, que a parte ré seja obrigada a adotar medidas imediatas para "
+                "cessar ou reduzir a emissão de poeira, ruído e vibração, bem como impedir a obstrução da via e demais "
+                "práticas que agravem o uso anormal da propriedade vizinha."
+            ),
+            (
+                "III. Requer-se que a parte ré seja compelida a instalar barreira física, muro, contenção ou outro meio "
+                "tecnicamente adequado para reduzir os impactos da atividade industrial sobre o imóvel da autora, conforme "
+                "definição técnica a ser confirmada nos autos."
+            ),
+            (
+                "IV. Requer-se a fixação de multa diária para o caso de descumprimento das obrigações impostas, nos termos "
+                "dos arts. 497 e 537 do Código de Processo Civil."
+            ),
+            (
+                "V. Requer-se, ao final, a confirmação da tutela e a condenação da parte ré em obrigação de fazer e/ou "
+                "não fazer, com adoção permanente das medidas necessárias para cessar ou mitigar os impactos narrados."
+            ),
+            (
+                "VI. Requer-se a condenação da parte ré ao pagamento de indenização por danos morais e, se comprovados, "
+                "danos materiais, em valor a ser definido pelo advogado responsável e/ou arbitrado por Vossa Excelência."
+            ),
+            (
+                "VII. Requer-se a produção de prova documental suplementar, testemunhal, pericial ambiental/acústica, "
+                "perícia de engenharia, inspeção judicial e demais meios de prova admitidos em direito."
+            ),
+            "VIII. Requer-se a condenação da parte ré ao pagamento das custas processuais e honorários advocatícios.",
+        ])
+
+        pedidos_valores_estimados = _paragraphs([
+            (
+                "O valor da causa deverá ser definido pelo advogado responsável antes do protocolo, considerando "
+                "a obrigação de fazer/não fazer, eventual tutela de urgência, danos morais, danos materiais e critérios "
+                "processuais aplicáveis."
+            ),
+            f"Valor da causa atualmente informado: R$ {cause_value}.",
+        ])
+
+        provas_requerimentos = _paragraphs([
+            (
+                "Requer-se a produção de todos os meios de prova em direito admitidos, especialmente documentos, fotos, "
+                "vídeos, testemunhas, notificação extrajudicial, documentos médicos, prova pericial ambiental/acústica, "
+                "perícia de engenharia e eventual inspeção judicial."
+            ),
+            (
+                "Deverão ser juntados, conforme disponibilidade, registros datados da poeira, ruído, vibração, obstrução "
+                "da via, ausência de barreira, comunicações extrajudiciais, comprovantes de recebimento da notificação, "
+                "documentos médicos e identificação de testemunhas."
+            ),
+        ])
+
+        fechamento = _paragraphs([
+            (
+                "Ante o exposto, requer o regular processamento da presente ação e, ao final, a procedência dos pedidos, "
+                "com a condenação da parte ré ao cumprimento das obrigações de fazer e/ou não fazer necessárias à cessação "
+                "ou mitigação dos impactos narrados."
+            ),
+            (
+                "Requer-se, ainda, a confirmação das medidas urgentes eventualmente deferidas, a fixação de multa diária "
+                "em caso de descumprimento, a produção das provas requeridas e a condenação da parte ré ao pagamento das "
+                "verbas indenizatórias cabíveis, custas e honorários."
+            ),
+            f"Dá-se à causa, para fins fiscais e processuais, o valor de R$ {cause_value}, sujeito à revisão do advogado responsável antes do protocolo.",
+            "Termos em que, pede deferimento.",
+            f"{civil_amb_signature_local}, {signature_date}.",
+            f"{lawyer_name} — OAB/{lawyer_uf} {lawyer_oab}.",
+        ])
 
     if is_civel_cobranca:
         import re
