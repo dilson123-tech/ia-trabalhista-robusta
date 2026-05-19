@@ -616,3 +616,147 @@ export async function createPlanChangeCheckout(
 
   return response.json()
 }
+
+export type CaseAttachmentCategory =
+  | "foto"
+  | "video"
+  | "pdf"
+  | "documento_medico"
+  | "notificacao"
+  | "documento_pessoal"
+  | "contrato"
+  | "testemunha"
+  | "outro"
+
+export type CaseAttachmentItem = {
+  id: number
+  tenant_id: number
+  case_id: number
+  original_filename: string
+  mime_type?: string | null
+  file_size_bytes: number
+  category: string
+  description?: string | null
+  event_date?: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type CaseAttachmentUploadPayload = {
+  file: File
+  category: CaseAttachmentCategory
+  description?: string
+  event_date?: string
+}
+
+export type CaseAttachmentUpdatePayload = {
+  category?: CaseAttachmentCategory
+  description?: string
+  event_date?: string
+}
+
+export async function listCaseAttachments(
+  token: string,
+  caseId: number,
+): Promise<CaseAttachmentItem[]> {
+  const response = await fetch(`${API_URL}/cases/${caseId}/attachments`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+
+  if (!response.ok) {
+    await parseError(response, "Erro ao listar provas/anexos do caso")
+  }
+
+  return response.json()
+}
+
+export async function uploadCaseAttachment(
+  token: string,
+  caseId: number,
+  payload: CaseAttachmentUploadPayload,
+): Promise<CaseAttachmentItem> {
+  const formData = new FormData()
+  formData.append("file", payload.file)
+  formData.append("category", payload.category)
+
+  if (payload.description?.trim()) {
+    formData.append("description", payload.description.trim())
+  }
+
+  if (payload.event_date?.trim()) {
+    formData.append("event_date", payload.event_date.trim())
+  }
+
+  const response = await fetch(`${API_URL}/cases/${caseId}/attachments`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: formData,
+  })
+
+  if (!response.ok) {
+    await parseError(response, "Erro ao anexar prova ao caso")
+  }
+
+  return response.json()
+}
+
+export async function updateCaseAttachment(
+  token: string,
+  caseId: number,
+  attachmentId: number,
+  payload: CaseAttachmentUpdatePayload,
+): Promise<CaseAttachmentItem> {
+  const response = await fetch(`${API_URL}/cases/${caseId}/attachments/${attachmentId}`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  })
+
+  if (!response.ok) {
+    await parseError(response, "Erro ao atualizar prova/anexo")
+  }
+
+  return response.json()
+}
+
+export async function downloadCaseAttachment(
+  token: string,
+  caseId: number,
+  attachmentId: number,
+): Promise<Blob> {
+  const response = await fetch(`${API_URL}/cases/${caseId}/attachments/${attachmentId}/download`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+
+  if (!response.ok) {
+    await parseError(response, "Erro ao baixar prova/anexo")
+  }
+
+  return response.blob()
+}
+
+export async function deleteCaseAttachment(
+  token: string,
+  caseId: number,
+  attachmentId: number,
+): Promise<void> {
+  const response = await fetch(`${API_URL}/cases/${caseId}/attachments/${attachmentId}`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+
+  if (!response.ok) {
+    await parseError(response, "Erro ao excluir prova/anexo")
+  }
+}

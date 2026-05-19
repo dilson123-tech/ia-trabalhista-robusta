@@ -1,4 +1,4 @@
-export type ExpansionModule = 'editor' | 'succession' | 'appeals'
+export type ExpansionModule = 'editor' | 'evidence' | 'succession' | 'appeals'
 
 type ExpansionModulesNavProps = {
   activeModule: ExpansionModule
@@ -16,6 +16,12 @@ const modules: Array<{
     label: 'Editor Jurídico Vivo',
     description: 'Estrutura, blocos, versões e aprovação da peça com leitura organizada.',
     stage: 'Frontend shell',
+  },
+  {
+    id: 'evidence',
+    label: 'Provas e Anexos',
+    description: 'PDFs, fotos, vídeos, notificações e documentos vinculados ao caso.',
+    stage: 'Backend ativo',
   },
   {
     id: 'succession',
