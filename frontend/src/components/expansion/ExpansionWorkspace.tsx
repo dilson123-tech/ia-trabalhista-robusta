@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { AppealsModulePanel } from './AppealsModulePanel'
 import { EditorModulePanel } from './EditorModulePanel'
 import { ExpansionModulesNav, type ExpansionModule } from './ExpansionModulesNav'
+import { EvidenceModulePanel } from './EvidenceModulePanel'
 import { SuccessionModulePanel } from './SuccessionModulePanel'
 
 type ExpansionWorkspaceProps = {
@@ -62,6 +63,7 @@ export function ExpansionWorkspace({
           pieceReadyRequestId={pieceReadyRequestId}
         />
       ) : null}
+      {activeModule === 'evidence' ? <EvidenceModulePanel token={token} selectedCaseId={selectedCaseId} /> : null}
       {activeModule === 'succession' ? <SuccessionModulePanel selectedCaseId={selectedCaseId} /> : null}
       {activeModule === 'appeals' ? <AppealsModulePanel selectedCaseId={selectedCaseId} /> : null}
     </>
