@@ -292,23 +292,27 @@ def _build_protocol_readiness_checklist_section(
     signature_date: str,
     cause_value: str,
     is_fgts_case: bool,
+    is_labor_case: bool = True,
 ) -> str:
     pending_items: list[str] = []
     ready_items: list[str] = []
 
+    author_label = "do reclamante" if is_labor_case else "da parte autora"
+    defendant_label = "da reclamada" if is_labor_case else "da parte ré"
+
     if "[CPF a complementar]" in author_inline_qualification:
-        pending_items.append("Informar e conferir CPF do reclamante.")
+        pending_items.append(f"Informar e conferir CPF {author_label}.")
     if "[RG a complementar]" in author_inline_qualification:
-        pending_items.append("Informar e conferir RG/documento pessoal do reclamante, se necessário.")
-    if "[endereço completo]" in author_inline_qualification:
-        pending_items.append("Informar endereço completo do reclamante.")
+        pending_items.append(f"Informar e conferir RG/documento pessoal {author_label}, se necessário.")
+    if "[endereço completo" in author_inline_qualification:
+        pending_items.append(f"Informar endereço completo {author_label}.")
 
     if "[CNPJ a complementar]" in defendant_inline_qualification:
-        pending_items.append("Informar e conferir CNPJ da reclamada.")
-    if "[endereço completo]" in defendant_inline_qualification:
-        pending_items.append("Informar endereço completo da reclamada.")
+        pending_items.append(f"Informar e conferir CNPJ {defendant_label}.")
+    if "[endereço completo" in defendant_inline_qualification:
+        pending_items.append(f"Informar endereço completo {defendant_label}.")
     elif "sede em" in defendant_inline_qualification.lower():
-        pending_items.append("Conferir se a sede/endereço da reclamada está completo para citação.")
+        pending_items.append(f"Conferir se a sede/endereço {defendant_label} está completo para citação.")
 
     if _has_placeholder(lawyer_name):
         pending_items.append("Informar nome do advogado responsável.")
@@ -1879,6 +1883,7 @@ def _build_assisted_sections(
         signature_date=signature_date,
         cause_value=cause_value,
         is_fgts_case=is_trabalhista_fgts_nao_recolhido and not is_trabalhista_verbas_rescisorias,
+        is_labor_case=is_labor_case,
     )
 
     return [
