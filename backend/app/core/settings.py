@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     CORS_ALLOW_ORIGINS: str = "http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174,http://localhost:4173,http://127.0.0.1:4173"
     API_V1_PREFIX: str = "/api/v1"
     DATABASE_URL: str = "postgresql+psycopg2://ia_app:ia_app_pass@127.0.0.1:55432/ia_trabalhista"
+    CASE_ATTACHMENT_STORAGE_DIR: str = str(ROOT_DIR / "backend" / "storage" / "case_attachments")
 
     PLAN_BASIC_ACTIVE_CASES_LIMIT: int = Field(50, validation_alias=AliasChoices("PLAN_BASIC_ACTIVE_CASES_LIMIT", "PLAN_BASIC_CASES_PER_MONTH"))
     PLAN_BASIC_CASE_RECORDS_LIMIT: int = 200
