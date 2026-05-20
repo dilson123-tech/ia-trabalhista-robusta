@@ -29,3 +29,7 @@ htmlcov/
 
 # Backups gerados por scripts
 *.bak_d02_*
+
+# Uploads reais de provas/anexos por caso — nunca commitar arquivos de clientes
+backend/storage/case_attachments/*
+!backend/storage/case_attachments/.gitkeep
