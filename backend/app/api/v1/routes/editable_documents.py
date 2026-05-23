@@ -2488,8 +2488,17 @@ def generate_assisted_draft(
     )
 
     current_user_id = _resolve_current_user_id(db, current_user)
-    next_version_number = document.current_version_number + 1
-
+    latest_version_number = (
+        db.query(EditableDocumentVersion.version_number)
+        .filter(
+            EditableDocumentVersion.editable_document_id == document.id,
+            EditableDocumentVersion.tenant_id == current_user["tenant_id"],
+        )
+        .order_by(EditableDocumentVersion.version_number.desc())
+        .limit(1)
+        .scalar()
+    )
+    next_version_number = (latest_version_number or document.current_version_number or 0) + 1
     version = EditableDocumentVersion(
         tenant_id=current_user["tenant_id"],
         editable_document_id=document.id,
@@ -2549,7 +2558,75 @@ def create_editable_document_version(
         raise HTTPException(status_code=404, detail="Editable document not found")
 
     current_user_id = _resolve_current_user_id(db, current_user)
-    next_version_number = document.current_version_number + 1
+    latest_version_number = (
+        db.query(EditableDocumentVersion.version_number)
+        .filter(
+            EditableDocumentVersion.editable_document_id == document.id,
+            EditableDocumentVersion.tenant_id == current_user["tenant_id"],
+        )
+        .order_by(EditableDocumentVersion.version_number.desc())
+        .limit(1)
+        .scalar()
+    )
+    next_version_number = (latest_version_number or document.current_version_number or 0) + 1
+    payload_sections = [section.model_dump() for section in payload.sections]
+    payload_metadata = payload.metadata or {}
+
+    def _section_has_assisted_origin(section):
+        section_source = str(section.get("source") or "")
+        section_metadata = section.get("metadata") or {}
+        generation_mode = str(section_metadata.get("generation_mode") or "")
+        return (
+            section_source == "assisted_draft"
+            or generation_mode == "assisted_draft_from_analysis"
+        )
+
+    def _version_has_assisted_origin(version):
+        if not version:
+            return False
+        version_metadata = version.version_metadata or {}
+        version_source = str(version_metadata.get("source") or "")
+        generation_mode = str(version_metadata.get("generation_mode") or "")
+        sections = version.sections or []
+        return (
+            version_source == "assisted_draft_from_analysis"
+            or generation_mode == "assisted_draft_from_analysis"
+            or any(_section_has_assisted_origin(section) for section in sections)
+        )
+
+    if payload.approved:
+        based_on_version_number = payload_metadata.get("based_on_version_number")
+        base_version = None
+
+        if based_on_version_number is not None:
+            try:
+                based_on_version_number = int(based_on_version_number)
+            except (TypeError, ValueError):
+                based_on_version_number = None
+
+        if based_on_version_number is not None:
+            base_version = (
+                db.query(EditableDocumentVersion)
+                .filter(
+                    EditableDocumentVersion.editable_document_id == document.id,
+                    EditableDocumentVersion.tenant_id == current_user["tenant_id"],
+                    EditableDocumentVersion.version_number == based_on_version_number,
+                )
+                .first()
+            )
+
+        payload_has_assisted_origin = any(
+            _section_has_assisted_origin(section) for section in payload_sections
+        )
+
+        if payload_has_assisted_origin or _version_has_assisted_origin(base_version):
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "Assisted draft versions cannot be approved directly. "
+                    "Create a reviewed draft version and approve only after manual coherence validation."
+                ),
+            )
 
     version = EditableDocumentVersion(
         tenant_id=current_user["tenant_id"],
@@ -2558,7 +2635,7 @@ def create_editable_document_version(
         version_number=next_version_number,
         approved=payload.approved,
         notes=payload.notes,
-        sections=[section.model_dump() for section in payload.sections],
+        sections=payload_sections,
         version_metadata=payload.metadata,
     )
     db.add(version)
