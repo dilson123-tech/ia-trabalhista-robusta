@@ -2521,12 +2521,34 @@ def generate_assisted_draft(
     )
     db.add(version)
 
-    document.current_version_number = next_version_number
-    document.status = "draft"
-    document.document_metadata = {
+    approved_version_number = (
+        db.query(EditableDocumentVersion.version_number)
+        .filter(
+            EditableDocumentVersion.editable_document_id == document.id,
+            EditableDocumentVersion.tenant_id == current_user["tenant_id"],
+            EditableDocumentVersion.approved.is_(True),
+        )
+        .order_by(EditableDocumentVersion.version_number.desc())
+        .limit(1)
+        .scalar()
+    )
+
+    if approved_version_number is None:
+        document.current_version_number = next_version_number
+        document.status = "draft"
+    else:
+        document.current_version_number = approved_version_number
+        document.status = "approved"
+
+    document_metadata = {
         **(document.document_metadata or {}),
         "last_generation_mode": "assisted_draft_from_analysis",
+        "last_assisted_draft_version_number": next_version_number,
     }
+    if approved_version_number is not None:
+        document_metadata["preserved_current_version_number"] = approved_version_number
+
+    document.document_metadata = document_metadata
     db.add(document)
 
     db.commit()
@@ -2640,8 +2662,28 @@ def create_editable_document_version(
     )
     db.add(version)
 
-    document.current_version_number = next_version_number
-    document.status = "approved" if payload.approved else "draft"
+    approved_version_number = (
+        db.query(EditableDocumentVersion.version_number)
+        .filter(
+            EditableDocumentVersion.editable_document_id == document.id,
+            EditableDocumentVersion.tenant_id == current_user["tenant_id"],
+            EditableDocumentVersion.approved.is_(True),
+        )
+        .order_by(EditableDocumentVersion.version_number.desc())
+        .limit(1)
+        .scalar()
+    )
+
+    if payload.approved:
+        document.current_version_number = next_version_number
+        document.status = "approved"
+    elif approved_version_number is not None:
+        document.current_version_number = approved_version_number
+        document.status = "approved"
+    else:
+        document.current_version_number = next_version_number
+        document.status = "draft"
+
     db.add(document)
 
     db.commit()
