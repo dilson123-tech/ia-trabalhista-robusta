@@ -538,7 +538,24 @@ export function EditorModulePanel({ token, selectedCaseId, selectedCaseArea, pie
 
   const currentVersion = useMemo(() => {
     if (!selectedDocument || selectedDocument.versions.length === 0) return null
-    return selectedDocument.versions[selectedDocument.versions.length - 1]
+
+    const documentCurrentVersion = selectedDocument.versions.find(
+      (version) => version.version_number === selectedDocument.current_version_number,
+    )
+
+    if (documentCurrentVersion) {
+      return documentCurrentVersion
+    }
+
+    const latestApprovedVersion = [...selectedDocument.versions]
+      .filter((version) => version.approved)
+      .sort((a, b) => b.version_number - a.version_number)[0]
+
+    if (latestApprovedVersion) {
+      return latestApprovedVersion
+    }
+
+    return [...selectedDocument.versions].sort((a, b) => b.version_number - a.version_number)[0] ?? null
   }, [selectedDocument])
 
   const versionsTimeline = useMemo(() => {
