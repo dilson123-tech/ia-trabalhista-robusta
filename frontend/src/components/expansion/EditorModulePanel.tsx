@@ -137,6 +137,24 @@ function getVersionDisplayLabel(version: EditableDocumentVersion): string {
   return `V${version.version_number} — ${getVersionOriginLabel(version)} — ${status}`
 }
 
+function isAssistedDraftVersion(version?: EditableDocumentVersion | null): boolean {
+  if (!version) return false
+
+  const metadataSource = String(version.version_metadata?.source ?? '')
+  const metadataGenerationMode = String(version.version_metadata?.generation_mode ?? '')
+
+  const hasAssistedSection = version.sections.some((section) => {
+    const sectionGenerationMode = String(section.metadata?.generation_mode ?? '')
+    return section.source === 'assisted_draft' || sectionGenerationMode === 'assisted_draft_from_analysis'
+  })
+
+  return (
+    metadataSource === 'assisted_draft_from_analysis' ||
+    metadataGenerationMode === 'assisted_draft_from_analysis' ||
+    hasAssistedSection
+  )
+}
+
 type CompareRow = {
   key: string
   title: string
@@ -760,8 +778,16 @@ export function EditorModulePanel({ token, selectedCaseId, selectedCaseArea, pie
     }
   }
 
+  const currentVersionIsAssistedDraft = isAssistedDraftVersion(currentVersion)
+
   async function handleCreateVersion(approved: boolean) {
     if (!token.trim() || !selectedDocument || !currentVersion) return
+
+    if (approved && isAssistedDraftVersion(currentVersion)) {
+      setVersionError('Versões assistidas precisam ser revisadas e salvas como versão manual antes da aprovação final.')
+      setVersionSuccess('')
+      return
+    }
 
     setVersionActionLoading(approved ? 'approve' : 'new')
     setVersionError('')
@@ -1239,18 +1265,25 @@ export function EditorModulePanel({ token, selectedCaseId, selectedCaseArea, pie
                   <button
                     type="button"
                     className={`btn ${
-                      versionActionLoading || !currentVersion || currentVersion.approved
+                      versionActionLoading || !currentVersion || currentVersion.approved || currentVersionIsAssistedDraft
                         ? 'btn-muted'
                         : 'btn-secondary'
                     }`}
                     onClick={() => void handleCreateVersion(true)}
-                    disabled={Boolean(versionActionLoading) || !currentVersion || currentVersion.approved}
+                    disabled={Boolean(versionActionLoading) || !currentVersion || currentVersion.approved || currentVersionIsAssistedDraft}
+                      title={
+                        currentVersionIsAssistedDraft
+                          ? 'Versões assistidas precisam de revisão manual antes da aprovação final.'
+                          : 'Aprovar versão atual'
+                      }
                   >
                     {versionActionLoading === 'approve'
                       ? 'Aprovando versão...'
                       : currentVersion?.approved
                         ? 'Versão já aprovada'
-                        : 'Aprovar versão atual'}
+                        : currentVersionIsAssistedDraft
+                            ? 'Revisão manual exigida'
+                            : 'Aprovar versão atual'}
                   </button>
 
                   <button
