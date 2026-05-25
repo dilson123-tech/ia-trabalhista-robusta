@@ -103,6 +103,22 @@ def _assert_area_coherence(legal_area: str, summary: str, issues: list[str], nex
         "prescricao bienal",
         "quinquenal",
     ]
+    if normalized_area in {"criminal", "penal"}:
+        forbidden_terms.extend(
+            [
+                "direito de vizinhança",
+                "poeira",
+                "cimento",
+                "material particulado",
+                "acústica",
+                "acustica",
+                "obrigação de fazer",
+                "obrigacao de fazer",
+                "reclamação cível",
+                "reclamacao civel",
+            ]
+        )
+
     hits = sorted({term for term in forbidden_terms if term in combined})
     if hits:
         raise LLMClientError(
@@ -167,6 +183,40 @@ def _fallback_analysis(
             "Organizar cronologia objetiva dos fatos, da perturbação e das tentativas extrajudiciais já realizadas",
             "Reunir prova visual, médica e técnica mínima sobre poeira, ruído, saúde da autora e obstrução da via",
             "Estruturar estratégia de obrigação de fazer/não fazer com tutela de urgência e eventual pedido indenizatório compatível com a prova disponível",
+        ]
+
+    elif normalized_area in {"criminal", "penal"}:
+        normalized_action = (action_type or "").strip().lower()
+
+        if any(term in text for term in ["prisão", "prisao", "flagrante", "custódia", "custodia"]):
+            issues.append("Necessária conferência da legalidade da prisão, comunicação, nota de culpa, auto de prisão e decisão de custódia")
+            risk = "high"
+
+        if any(term in text for term in ["liberdade provisória", "liberdade provisoria", "medidas cautelares"]) or "liberdade" in normalized_action:
+            issues.append("Possível avaliação de liberdade provisória ou medidas cautelares diversas da prisão, condicionada aos fatos e documentos")
+            risk = "high"
+
+        if any(term in text for term in ["relaxamento", "ilegalidade", "prisão ilegal", "prisao ilegal"]) or "relaxamento" in normalized_action:
+            issues.append("Possível análise de relaxamento de prisão quando houver ilegalidade formal ou material demonstrável")
+            risk = "high"
+
+        if any(term in text for term in ["denúncia", "denuncia", "resposta à acusação", "resposta a acusacao"]) or "resposta" in normalized_action:
+            issues.append("Necessária organização da imputação, preliminares, mérito, provas e testemunhas para resposta à acusação")
+            risk = "medium"
+
+        if any(term in text for term in ["habeas corpus", "constrangimento ilegal"]) or "habeas" in normalized_action:
+            issues.append("Possível avaliação de habeas corpus, com foco em constrangimento ilegal objetivo e urgência")
+            risk = "high"
+
+        if len(issues) < 2:
+            issues.append("Necessária triagem criminal supervisionada para delimitar fatos, fase procedimental, documentos, provas e riscos urgentes")
+            issues.append("Necessário validar estratégia com advogado antes de qualquer uso externo da análise ou minuta")
+
+        next_steps = [
+            "Organizar cronologia dos fatos, fase do procedimento, existência de prisão e decisões já proferidas",
+            "Conferir boletim de ocorrência, auto de prisão, nota de culpa, denúncia, decisão judicial e demais documentos disponíveis",
+            "Mapear provas, testemunhas, registros digitais e pendências documentais sem presumir fatos não informados",
+            "Submeter análise e eventual minuta à revisão obrigatória do advogado antes de qualquer protocolo",
         ]
 
     else:
@@ -255,6 +305,9 @@ def _build_prompt(
     - A área jurídica informada é mandatória e deve prevalecer sobre inferências soltas do texto.
     - Quando a área indicada NÃO for trabalhista, é proibido mencionar ou pressupor: reclamação trabalhista, Justiça do Trabalho, vínculo empregatício, empregador, FGTS, CTPS, insalubridade, contrato de trabalho, prescrição bienal trabalhista ou créditos trabalhistas.
     - Se a área for civil_ambiental, priorizar direito de vizinhança, obrigação de fazer/não fazer, tutela de urgência, responsabilidade civil, dano moral, prova ambiental/acústica/médica e proteção à saúde/sossego/segurança.
+    - Se a área for criminal ou penal, priorizar triagem criminal, legalidade da prisão, liberdade provisória, relaxamento de prisão, medidas cautelares, resposta à acusação, habeas corpus, provas, testemunhas, prazos e riscos urgentes.
+    - Em área criminal ou penal, é proibido prometer resultado, afirmar culpa/inocência de forma definitiva, orientar fuga, ocultação de prova, fraude, intimidação de testemunhas ou qualquer conduta ilegal.
+    - Em área criminal ou penal, toda conclusão deve deixar clara a necessidade de revisão e decisão final por advogado habilitado.
     - O resumo deve indicar, quando cabível, se há direito material aparentemente forte, dependência probatória, risco prescricional/decadencial ou necessidade de cálculo.
     - Não usar linguagem vaga sem explicar o motivo técnico.
     - Não inventar documentos, datas, testemunhas ou fatos não descritos.

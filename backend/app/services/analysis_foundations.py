@@ -23,6 +23,15 @@ def _base_normativa_for_area(legal_area: str | None) -> list[str]:
             "Código de Processo Civil aplicado subsidiariamente — tutela de urgência e produção probatória.",
         ]
 
+    if area in {"criminal", "penal"}:
+        return [
+            "Constituição Federal, art. 5º — devido processo legal, contraditório, ampla defesa, presunção de inocência e controle de legalidade da prisão.",
+            "Código de Processo Penal — prisão, liberdade provisória, relaxamento de prisão, medidas cautelares, resposta à acusação e habeas corpus.",
+            "Código Penal — tipicidade, ilicitude, culpabilidade e consequências penais conforme os fatos narrados.",
+            "Lei 12.403/2011 — medidas cautelares diversas da prisão e parâmetros para avaliação da necessidade da custódia.",
+            "Jurisprudência aplicável — controle de fundamentação concreta, contemporaneidade, proporcionalidade e adequação da medida cautelar.",
+        ]
+
     return [
         "Constituição Federal — devido processo legal, acesso à justiça e proteção de direitos fundamentais.",
         "Código de Processo Civil — tutela de urgência, produção de prova e técnicas executivas.",
@@ -83,6 +92,29 @@ def _elementos_faticos(case: dict[str, Any], technical: dict[str, Any]) -> list[
         for key, label in labor_map:
             add_when(key, label)
 
+    elif legal_area in {"criminal", "penal"}:
+        criminal_map = [
+            ("prisão em flagrante", "Relato de prisão em flagrante a ser analisada quanto à legalidade formal e material."),
+            ("prisao em flagrante", "Relato de prisão em flagrante a ser analisada quanto à legalidade formal e material."),
+            ("flagrante", "Menção a flagrante, exigindo conferência do auto, nota de culpa, comunicação e audiência de custódia."),
+            ("liberdade provisória", "Discussão relacionada à possibilidade de liberdade provisória e medidas cautelares diversas da prisão."),
+            ("liberdade provisoria", "Discussão relacionada à possibilidade de liberdade provisória e medidas cautelares diversas da prisão."),
+            ("relaxamento de prisão", "Possível análise de ilegalidade da prisão e cabimento de relaxamento, conforme revisão do advogado."),
+            ("relaxamento de prisao", "Possível análise de ilegalidade da prisão e cabimento de relaxamento, conforme revisão do advogado."),
+            ("habeas corpus", "Possível constrangimento ilegal a ser avaliado com cautela para eventual habeas corpus."),
+            ("denúncia", "Existência ou expectativa de denúncia, exigindo organização de imputação, fatos, provas e teses defensivas."),
+            ("denuncia", "Existência ou expectativa de denúncia, exigindo organização de imputação, fatos, provas e teses defensivas."),
+            ("resposta à acusação", "Discussão relacionada à fase de resposta à acusação, preliminares, mérito, provas e testemunhas."),
+            ("resposta a acusacao", "Discussão relacionada à fase de resposta à acusação, preliminares, mérito, provas e testemunhas."),
+            ("audiência de custódia", "Menção à audiência de custódia, exigindo conferência de legalidade, necessidade da prisão e cautelares."),
+            ("audiencia de custodia", "Menção à audiência de custódia, exigindo conferência de legalidade, necessidade da prisão e cautelares."),
+            ("medidas cautelares", "Possibilidade de avaliação de medidas cautelares diversas da prisão."),
+            ("testemunha", "Indicação de testemunha(s), exigindo organização da prova oral e coerência com a versão defensiva."),
+        ]
+
+        for key, label in criminal_map:
+            add_when(key, label)
+
     else:
         generic_map = [
             ("contrato", "Existência de relação contratual narrada no caso."),
@@ -118,6 +150,11 @@ def _lacunas_probatorias(technical: dict[str, Any]) -> list[str]:
         (("notificação", "notificacao"), "Necessidade de comprovar documentalmente a notificação extrajudicial e seu recebimento."),
         (("data", "datas"), "Necessidade de cronologia objetiva dos fatos e da persistência da conduta."),
         (("perícia", "pericia"), "Necessidade de perícia técnica para quantificação e correlação dos impactos alegados."),
+        (("prisão", "prisao", "flagrante"), "Necessidade de conferir auto de prisão, nota de culpa, comunicação da prisão e decisão de custódia."),
+        (("liberdade provisória", "liberdade provisoria", "cautelar"), "Necessidade de avaliar elementos concretos para liberdade provisória ou medidas cautelares diversas da prisão."),
+        (("denúncia", "denuncia", "acusação", "acusacao"), "Necessidade de confrontar a imputação com denúncia, documentos, provas disponíveis e linha defensiva."),
+        (("habeas corpus", "constrangimento ilegal"), "Necessidade de demonstrar objetivamente o constrangimento ilegal e a urgência da medida."),
+        (("testemunha", "testemunhas"), "Necessidade de qualificar testemunhas e organizar a pertinência da prova oral."),
     ]
 
     for keys, label in gap_rules:
@@ -148,6 +185,12 @@ def build_analysis_foundations(
         "Saída estruturada a partir dos fatos informados, base normativa aplicável à área selecionada "
         "e critérios de viabilidade/prova. Recomendável validação profissional final antes do protocolo."
     )
+    if legal_area in {"criminal", "penal"}:
+        disclaimer = (
+            "Saída criminal estruturada exclusivamente para apoio jurídico supervisionado. "
+            "Não substitui análise de advogado habilitado, não representa promessa de resultado, "
+            "não autoriza uso externo sem revisão profissional e não deve orientar qualquer conduta ilegal."
+        )
 
     return {
         "normative_basis": _base_normativa_for_area(str(legal_area or "")),
