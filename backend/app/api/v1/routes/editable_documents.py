@@ -901,6 +901,7 @@ def _build_assisted_sections(
     is_civil_ambiental = normalized_area == "civil_ambiental"
     is_civel_area = normalized_area in {"civel", "civil_ambiental"}
     is_trabalhista_area = normalized_area in {"trabalhista", "trabalho", "laboral"}
+    is_criminal_area = normalized_area in {"criminal", "penal"}
     is_civel_cobranca = is_civel_area and any(
         marker in case_search_text
         for marker in ["cobran", "inadimpl", "dívida", "divida", "saldo contratual", "contrato de prestação"]
@@ -2055,6 +2056,192 @@ def _build_assisted_sections(
                 f"{lawyer_name}\nOAB/{lawyer_uf} {lawyer_oab}",
             ]
         )
+
+
+    # PATCH: criminal_editable_document_routing_v1
+    # Criminal V1 entra como minuta supervisionada, sem promessa de resultado,
+    # sem juízo definitivo de culpa/inocência e sem uso externo sem revisão do advogado.
+    if is_criminal_area:
+        is_criminal_liberdade = any(
+            term in case_search_text
+            for term in [
+                "liberdade provisória",
+                "liberdade provisoria",
+                "medidas cautelares",
+                "prisão em flagrante",
+                "prisao em flagrante",
+                "audiência de custódia",
+                "audiencia de custodia",
+            ]
+        ) or "liberdade" in normalized_action_type
+
+        is_criminal_relaxamento = any(
+            term in case_search_text
+            for term in [
+                "relaxamento de prisão",
+                "relaxamento de prisao",
+                "prisão ilegal",
+                "prisao ilegal",
+                "ilegalidade da prisão",
+                "ilegalidade da prisao",
+            ]
+        ) or "relaxamento" in normalized_action_type
+
+        is_criminal_habeas = "habeas" in case_search_text or "habeas" in normalized_action_type
+        is_criminal_resposta = any(
+            term in case_search_text
+            for term in [
+                "resposta à acusação",
+                "resposta a acusacao",
+                "denúncia",
+                "denuncia",
+                "acusação",
+                "acusacao",
+            ]
+        ) or "resposta" in normalized_action_type
+
+        if is_criminal_relaxamento:
+            criminal_title = "PEDIDO DE RELAXAMENTO DE PRISÃO"
+            criminal_core_request = (
+                "o relaxamento da prisão, caso confirmada ilegalidade formal ou material, "
+                "com expedição do alvará de soltura, salvo se houver outro motivo legal para manutenção da custódia"
+            )
+            criminal_focus = (
+                "legalidade da prisão, formalidades do flagrante, comunicação, nota de culpa, fundamentação judicial, "
+                "audiência de custódia e eventual constrangimento ilegal"
+            )
+        elif is_criminal_habeas:
+            criminal_title = "HABEAS CORPUS COM PEDIDO LIMINAR"
+            criminal_core_request = (
+                "a concessão da ordem, inclusive em caráter liminar quando presentes os requisitos, "
+                "para cessar constrangimento ilegal objetivamente demonstrado"
+            )
+            criminal_focus = (
+                "constrangimento ilegal, urgência, ato coator, autoridade apontada, fundamentação concreta da medida "
+                "e adequação do habeas corpus ao caso"
+            )
+        elif is_criminal_resposta:
+            criminal_title = "RESPOSTA À ACUSAÇÃO"
+            criminal_core_request = (
+                "o recebimento da resposta defensiva, com análise de preliminares, mérito, provas, testemunhas "
+                "e demais requerimentos defensivos cabíveis"
+            )
+            criminal_focus = (
+                "imputação narrada na denúncia, preliminares, justa causa, provas disponíveis, testemunhas, "
+                "tese defensiva e requerimentos probatórios"
+            )
+        else:
+            criminal_title = "PEDIDO DE LIBERDADE PROVISÓRIA COM OU SEM MEDIDAS CAUTELARES"
+            criminal_core_request = (
+                "a concessão de liberdade provisória, com ou sem medidas cautelares diversas da prisão, "
+                "conforme avaliação técnica do advogado e documentos disponíveis"
+            )
+            criminal_focus = (
+                "legalidade da prisão, necessidade concreta da custódia, adequação de medidas cautelares, "
+                "condições pessoais, documentos, decisão de custódia e riscos processuais"
+            )
+
+        criminal_review_warning = (
+            "ATENÇÃO: minuta criminal gerada em modo assistido. O conteúdo não substitui a atuação de advogado "
+            "habilitado, não representa promessa de resultado, não afirma culpa ou inocência de forma definitiva "
+            "e não deve ser usado externamente sem revisão, validação e aprovação profissional."
+        )
+
+        enderecamento = _paragraphs(
+            [
+                f"EXCELENTÍSSIMO(A) SENHOR(A) DOUTOR(A) JUIZ(A) DE DIREITO DO JUÍZO CRIMINAL COMPETENTE DA COMARCA DE {case_comarca}.",
+                "Na versão final, o advogado deverá confirmar competência, prevenção, autoridade coatora quando aplicável, fase procedimental e rito adequado antes de qualquer protocolo.",
+            ]
+        )
+
+        qualificacao_partes = _paragraphs(
+            [
+                (
+                    f"{author_inline_qualification}, por seu advogado, vem, respeitosamente, à presença de Vossa Excelência, "
+                    f"apresentar a presente minuta de {criminal_title}, conforme fatos, documentos e fundamentos a seguir expostos."
+                ),
+                "A qualificação das partes, investigado/acusado/paciente, autoridade policial ou judicial, Ministério Público, vítima, testemunhas e demais envolvidos deverá ser conferida e complementada pelo advogado na versão final.",
+                criminal_review_warning,
+            ]
+        )
+
+        resumo_fatico = _paragraphs(
+            [
+                f"Trata-se do caso criminal {case.case_number} — {case.title}.",
+                case_description,
+                (
+                    "A narrativa deverá ser revisada pelo advogado com atenção especial à data e local dos fatos, fase do procedimento, existência de prisão, autoridade responsável, documentos recebidos, provas disponíveis, testemunhas conhecidas e prazos urgentes."
+                ),
+                (
+                    f"A leitura inicial do sistema indica foco em {criminal_focus}, sem conclusão definitiva sobre culpa, inocência, legalidade da medida ou resultado judicial."
+                ),
+            ]
+        )
+
+        fundamentacao = _paragraphs(
+            [
+                f"I. DO CABIMENTO DA MEDIDA. A presente minuta é estruturada como {criminal_title}, em caráter assistido, para revisão técnica do advogado responsável antes de qualquer uso externo.",
+                (
+                    "II. DAS GARANTIAS PROCESSUAIS. A análise deve observar devido processo legal, contraditório, ampla defesa, presunção de inocência, controle judicial da prisão e necessidade de fundamentação concreta das medidas restritivas de liberdade."
+                ),
+                _series_block("III. DA BASE NORMATIVA INICIAL CONSIDERADA:", normative_basis, limit=5),
+                (
+                    f"IV. DOS PONTOS JURÍDICOS A SEREM ENFRENTADOS. A minuta deve concentrar a argumentação em {criminal_focus}, sempre com base nos documentos efetivamente disponíveis e sem presunção de fatos não informados."
+                ),
+                _series_block("V. DOS PONTOS CONTROVERTIDOS E RISCOS TÉCNICOS:", controverted_points, limit=5),
+                _series_block("VI. DAS LACUNAS PROBATÓRIAS A SUPRIR ANTES DO PROTOCOLO:", proof_checklist, limit=5),
+                (
+                    f"VII. DA SÍNTESE TÉCNICA CONSIDERADA. {executive_summary}"
+                    if executive_summary and "dados insuficientes" not in executive_summary.lower()
+                    else ""
+                ),
+                criminal_review_warning,
+            ]
+        )
+
+        pedidos = _paragraphs(
+            [
+                f"Diante do exposto, requer-se, após revisão e validação do advogado:",
+                f"I. {criminal_core_request.capitalize()}.",
+                "II. A análise expressa da legalidade, necessidade, adequação e proporcionalidade da medida restritiva discutida, conforme documentos e decisões constantes do caso.",
+                "III. Subsidiariamente, quando juridicamente adequado, a aplicação de medidas cautelares diversas da prisão, observados os fatos concretos, a fase procedimental e a avaliação profissional do advogado.",
+                "IV. A juntada e consideração dos documentos, provas e registros indicados pela defesa, sem prejuízo de complementação documental antes do protocolo.",
+                "V. A intimação do Ministério Público ou da autoridade competente, quando cabível ao rito e à medida adotada.",
+                "VI. A expedição das comunicações, alvarás, ofícios ou providências cabíveis somente se deferida a medida pelo juízo competente.",
+                "VII. Que todos os pedidos sejam revisados pelo advogado para adequação ao caso concreto, à competência, à fase procedimental e aos documentos efetivamente disponíveis.",
+            ]
+        )
+
+        pedidos_valores_estimados = _paragraphs(
+            [
+                "Em regra, a minuta criminal inicial não depende de estimativa econômica de pedidos.",
+                "Caso haja pedido indenizatório, fiança, custas, multa, reparação mínima, valor de causa ou outro reflexo econômico, o advogado deverá preencher e validar o valor aplicável na versão final.",
+                f"Valor econômico/custas/fiança: R$ {cause_value}, sujeito a confirmação técnica e documental pelo advogado.",
+            ]
+        )
+
+        provas_requerimentos = _paragraphs(
+            [
+                "Requer-se a análise e juntada dos documentos criminais disponíveis, conforme a fase do caso e a medida escolhida pelo advogado.",
+                "Devem ser conferidos, quando existentes: boletim de ocorrência, auto de prisão em flagrante, nota de culpa, decisão judicial, ata de audiência de custódia, denúncia, citação/intimação, certidões, procuração e documentos pessoais.",
+                "Também devem ser organizados registros digitais, prints, conversas, áudios, vídeos, fotografias, comprovantes de endereço, documentos profissionais, testemunhas e demais elementos relevantes à versão defensiva.",
+                "Antes do protocolo, o advogado deverá verificar autenticidade, pertinência, cadeia mínima de preservação, origem dos documentos e eventual necessidade de sigilo ou tarja de dados sensíveis.",
+                "Nenhuma prova deve ser inventada, adulterada, ocultada ou orientada de forma ilegal. O sistema apenas organiza informações fornecidas e pendências de validação.",
+            ]
+        )
+
+        fechamento = _paragraphs(
+            [
+                "Ante o exposto, requer-se o regular processamento da medida criminal cabível, nos limites dos fatos narrados, documentos disponíveis e fundamentos revisados pelo advogado.",
+                f"Requer-se, conforme validação profissional, {criminal_core_request}.",
+                "A presente minuta permanece em estado de rascunho assistido e deverá ser integralmente revisada, ajustada e aprovada por advogado habilitado antes de qualquer uso externo.",
+                "Termos em que,",
+                "Pede deferimento.",
+                f"{signature_local}, {signature_date}.",
+                f"{lawyer_name}\nOAB/{lawyer_uf} {lawyer_oab}",
+            ]
+        )
+
 
     protocolo_checklist = _build_protocol_readiness_checklist_section(
         author_inline_qualification=author_inline_qualification,
