@@ -184,3 +184,151 @@ def test_criminal_liberdade_provisoria_assisted_draft_flow(monkeypatch):
     ]
     for term in forbidden_terms:
         assert term not in combined_text
+
+
+def test_criminal_resposta_acusacao_assisted_draft_has_no_civil_medical_contamination(monkeypatch):
+    headers = _auth_headers(monkeypatch)
+
+    create_case_payload = {
+        "case_number": f"CRIM-RESP-{uuid.uuid4().hex[:8]}",
+        "title": "Resposta à acusação em ação penal inicial",
+        "description": (
+            "Área jurídica: Criminal. "
+            "Acusado citado para apresentar resposta à acusação após oferecimento de denúncia. "
+            "A defesa precisa organizar preliminares, mérito, provas disponíveis, rol de testemunhas "
+            "e pedidos defensivos cabíveis. "
+            "Documentos disponíveis: denúncia, decisão de recebimento, mandado de citação, certidões, "
+            "procuração, documentos pessoais, conversas digitais e indicação inicial de testemunhas. "
+            "O advogado deverá revisar imputação, justa causa, materialidade, autoria, nulidades, "
+            "prazos e estratégia defensiva antes de qualquer protocolo."
+        ),
+        "legal_area": "criminal",
+        "action_type": "resposta_acusacao",
+        "status": "draft",
+    }
+
+    r_case = client.post("/api/v1/cases", json=create_case_payload, headers=headers)
+    assert r_case.status_code == 200
+    case_id = r_case.json()["id"]
+
+    r_analysis = client.get(
+        f"/api/v1/cases/{case_id}/analysis?force=true",
+        headers=headers,
+    )
+    assert r_analysis.status_code == 200
+    technical = r_analysis.json()["analysis"]["technical"]
+
+    assert technical["legal_area"] == "criminal"
+    assert technical["action_type"] == "resposta_acusacao"
+
+    create_document_payload = {
+        "case_id": case_id,
+        "area": "criminal",
+        "document_type": "resposta_acusacao",
+        "title": "Resposta à Acusação — Minuta Assistida",
+        "notes": "Documento criado para validação de blindagem temática da resposta à acusação.",
+        "metadata": {
+            "source": "test_criminal_response_accusation_contamination",
+            "case_comarca": "JOINVILLE/SC",
+            "lawyer_name": "Advogado Responsável",
+            "lawyer_oab": "00000",
+            "lawyer_uf": "SC",
+            "signature_local": "Joinville/SC",
+            "signature_date": "26/05/2026",
+        },
+        "sections": [
+            {
+                "key": "resumo_fatico",
+                "title": "Resumo Fático",
+                "content": "",
+                "source": "manual",
+                "status": "draft",
+                "metadata": {},
+            },
+            {
+                "key": "fundamentacao",
+                "title": "Fundamentação",
+                "content": "",
+                "source": "manual",
+                "status": "draft",
+                "metadata": {},
+            },
+            {
+                "key": "pedidos",
+                "title": "Pedidos",
+                "content": "",
+                "source": "manual",
+                "status": "draft",
+                "metadata": {},
+            },
+        ],
+    }
+
+    r_create_doc = client.post(
+        "/api/v1/editable-documents",
+        json=create_document_payload,
+        headers=headers,
+    )
+    assert r_create_doc.status_code == 200
+    document_id = r_create_doc.json()["id"]
+
+    r_generate = client.post(
+        f"/api/v1/editable-documents/{document_id}/generate-assisted-draft",
+        headers=headers,
+    )
+    assert r_generate.status_code == 200
+
+    generated = r_generate.json()
+    assert generated["area"] == "criminal"
+    assert generated["document_type"] == "resposta_acusacao"
+    assert generated["current_version_number"] == 2
+    assert generated["status"] == "draft"
+
+    latest_version = max(generated["versions"], key=lambda item: item["version_number"])
+    assert latest_version["approved"] is False
+    assert latest_version["version_metadata"]["source"] == "assisted_draft_from_analysis"
+
+    combined_text = "\n".join(
+        (section.get("content") or "")
+        for section in latest_version["sections"]
+    ).lower()
+
+    required_terms = [
+        "resposta à acusação",
+        "denúncia",
+        "imputação",
+        "preliminares",
+        "justa causa",
+        "provas disponíveis",
+        "testemunhas",
+        "tese defensiva",
+        "requerimentos probatórios",
+        "advogado",
+        "não representa promessa de resultado",
+        "não afirma culpa ou inocência",
+        "não deve ser usado externamente sem revisão",
+        "nenhuma prova deve ser inventada",
+    ]
+    for term in required_terms:
+        assert term in combined_text
+
+    forbidden_terms = [
+        "relatório médico",
+        "laudo médico",
+        "urgência médica",
+        "nexo causal",
+        "quantificação de impactos",
+        "impactos alegados",
+        "incapacidade laboral",
+        "benefício previdenciário",
+        "dano material ambiental",
+        "direito de vizinhança",
+        "verbas rescisórias",
+        "fgts",
+        "clt",
+        "vara do trabalho",
+        "obrigação de fazer",
+    ]
+    for term in forbidden_terms:
+        assert term not in combined_text
+
