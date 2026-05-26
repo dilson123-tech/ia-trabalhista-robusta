@@ -2100,6 +2100,64 @@ def _build_assisted_sections(
             ]
         ) or "resposta" in normalized_action_type
 
+        if is_criminal_resposta:
+            response_accusation_forbidden_context_markers = [
+                "relatório médico",
+                "relatorio medico",
+                "laudo médico",
+                "laudo medico",
+                "urgência médica",
+                "urgencia medica",
+                "nexo causal",
+                "quantificação de impactos",
+                "quantificacao de impactos",
+                "impactos alegados",
+                "incapacidade laboral",
+                "benefício previdenciário",
+                "beneficio previdenciario",
+                "dano material ambiental",
+                "direito de vizinhança",
+                "direito de vizinhanca",
+                "verbas rescisórias",
+                "verbas rescisorias",
+                "fgts",
+                "clt",
+                "vara do trabalho",
+                "obrigação de fazer",
+                "obrigacao de fazer",
+            ]
+
+            def _has_response_accusation_contamination(item: str) -> bool:
+                item_lower = str(item or "").lower()
+                return any(
+                    marker in item_lower
+                    for marker in response_accusation_forbidden_context_markers
+                )
+
+            controverted_points = [
+                item
+                for item in controverted_points
+                if not _has_response_accusation_contamination(item)
+            ]
+            proof_checklist = [
+                item
+                for item in proof_checklist
+                if not _has_response_accusation_contamination(item)
+            ]
+
+            if executive_summary and _has_response_accusation_contamination(executive_summary):
+                executive_summary = ""
+
+            proof_checklist.extend(
+                [
+                    "Necessidade de conferir denúncia, decisão de recebimento, citação/intimação e prazo para resposta.",
+                    "Necessidade de organizar preliminares, justa causa, materialidade, autoria, provas disponíveis e rol de testemunhas.",
+                    "Necessidade de validar estratégia defensiva e requerimentos probatórios antes do protocolo.",
+                ]
+            )
+            proof_checklist = list(dict.fromkeys([item for item in proof_checklist if item]))
+            controverted_points = list(dict.fromkeys([item for item in controverted_points if item]))
+
         if is_criminal_relaxamento:
             criminal_title = "PEDIDO DE RELAXAMENTO DE PRISÃO"
             criminal_core_request = (
