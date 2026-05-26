@@ -1,5 +1,5 @@
 from datetime import datetime
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class CaseBase(BaseModel):
@@ -12,7 +12,7 @@ class CaseBase(BaseModel):
 
 
 class CaseCreate(CaseBase):
-    pass
+    model_config = ConfigDict(extra="forbid")
 
 
 class CaseOut(CaseBase):

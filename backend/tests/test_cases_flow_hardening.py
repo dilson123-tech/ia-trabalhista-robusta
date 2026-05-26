@@ -99,3 +99,24 @@ def test_cases_endpoints_return_404_for_missing_case(monkeypatch):
 
     report = client.get(f"/api/v1/cases/{missing_id}/report", headers=headers)
     assert report.status_code == 404
+
+def test_create_case_rejects_extra_slug_field(monkeypatch):
+    headers = _auth_headers(monkeypatch)
+
+    create_payload = {
+        "case_number": f"EXTRA-{uuid.uuid4()}",
+        "title": "Caso com campo extra indevido",
+        "description": "Payload deve ser rejeitado antes de chegar na persistência.",
+        "status": "draft",
+        "slug": "campo-interno-indevido",
+    }
+
+    response = client.post("/api/v1/cases", json=create_payload, headers=headers)
+
+    assert response.status_code == 422
+    body = response.json()
+    assert "detail" in body
+    assert any(
+        "slug" in ".".join(str(part) for part in item.get("loc", []))
+        for item in body["detail"]
+    )
