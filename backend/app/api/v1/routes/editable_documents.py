@@ -2692,7 +2692,7 @@ def generate_assisted_draft(
         created_by_user_id=current_user_id,
         version_number=next_version_number,
         approved=False,
-        notes="Peça pronta gerada a partir da análise do caso",
+        notes="Minuta assistida gerada a partir da análise do caso",
         sections=assisted_sections,
         version_metadata={
             "source": "assisted_draft_from_analysis",
