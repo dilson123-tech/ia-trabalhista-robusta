@@ -11,6 +11,7 @@ from app.api.v1.routes.billing import router as billing_router
 from app.api.v1.routes.editable_documents import router as editable_documents_router
 from app.api.v1.routes.case_party_states import router as case_party_states_router
 from app.api.v1.routes.appeal_reaction_states import router as appeal_reaction_states_router
+from app.api.v1.routes.legal_modules import router as legal_modules_router
 
 api_router = APIRouter()
 
@@ -22,6 +23,7 @@ api_router.include_router(usage_router)
 api_router.include_router(editable_documents_router)
 api_router.include_router(case_party_states_router)
 api_router.include_router(appeal_reaction_states_router)
+api_router.include_router(legal_modules_router)
 
 api_router.include_router(webhooks_router)
 api_router.include_router(billing_router)
