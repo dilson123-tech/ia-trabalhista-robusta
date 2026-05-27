@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.services.legal_modules import infer_legal_module
+
 
 def _base_normativa_for_area(legal_area: str | None) -> list[str]:
-    area = (legal_area or "").strip().lower()
+    area = infer_legal_module(legal_area=legal_area, default="civel")
 
     if area == "civil_ambiental":
         return [
@@ -32,6 +34,38 @@ def _base_normativa_for_area(legal_area: str | None) -> list[str]:
             "Jurisprudência aplicável — controle de fundamentação concreta, contemporaneidade, proporcionalidade e adequação da medida cautelar.",
         ]
 
+    if area == "consumidor":
+        return [
+            "Código de Defesa do Consumidor — relação de consumo, responsabilidade do fornecedor, vício/defeito do produto ou serviço e práticas abusivas.",
+            "Código Civil — responsabilidade civil, perdas e danos e inadimplemento quando aplicável.",
+            "Código de Processo Civil — tutela de urgência, produção de prova, inversão do ônus probatório quando cabível e técnicas executivas.",
+            "Constituição Federal, art. 5º e art. 170 — acesso à justiça, defesa do consumidor e ordem econômica.",
+        ]
+
+    if area == "familia":
+        return [
+            "Código Civil — direito de família, casamento, união estável, alimentos, guarda e regime de bens conforme o caso.",
+            "Estatuto da Criança e do Adolescente — proteção integral e melhor interesse da criança/adolescente quando aplicável.",
+            "Código de Processo Civil — ações de família, tutela provisória, prova e autocomposição.",
+            "Constituição Federal, art. 226 e 227 — proteção da família, criança e adolescente.",
+        ]
+
+    if area == "previdenciario":
+        return [
+            "Lei 8.742/1993 (LOAS) — benefício de prestação continuada, vulnerabilidade social, idoso e pessoa com deficiência.",
+            "Lei 8.213/1991 — benefícios previdenciários e regras gerais quando aplicável.",
+            "Decreto 6.214/2007 — regulamentação do BPC/LOAS.",
+            "Normas administrativas do INSS — requerimento, indeferimento, recurso e documentação obrigatória.",
+            "Código de Processo Civil — prova documental, prova médica/social e tutela de urgência quando cabível.",
+        ]
+
+    if area == "civel":
+        return [
+            "Código Civil — responsabilidade civil, obrigações, inadimplemento contratual e reparação de danos conforme o caso.",
+            "Código de Processo Civil — tutela de urgência, produção de prova, obrigação de fazer/não fazer, cobrança e técnicas executivas.",
+            "Constituição Federal — devido processo legal, acesso à justiça e proteção de direitos fundamentais.",
+        ]
+
     return [
         "Constituição Federal — devido processo legal, acesso à justiça e proteção de direitos fundamentais.",
         "Código de Processo Civil — tutela de urgência, produção de prova e técnicas executivas.",
@@ -41,7 +75,13 @@ def _base_normativa_for_area(legal_area: str | None) -> list[str]:
 
 def _elementos_faticos(case: dict[str, Any], technical: dict[str, Any]) -> list[str]:
     description = str(case.get("description") or "").lower()
-    legal_area = str(case.get("legal_area") or technical.get("legal_area") or "").strip().lower()
+    legal_area = infer_legal_module(
+        legal_area=case.get("legal_area") or technical.get("legal_area"),
+        action_type=case.get("action_type") or technical.get("action_type"),
+        title=case.get("title") or technical.get("title"),
+        description=case.get("description") or technical.get("summary"),
+        default="civel",
+    )
     elements: list[str] = []
 
     def add_when(term: str, label: str) -> None:
@@ -90,6 +130,60 @@ def _elementos_faticos(case: dict[str, Any], technical: dict[str, Any]) -> list[
         ]
 
         for key, label in labor_map:
+            add_when(key, label)
+
+    elif legal_area == "consumidor":
+        consumer_map = [
+            ("produto", "Indicação de produto adquirido, exigindo prova da compra e do defeito/vício alegado."),
+            ("defeito", "Relato de defeito ou vício do produto/serviço."),
+            ("vício", "Relato de vício do produto/serviço a ser enquadrado no CDC."),
+            ("vicio", "Relato de vício do produto/serviço a ser enquadrado no CDC."),
+            ("serviço", "Discussão relacionada à prestação de serviço."),
+            ("servico", "Discussão relacionada à prestação de serviço."),
+            ("fornecedor", "Necessidade de identificar fornecedor e responsabilidade na cadeia de consumo."),
+            ("protocolo", "Existência ou necessidade de protocolos de atendimento/reclamação."),
+            ("cobrança indevida", "Possível cobrança indevida a ser comprovada documentalmente."),
+            ("negativação", "Possível negativação indevida a ser validada por documento/consulta."),
+        ]
+
+        for key, label in consumer_map:
+            add_when(key, label)
+
+    elif legal_area == "familia":
+        family_map = [
+            ("alimentos", "Discussão relacionada a alimentos e necessidade/possibilidade econômica."),
+            ("pensão", "Discussão relacionada a pensão alimentícia."),
+            ("pensao", "Discussão relacionada a pensão alimentícia."),
+            ("guarda", "Discussão relacionada à guarda e rotina de cuidado."),
+            ("convivência", "Discussão relacionada à convivência familiar."),
+            ("convivencia", "Discussão relacionada à convivência familiar."),
+            ("divórcio", "Discussão relacionada à dissolução do vínculo conjugal."),
+            ("divorcio", "Discussão relacionada à dissolução do vínculo conjugal."),
+            ("partilha", "Discussão relacionada à partilha de bens."),
+            ("menor", "Presença de menor, exigindo atenção ao melhor interesse da criança/adolescente."),
+            ("criança", "Presença de criança/adolescente, exigindo linguagem sensível e prova adequada."),
+            ("crianca", "Presença de criança/adolescente, exigindo linguagem sensível e prova adequada."),
+        ]
+
+        for key, label in family_map:
+            add_when(key, label)
+
+    elif legal_area == "previdenciario":
+        previd_map = [
+            ("bpc", "Discussão relacionada ao benefício de prestação continuada."),
+            ("loas", "Discussão relacionada ao BPC/LOAS e requisitos assistenciais."),
+            ("inss", "Existência de eixo administrativo/previdenciário perante o INSS."),
+            ("cadúnico", "Necessidade de conferir CadÚnico e composição familiar."),
+            ("cadunico", "Necessidade de conferir CadÚnico e composição familiar."),
+            ("idoso", "Possível requisito etário para benefício assistencial/previdenciário."),
+            ("deficiência", "Possível requisito de deficiência/incapacidade a comprovar por documentação médica/social."),
+            ("deficiencia", "Possível requisito de deficiência/incapacidade a comprovar por documentação médica/social."),
+            ("renda", "Necessidade de prova de renda familiar e vulnerabilidade social."),
+            ("indeferimento", "Necessidade de analisar decisão administrativa de indeferimento."),
+            ("laudo", "Necessidade de laudo/relatório médico quando aplicável."),
+        ]
+
+        for key, label in previd_map:
             add_when(key, label)
 
     elif legal_area in {"criminal", "penal"}:
@@ -176,16 +270,30 @@ def build_analysis_foundations(
     viability: dict[str, Any],
     decision: dict[str, Any],
 ) -> dict[str, Any]:
-    legal_area = case.get("legal_area") or technical.get("legal_area")
-    if isinstance(legal_area, str):
-        legal_area = legal_area.strip().lower() or None
+    legal_area = infer_legal_module(
+        legal_area=case.get("legal_area") or technical.get("legal_area"),
+        action_type=case.get("action_type") or technical.get("action_type"),
+        title=case.get("title") or technical.get("title"),
+        description=case.get("description") or technical.get("summary"),
+        default="civel",
+    )
     final_status = str(decision.get("final_status") or "").strip()
 
     disclaimer = (
         "Saída estruturada a partir dos fatos informados, base normativa aplicável à área selecionada "
         "e critérios de viabilidade/prova. Recomendável validação profissional final antes do protocolo."
     )
-    if legal_area in {"criminal", "penal"}:
+    if legal_area == "familia":
+        disclaimer = (
+            "Saída de família estruturada para apoio jurídico supervisionado, com cuidado especial "
+            "a dados sensíveis, menores, vínculo familiar e necessidade de revisão profissional antes de qualquer uso externo."
+        )
+    elif legal_area == "previdenciario":
+        disclaimer = (
+            "Saída previdenciária/assistencial estruturada para apoio jurídico supervisionado. "
+            "Exige conferência de documentos administrativos, médicos, sociais, econômicos e revisão do advogado responsável."
+        )
+    elif legal_area in {"criminal", "penal"}:
         disclaimer = (
             "Saída criminal estruturada exclusivamente para apoio jurídico supervisionado. "
             "Não substitui análise de advogado habilitado, não representa promessa de resultado, "
