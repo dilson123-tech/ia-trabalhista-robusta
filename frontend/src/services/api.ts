@@ -65,6 +65,16 @@ export type LoginResponse = {
   token_type: string
 }
 
+export type LegalModule = {
+  id: string
+  label: string
+  canonical_legal_area: string
+  status: string
+  aliases: string[]
+  action_keywords: string[]
+  safety_notes: string[]
+}
+
 export async function login(payload: LoginPayload): Promise<LoginResponse> {
   const response = await fetch(`${API_URL}/auth/login`, {
     method: "POST",
@@ -76,6 +86,16 @@ export async function login(payload: LoginPayload): Promise<LoginResponse> {
 
   if (!response.ok) {
     await parseError(response, "Erro ao autenticar no sistema")
+  }
+
+  return response.json()
+}
+
+export async function getLegalModules(): Promise<LegalModule[]> {
+  const response = await fetch(`${API_URL}/legal-modules`)
+
+  if (!response.ok) {
+    await parseError(response, "Erro ao buscar módulos jurídicos")
   }
 
   return response.json()

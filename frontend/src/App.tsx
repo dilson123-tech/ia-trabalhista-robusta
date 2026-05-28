@@ -1,7 +1,7 @@
 import './App.css'
 import { useEffect, useState, type KeyboardEvent } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
-import { ApiError, cleanupDemoCases, createPlanChangeCheckout, createCase, getCases, getCaseAnalysis, getExecutiveSummary, getExecutiveReport, getExecutivePdf, getUsageSummaryV2, login, updateCaseStatus, type CaseItem, type CaseAnalysisResponse, type ExecutiveSummaryResponse, type ExecutiveReportResponse, type UsageSummaryV2Response } from './services/api'
+import { ApiError, cleanupDemoCases, createPlanChangeCheckout, createCase, getCases, getCaseAnalysis, getLegalModules, getExecutiveSummary, getExecutiveReport, getExecutivePdf, getUsageSummaryV2, login, updateCaseStatus, type CaseItem, type CaseAnalysisResponse, type ExecutiveSummaryResponse, type ExecutiveReportResponse, type LegalModule, type UsageSummaryV2Response } from './services/api'
 import { ExpansionWorkspace } from './components/expansion/ExpansionWorkspace'
 import { CaseFiltersBar } from './components/CaseFiltersBar'
 import { CaseCard } from './components/CaseCard'
@@ -54,6 +54,9 @@ function App() {
   const [usageSummary, setUsageSummary] = useState<UsageSummaryV2Response | null>(null)
   const [usageLoading, setUsageLoading] = useState(false)
   const [usageError, setUsageError] = useState('')
+  const [legalModules, setLegalModules] = useState<LegalModule[]>([])
+  const [legalModulesLoading, setLegalModulesLoading] = useState(false)
+  const [legalModulesError, setLegalModulesError] = useState('')
   const [planActionNotice, setPlanActionNotice] = useState('')
   const [planPanelCollapsed, setPlanPanelCollapsed] = useState(false)
   const [planWorkspaceView, setPlanWorkspaceView] = useState<'capacity' | 'commercial'>('capacity')
@@ -78,6 +81,13 @@ function App() {
     low: 'Baixo',
   }
 
+  const legalModuleStatusLabelMap: Record<string, string> = {
+    operational_real_supervised: 'Operacional supervisionado',
+    operational_initial_package: 'Pacote inicial validado',
+    qa_existing: 'Base QA existente',
+    qa_existing_to_formalize: 'Base pronta para formalizar',
+  }
+
   function getStatusLabel(status: string) {
     return statusLabelMap[status] ?? status
   }
@@ -85,6 +95,10 @@ function App() {
   function getRiskLabel(risk: string | undefined) {
     if (!risk) return 'Não informado'
     return riskLabelMap[risk] ?? risk
+  }
+
+  function getLegalModuleStatusLabel(status: string) {
+    return legalModuleStatusLabelMap[status] ?? status
   }
 
   function getPlanLabel(planType: string | undefined) {
@@ -298,8 +312,10 @@ function App() {
   async function refreshPortfolioAndUsage(authToken: string) {
     setLoading(true)
     setUsageLoading(true)
+    setLegalModulesLoading(true)
     setError('')
     setUsageError('')
+    setLegalModulesError('')
 
     try {
       const [casesData, usageData] = await Promise.all([
@@ -309,6 +325,16 @@ function App() {
 
       setCases(sortCasesForDisplay(casesData))
       setUsageSummary(usageData)
+
+      try {
+        const legalModulesData = await getLegalModules()
+        setLegalModules(legalModulesData)
+      } catch (err) {
+        console.error(err)
+        setLegalModules([])
+        setLegalModulesError('Não foi possível carregar os módulos jurídicos oficiais.')
+      }
+
       setLoaded(true)
     } catch (err) {
       const fallback = handleApiFailure(err, 'Não foi possível carregar os dados principais do painel.')
@@ -320,6 +346,7 @@ function App() {
     } finally {
       setLoading(false)
       setUsageLoading(false)
+      setLegalModulesLoading(false)
     }
   }
 
@@ -697,10 +724,98 @@ function App() {
               </div>
 
               {dashboardWorkspace === 'production' ? (
-                <p className="insight-empty">
-                  Você está no workspace de Produção. Gestão comercial fica separada para manter a operação limpa.
-                </p>
-              ) : planPanelCollapsed ? (
+                  <>
+                    <div
+                      className="insight-head"
+                      style={{
+                        alignItems: 'flex-start',
+                        marginBottom: '14px',
+                      }}
+                    >
+                      <div>
+                        <p className="insight-kicker">Plataforma IA Jurídica Pro</p>
+                        <h2 className="insight-title" style={{ marginBottom: '4px' }}>
+                          Módulos jurídicos oficiais
+                        </h2>
+                        <p className="insight-description" style={{ marginBottom: 0 }}>
+                          Cada área fica no seu quadrado, com status operacional e notas de segurança para uso supervisionado.
+                        </p>
+                      </div>
+                    </div>
+
+                    {legalModulesLoading ? (
+                      <p className="insight-empty">Carregando módulos jurídicos oficiais...</p>
+                    ) : legalModulesError ? (
+                      <p className="insight-empty">{legalModulesError}</p>
+                    ) : legalModules.length === 0 ? (
+                      <p className="insight-empty">Nenhum módulo jurídico carregado ainda.</p>
+                    ) : (
+                      <div
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                          gap: '14px',
+                        }}
+                      >
+                        {legalModules.map((legalModule) => (
+                          <article
+                            key={legalModule.id}
+                            style={{
+                              border: '1px solid rgba(245, 158, 11, 0.18)',
+                              borderRadius: '18px',
+                              padding: '16px',
+                              background: 'linear-gradient(145deg, rgba(15, 23, 42, 0.72), rgba(30, 41, 59, 0.42))',
+                              boxShadow: '0 16px 34px rgba(15, 23, 42, 0.22)',
+                              minHeight: '190px',
+                            }}
+                          >
+                            <p className="insight-kicker" style={{ marginBottom: '8px' }}>
+                              {getLegalModuleStatusLabel(legalModule.status)}
+                            </p>
+                            <h3
+                              style={{
+                                margin: '0 0 8px',
+                                color: 'var(--text-primary)',
+                                fontSize: '1.08rem',
+                              }}
+                            >
+                              {legalModule.label}
+                            </h3>
+                            <p
+                              className="insight-description"
+                              style={{
+                                marginBottom: '12px',
+                                fontSize: '0.86rem',
+                              }}
+                            >
+                              Área canônica: {legalModule.canonical_legal_area}
+                            </p>
+                            <p
+                              style={{
+                                margin: '0 0 12px',
+                                color: 'var(--muted-text)',
+                                fontSize: '0.82rem',
+                                lineHeight: 1.45,
+                              }}
+                            >
+                              {legalModule.action_keywords.slice(0, 3).join(' • ')}
+                            </p>
+                            <p
+                              style={{
+                                margin: 0,
+                                color: '#fde68a',
+                                fontSize: '0.78rem',
+                                lineHeight: 1.45,
+                              }}
+                            >
+                              {legalModule.safety_notes[0]}
+                            </p>
+                          </article>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                ) : planPanelCollapsed ? (
                   <p className="insight-empty">
                     Visão comercial recolhida. Abra quando quiser consultar assinatura, capacidade e cobrança.
                   </p>
