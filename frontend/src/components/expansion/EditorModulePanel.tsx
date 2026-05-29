@@ -39,6 +39,10 @@ const isEditorAreaSupported = (area: string | null | undefined): boolean => {
   )
 }
 
+const isStrategicHearingDocumentType = (documentType: string | null | undefined): boolean => {
+  return (documentType || '').trim().toLowerCase() === 'audiencia_estrategica'
+}
+
 const getAreaLabel = (area: string | null | undefined): string => {
   const normalized = (area || '').trim().toLowerCase()
   const labels: Record<string, string> = {
@@ -317,7 +321,9 @@ export function EditorModulePanel({ token, selectedCaseId, selectedCaseArea, pie
       setEditingContent('')
       setShowCreateForm(false)
       setVersionSuccess(
-        `Peça pronta gerada com sucesso na versão ${assistedDetail.current_version_number}. Revise, aprove e exporte o PDF final.`,
+        selectedDocumentIsStrategicHearing
+          ? `Roteiro de audiência gerado com sucesso na versão ${assistedDetail.current_version_number}. Revise, aprove e exporte o PDF de apoio.`
+          : `Peça pronta gerada com sucesso na versão ${assistedDetail.current_version_number}. Revise, aprove e exporte o PDF final.`,
       )
     } catch (err) {
       if (err instanceof ApiError) {
@@ -795,12 +801,15 @@ export function EditorModulePanel({ token, selectedCaseId, selectedCaseArea, pie
     }
   }
 
-  const currentVersionIsAssistedDraft = isAssistedDraftVersion(currentVersion)
+  const selectedDocumentIsStrategicHearing = isStrategicHearingDocumentType(selectedDocument?.document_type)
+  const currentVersionIsAssistedDraft = selectedDocumentIsStrategicHearing
+    ? false
+    : isAssistedDraftVersion(currentVersion)
 
   async function handleCreateVersion(approved: boolean) {
     if (!token.trim() || !selectedDocument || !currentVersion) return
 
-    if (approved && isAssistedDraftVersion(currentVersion)) {
+    if (approved && currentVersionIsAssistedDraft && !selectedDocumentIsStrategicHearing) {
       setVersionError('Versões assistidas precisam ser revisadas e salvas como versão manual antes da aprovação final.')
       setVersionSuccess('')
       return
@@ -1265,9 +1274,9 @@ export function EditorModulePanel({ token, selectedCaseId, selectedCaseArea, pie
                       disabled={
                         assistedDraftLoading || !selectedDocumentId || Boolean(versionActionLoading) || exportLoading !== null
                       }
-                      title="Gerar rascunho inicial dos blocos com base na análise, resumo executivo e decisão do caso"
+                      title={selectedDocumentIsStrategicHearing ? "Gerar roteiro de audiência com perguntas e prova oral" : "Gerar rascunho inicial dos blocos com base na análise, resumo executivo e decisão do caso"}
                     >
-                      {assistedDraftLoading ? 'Gerando peça pronta...' : 'Gerar peça pronta'}
+                      {assistedDraftLoading ? (selectedDocumentIsStrategicHearing ? 'Gerando roteiro...' : 'Gerando peça pronta...') : (selectedDocumentIsStrategicHearing ? 'Gerar roteiro de audiência' : 'Gerar peça pronta')}
                     </button>
 
                   <button
@@ -1282,12 +1291,12 @@ export function EditorModulePanel({ token, selectedCaseId, selectedCaseArea, pie
                   <button
                     type="button"
                     className={`btn ${
-                      versionActionLoading || !currentVersion || currentVersion.approved || currentVersionIsAssistedDraft
+                      versionActionLoading || !currentVersion || currentVersion.approved || (!selectedDocumentIsStrategicHearing && currentVersionIsAssistedDraft)
                         ? 'btn-muted'
                         : 'btn-secondary'
                     }`}
                     onClick={() => void handleCreateVersion(true)}
-                    disabled={Boolean(versionActionLoading) || !currentVersion || currentVersion.approved || currentVersionIsAssistedDraft}
+                    disabled={Boolean(versionActionLoading) || !currentVersion || currentVersion.approved || (!selectedDocumentIsStrategicHearing && currentVersionIsAssistedDraft)}
                       title={
                         currentVersionIsAssistedDraft
                           ? 'Versões assistidas precisam de revisão manual antes da aprovação final.'

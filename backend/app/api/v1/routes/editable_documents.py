@@ -37,6 +37,228 @@ def _resolve_current_user_id(db: Session, current_user: dict) -> int | None:
     return user.id if user else None
 
 
+
+def _is_audiencia_estrategica_document_type(document_type: str | None) -> bool:
+    normalized = (document_type or "").strip().lower().replace("-", "_").replace(" ", "_")
+    return normalized in {
+        "audiencia_estrategica",
+        "roteiro_audiencia",
+        "perguntas_testemunhas",
+        "prova_oral_estrategica",
+    }
+
+
+def _build_audiencia_estrategica_sections(
+    case: Case,
+    analysis_record,
+) -> list[dict]:
+    case_number = _safe_text(getattr(case, "case_number", "")) or f"#{case.id}"
+    case_title = _safe_text(getattr(case, "title", "")) or "Caso sem título"
+    case_description = _safe_text(getattr(case, "description", ""))
+
+    technical_summary = _safe_text(getattr(analysis_record, "technical_summary", ""))
+    issues = getattr(analysis_record, "issues", None) or []
+    next_steps = getattr(analysis_record, "next_steps", None) or []
+
+    issues_text = "\n".join(f"- {item}" for item in issues if item)
+    next_steps_text = "\n".join(f"- {item}" for item in next_steps if item)
+
+    base_context = _paragraphs(
+        [
+            f"Caso: {case_number} — {case_title}.",
+            case_description,
+            technical_summary,
+            "Este roteiro é material de apoio estratégico para audiência/prova oral, sujeito à revisão e decisão final do advogado responsável.",
+        ]
+    )
+
+    common_metadata = {
+        "origin_sources": ["case", "technical_analysis", "executive_summary", "attachments"],
+        "generation_mode": "audiencia_estrategica_from_analysis",
+        "guardrail_status": "requires_professional_review",
+        "export_visibility": "internal",
+        "include_in_final_pdf": True,
+        "document_family": "audiencia_estrategica",
+    }
+
+    return [
+        {
+            "key": "sintese_tese_audiencia",
+            "title": "Síntese da tese para audiência",
+            "content": _paragraphs(
+                [
+                    base_context,
+                    "Objetivo: transformar os fatos, documentos e análise do caso em roteiro prático de perguntas para audiência.",
+                    "A saída não é petição, manifestação, contestação ou peça para protocolo.",
+                ]
+            ),
+            "source": "assisted_draft",
+            "status": "draft",
+            "metadata": common_metadata,
+        },
+        {
+            "key": "pontos_provar",
+            "title": "Pontos que precisam ser provados",
+            "content": _paragraphs(
+                [
+                    "Liste e revise os fatos que precisam ser confirmados em audiência.",
+                    issues_text or "- Confirmar tese central do caso, fatos controvertidos, documentos existentes e pontos de prova oral.",
+                    next_steps_text or "- Conferir documentos, anexos, testemunhas e riscos antes da audiência.",
+                ]
+            ),
+            "source": "assisted_draft",
+            "status": "draft",
+            "metadata": common_metadata,
+        },
+        {
+            "key": "perguntas_parte_autora",
+            "title": "Perguntas indispensáveis para parte autora / representante da autora",
+            "content": _paragraphs(
+                [
+                    "Use este bloco para perguntas objetivas à parte autora ou ao representante legal.",
+                    "1. Quem participou diretamente dos fatos principais discutidos no caso?",
+                    "2. Quais documentos comprovam a versão apresentada pela parte autora?",
+                    "3. A parte autora tomou alguma providência concreta antes do ajuizamento?",
+                    "4. Há registro formal de comunicação, cobrança, tentativa de solução ou providência administrativa?",
+                    "5. Como a parte autora quantifica o dano, prejuízo ou pedido apresentado?",
+                    "6. Existe documento que confirme a data, o valor e a origem do prejuízo alegado?",
+                    "7. A parte autora possui prova direta do fato central controvertido?",
+                    "8. A parte autora confirma se houve participação de terceiro nos fatos?",
+                    "9. A parte autora realizou diligências para mitigar ou apurar o prejuízo?",
+                    "10. Há algum ponto dos autos que a parte autora não consiga confirmar por conhecimento direto?",
+                ]
+            ),
+            "source": "assisted_draft",
+            "status": "draft",
+            "metadata": common_metadata,
+        },
+        {
+            "key": "perguntas_parte_re",
+            "title": "Perguntas indispensáveis para parte ré",
+            "content": _paragraphs(
+                [
+                    "Use este bloco quando houver depoimento pessoal da parte ré.",
+                    "1. Qual foi sua participação direta nos fatos discutidos?",
+                    "2. O senhor confirma ou nega a posse, guarda, uso ou controle do bem/objeto discutido no momento do fato?",
+                    "3. Quais providências foram tomadas após tomar conhecimento do problema?",
+                    "4. Houve comunicação à parte contrária? Por qual meio?",
+                    "5. Existem documentos, mensagens ou testemunhas que confirmem sua versão?",
+                    "6. Houve atuação de terceiro nos fatos? Quem e de que forma?",
+                    "7. O senhor obteve vantagem com o fato discutido?",
+                    "8. O senhor tentou ocultar, dificultar ou impedir a apuração dos fatos?",
+                    "9. O senhor tem conhecimento direto sobre data, local e circunstâncias do fato?",
+                    "10. Há algum ponto relevante que ainda não foi esclarecido?",
+                ]
+            ),
+            "source": "assisted_draft",
+            "status": "draft",
+            "metadata": common_metadata,
+        },
+        {
+            "key": "perguntas_testemunhas",
+            "title": "Perguntas para testemunhas",
+            "content": _paragraphs(
+                [
+                    "Separar perguntas por testemunha quando houver nomes nos autos.",
+                    "Perguntas-base:",
+                    "1. Qual é sua relação com as partes?",
+                    "2. O que a testemunha presenciou diretamente?",
+                    "3. O que sabe apenas por ouvir dizer?",
+                    "4. Quem estava presente no momento do fato relevante?",
+                    "5. Quem praticou ou acompanhou a conduta principal discutida?",
+                    "6. A testemunha viu documentos, mensagens, pagamentos, entrega, posse ou comunicação?",
+                    "7. A testemunha sabe informar datas, locais e sequência dos acontecimentos?",
+                    "8. A testemunha percebeu tentativa de resolver o problema?",
+                    "9. A testemunha percebeu tentativa de ocultar o fato?",
+                    "10. Há algum detalhe importante que ainda não foi perguntado?",
+                ]
+            ),
+            "source": "assisted_draft",
+            "status": "draft",
+            "metadata": common_metadata,
+        },
+        {
+            "key": "perguntas_repetitivas_perigosas",
+            "title": "Perguntas repetitivas e perguntas perigosas",
+            "content": _paragraphs(
+                [
+                    "Perguntas repetitivas devem ser cortadas quando buscam a mesma resposta com variações pequenas.",
+                    "Usar repetição apenas se houver evasiva, contradição ou resposta incompleta.",
+                    "Perguntas perigosas exigem cautela quando:",
+                    "- reforçam responsabilidade formal da própria parte;",
+                    "- afirmam fato ainda não comprovado;",
+                    "- abrem tema sem documento mínimo;",
+                    "- permitem confissão desfavorável;",
+                    "- induzem testemunha;",
+                    "- deixam a parte contrária explicar um ponto fraco sem contraponto.",
+                    "A decisão final sobre manter ou cortar a pergunta é do advogado responsável.",
+                ]
+            ),
+            "source": "assisted_draft",
+            "status": "draft",
+            "metadata": common_metadata,
+        },
+        {
+            "key": "perguntas_condicionais",
+            "title": "Perguntas condicionais",
+            "content": _paragraphs(
+                [
+                    "Perguntas condicionais só devem ser feitas se a resposta anterior abrir caminho.",
+                    "Modelo:",
+                    "Se a parte admitir ciência de fato relevante, perguntar desde quando sabia, como documentou e quais providências adotou.",
+                    "Se a parte negar fato mencionado nos autos, perguntar por que o fato aparece em documento, manifestação ou anexo.",
+                    "Se a testemunha disser que não presenciou diretamente, limitar o valor da resposta e evitar insistência improdutiva.",
+                    "Se surgir contradição, pedir esclarecimento objetivo sem agressividade.",
+                ]
+            ),
+            "source": "assisted_draft",
+            "status": "draft",
+            "metadata": common_metadata,
+        },
+        {
+            "key": "versao_curta",
+            "title": "Versão curtíssima para audiência com pouco tempo",
+            "content": _paragraphs(
+                [
+                    "Usar quando o tempo estiver curto.",
+                    "1. Quem participou diretamente do fato central?",
+                    "2. Quem tinha posse, guarda, uso, controle ou responsabilidade no momento do fato?",
+                    "3. A outra parte foi comunicada? Quando e por qual meio?",
+                    "4. Existe documento que confirme essa comunicação?",
+                    "5. Quais providências foram adotadas após o fato?",
+                    "6. Existe prova direta do prejuízo ou da responsabilidade alegada?",
+                    "7. Houve atuação de terceiro? Qual?",
+                    "8. Há contradição entre o que foi dito hoje e o que está nos autos?",
+                    "9. O valor pedido está documentado? Como foi calculado?",
+                    "10. Há algo relevante que a pessoa confirma por conhecimento direto?",
+                ]
+            ),
+            "source": "assisted_draft",
+            "status": "draft",
+            "metadata": common_metadata,
+        },
+        {
+            "key": "pontos_confirmar_advogado",
+            "title": "Pontos que o advogado deve confirmar antes da audiência",
+            "content": _paragraphs(
+                [
+                    "- Conferir se os documentos citados realmente estão nos autos.",
+                    "- Conferir se as testemunhas sabem por conhecimento direto ou por ouvir dizer.",
+                    "- Conferir se as perguntas respeitam o saneamento e a prova deferida.",
+                    "- Conferir riscos de contradição.",
+                    "- Conferir se alguma pergunta pode reforçar responsabilidade formal indesejada.",
+                    "- Conferir se há documentos para sustentar perguntas sobre valores, seguro, comunicação, posse, dano ou nexo.",
+                    "- Revisar a versão final antes de usar em audiência.",
+                    "Este material é apoio estratégico supervisionado, não substitui a condução técnica do advogado.",
+                ]
+            ),
+            "source": "assisted_draft",
+            "status": "draft",
+            "metadata": common_metadata,
+        },
+    ]
+
+
 def _build_document_detail_payload(
     db: Session,
     document: EditableDocument,
@@ -2724,13 +2946,26 @@ def generate_assisted_draft(
         )
 
     analysis_record = _get_or_create_case_analysis_record(db=db, case=case, current_user=current_user)
-    assisted_sections = _build_assisted_sections(
-        db,
-        case,
-        analysis_record,
-        current_user["tenant_id"],
-        document_metadata=document.document_metadata or {},
-    )
+
+    if _is_audiencia_estrategica_document_type(document.document_type):
+        assisted_sections = _build_audiencia_estrategica_sections(
+            case,
+            analysis_record,
+        )
+        version_notes = "Roteiro de audiência estratégica gerado a partir da análise do caso"
+        version_source = "audiencia_estrategica_from_analysis"
+        version_generation_mode = "audiencia_estrategica_from_analysis"
+    else:
+        assisted_sections = _build_assisted_sections(
+            db,
+            case,
+            analysis_record,
+            current_user["tenant_id"],
+            document_metadata=document.document_metadata or {},
+        )
+        version_notes = "Minuta assistida gerada a partir da análise do caso"
+        version_source = "assisted_draft_from_analysis"
+        version_generation_mode = "assisted_draft_from_analysis"
 
     current_user_id = _resolve_current_user_id(db, current_user)
     latest_version_number = (
@@ -2886,7 +3121,10 @@ def create_editable_document_version(
             _section_has_assisted_origin(section) for section in payload_sections
         )
 
-        if payload_has_assisted_origin or _version_has_assisted_origin(base_version):
+        if (
+            not _is_audiencia_estrategica_document_type(document.document_type)
+            and (payload_has_assisted_origin or _version_has_assisted_origin(base_version))
+        ):
             raise HTTPException(
                 status_code=409,
                 detail=(
