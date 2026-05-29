@@ -48,6 +48,83 @@ def _is_audiencia_estrategica_document_type(document_type: str | None) -> bool:
     }
 
 
+
+def _build_audiencia_person_specific_questions(context_text: str) -> str:
+    normalized = (context_text or "").lower()
+
+    has_pratic = "pratic sider" in normalized or "pratic" in normalized
+    has_edson = "edson" in normalized
+    has_rosangela = "rosangela" in normalized or "rosângela" in normalized
+    has_dilson = "dilson" in normalized
+
+    blocks: list[str] = []
+
+    if has_pratic:
+        blocks.append(_paragraphs([
+            "Representante da PRATIC SIDER / parte autora:",
+            "1. Quem procurou a empresa inicialmente para viabilizar a locação da carreta?",
+            "2. Edson Estevão participou das tratativas antes ou durante a contratação?",
+            "3. A empresa tinha conhecimento de que Edson seria usuário, condutor ou interessado prático na carreta?",
+            "4. A empresa confirma se, nos autos, afirmou que Dilson teria apenas emprestado o CNPJ para Edson locar a carreta?",
+            "5. A empresa sabe dizer quem estava com a posse direta ou condução da carreta no momento do desaparecimento?",
+            "6. Há prova direta de que Dilson estava dirigindo ou com a posse física da carreta no momento do desaparecimento?",
+            "7. A empresa foi comunicada sobre o desaparecimento/furto da carreta? Quando e por qual meio?",
+            "8. Foi registrado boletim de ocorrência? Quem registrou e com quais informações?",
+            "9. Havia seguro para furto/roubo da carreta? A apólice e eventual negativa foram juntadas aos autos?",
+            "10. Como a empresa calculou o valor cobrado e quais documentos demonstram esse prejuízo?",
+        ]))
+
+    if has_edson:
+        blocks.append(_paragraphs([
+            "Edson Estevão:",
+            "1. Foi o senhor quem pediu a Dilson que fizesse a locação da carreta?",
+            "2. A carreta seria usada pelo senhor ou em atividade de seu interesse?",
+            "3. A locação foi formalizada em nome de Dilson para atender a um pedido seu?",
+            "4. Depois da locação, quem passou a usar ou conduzir a carreta no dia a dia?",
+            "5. No momento do desaparecimento, quem estava com a posse direta ou condução da carreta?",
+            "6. Dilson estava presente, dirigindo ou controlando a carreta quando ela desapareceu?",
+            "7. Onde a carreta estava quando desapareceu?",
+            "8. O local tinha controle de entrada, saída, vigilância, estacionamento ou responsável?",
+            "9. O senhor comunicou Dilson sobre o desaparecimento? Quando e por qual meio?",
+            "10. A empresa locadora foi comunicada? Quem comunicou e em qual momento aproximado?",
+        ]))
+
+    if has_rosangela:
+        blocks.append(_paragraphs([
+            "Rosangela de Lourdes Siqueira:",
+            "1. A senhora conhece Dilson Pereira e Edson Estevão?",
+            "2. A senhora sabe como surgiu a locação da carreta discutida no processo?",
+            "3. Pelo que a senhora presenciou diretamente, Edson pediu ajuda de Dilson para locar a carreta?",
+            "4. A carreta era para uso de Dilson ou para uso/interesse de Edson?",
+            "5. Depois da locação, quem efetivamente passou a usar ou conduzir a carreta?",
+            "6. A senhora soube quem estava com a carreta quando ela desapareceu?",
+            "7. A senhora sabe se Dilson foi comunicado logo após o desaparecimento?",
+            "8. A senhora presenciou alguma tentativa de esconder o fato ou, ao contrário, de comunicar e resolver a situação?",
+        ]))
+
+    if has_dilson:
+        blocks.append(_paragraphs([
+            "Dilson Pereira / parte ré:",
+            "1. Qual foi a participação de Dilson na formalização da locação?",
+            "2. A locação foi feita para uso próprio de Dilson ou para atender pedido/interesse de Edson?",
+            "3. Dilson tinha posse direta, condução ou controle diário da carreta?",
+            "4. Dilson estava com a carreta quando ela desapareceu?",
+            "5. Quando Dilson tomou conhecimento do desaparecimento?",
+            "6. Quais providências foram adotadas após essa comunicação?",
+            "7. Há mensagens, testemunhas ou documentos que confirmem a participação de Edson?",
+            "8. Há prova de que Dilson agiu de má-fé ou se beneficiou do desaparecimento?",
+        ]))
+
+    if not blocks:
+        return _paragraphs([
+            "Nenhuma pessoa específica foi identificada com segurança suficiente no contexto do caso.",
+            "Separar manualmente as perguntas por parte, representante e testemunha antes da audiência.",
+            "Quando houver nomes nos autos, revisar o roteiro para criar blocos individuais por pessoa.",
+        ])
+
+    return "\n\n".join(blocks)
+
+
 def _build_audiencia_estrategica_sections(
     case: Case,
     analysis_record,
@@ -62,6 +139,19 @@ def _build_audiencia_estrategica_sections(
 
     issues_text = "\n".join(f"- {item}" for item in issues if item)
     next_steps_text = "\n".join(f"- {item}" for item in next_steps if item)
+
+    combined_context_text = " ".join(
+        [
+            case_number,
+            case_title,
+            case_description,
+            technical_summary,
+            " ".join(str(item) for item in issues if item),
+            " ".join(str(item) for item in next_steps if item),
+        ]
+    )
+
+    person_specific_questions = _build_audiencia_person_specific_questions(combined_context_text)
 
     base_context = _paragraphs(
         [
@@ -173,6 +263,14 @@ def _build_audiencia_estrategica_sections(
                     "10. Há algum detalhe importante que ainda não foi perguntado?",
                 ]
             ),
+            "source": "assisted_draft",
+            "status": "draft",
+            "metadata": common_metadata,
+        },
+        {
+            "key": "perguntas_pessoas_identificadas",
+            "title": "Perguntas por pessoa identificada",
+            "content": person_specific_questions,
             "source": "assisted_draft",
             "status": "draft",
             "metadata": common_metadata,

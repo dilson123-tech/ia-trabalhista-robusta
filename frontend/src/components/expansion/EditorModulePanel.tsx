@@ -329,7 +329,7 @@ export function EditorModulePanel({ token, selectedCaseId, selectedCaseArea, pie
       if (err instanceof ApiError) {
         setVersionError(err.message)
       } else {
-        setVersionError('Não foi possível gerar a peça pronta para o caso selecionado.')
+        setVersionError(selectedDocumentIsStrategicHearing ? 'Não foi possível gerar o roteiro de audiência para o caso selecionado.' : 'Não foi possível gerar a peça pronta para o caso selecionado.')
       }
     } finally {
       setAssistedDraftLoading(false)
@@ -353,12 +353,12 @@ export function EditorModulePanel({ token, selectedCaseId, selectedCaseArea, pie
       setCompareTargetVersionNumber(null)
       setEditingSectionKey(null)
       setEditingContent('')
-      setVersionSuccess(`Peça pronta atualizada com sucesso na versão ${detail.current_version_number}.`)
+      setVersionSuccess(selectedDocumentIsStrategicHearing ? `Roteiro de audiência atualizado com sucesso na versão ${detail.current_version_number}.` : `Peça pronta atualizada com sucesso na versão ${detail.current_version_number}.`)
     } catch (err) {
       if (err instanceof ApiError) {
         setVersionError(err.message)
       } else {
-        setVersionError('Não foi possível gerar a peça pronta a partir da análise.')
+        setVersionError(selectedDocumentIsStrategicHearing ? 'Não foi possível gerar o roteiro de audiência a partir da análise.' : 'Não foi possível gerar a peça pronta a partir da análise.')
       }
     } finally {
       setAssistedDraftLoading(false)
