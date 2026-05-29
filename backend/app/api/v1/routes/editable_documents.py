@@ -9,7 +9,16 @@ from sqlalchemy.orm import Session
 from app.core.security import require_auth, require_role
 from app.core.tenant import scoped_query
 from app.db.session import get_db
-from app.models import Case, User, CasePartyModel, CasePartyStateModel
+from app.models import (
+    Case,
+    User,
+    CaseAttachment,
+    CasePartyEventModel,
+    CasePartyModel,
+    CasePartyRelationshipModel,
+    CasePartyRepresentativeModel,
+    CasePartyStateModel,
+)
 from app.api.v1.routes.cases import _get_or_create_case_analysis_record
 from app.models.editable_document import EditableDocument, EditableDocumentVersion
 from app.schemas.editable_document import (
@@ -330,9 +339,219 @@ def _build_audiencia_person_specific_questions(
     return "\n\n".join(blocks)
 
 
+def _build_audiencia_context_snapshot(
+    db: Session | None,
+    case: Case,
+    tenant_id: int | None,
+) -> str:
+    if db is None or tenant_id is None:
+        return ""
+
+    lines: list[str] = []
+
+    state = (
+        db.query(CasePartyStateModel)
+        .filter(
+            CasePartyStateModel.tenant_id == tenant_id,
+            CasePartyStateModel.case_id == case.id,
+        )
+        .order_by(CasePartyStateModel.updated_at.desc())
+        .first()
+    )
+
+    if state:
+        state_metadata = state.state_metadata or {}
+        metadata_parts = []
+        for key in (
+            "case_comarca",
+            "cause_value",
+            "signature_local",
+            "signature_date",
+            "source",
+        ):
+            value = _safe_text(state_metadata.get(key))
+            if value:
+                metadata_parts.append(f"{key}: {value}")
+
+        if metadata_parts:
+            lines.append("Metadados estruturados do caso: " + "; ".join(metadata_parts) + ".")
+
+        parties = (
+            db.query(CasePartyModel)
+            .filter(
+                CasePartyModel.tenant_id == tenant_id,
+                CasePartyModel.party_state_id == state.id,
+            )
+            .order_by(CasePartyModel.id.asc())
+            .all()
+        )
+
+        if parties:
+            party_name_by_key = {
+                party.party_key: _safe_text(party.name) or party.party_key
+                for party in parties
+            }
+
+            active_party_lines = []
+            historical_party_lines = []
+
+            for party in parties[:20]:
+                party_name = _safe_text(party.name) or party.party_key
+                party_role = _safe_text(party.role) or "papel não informado"
+                party_type = _safe_text(party.party_type) or "tipo não informado"
+                party_status = _safe_text(party.status) or "status não informado"
+                party_metadata = party.party_metadata or {}
+
+                metadata_notes = []
+                for key in (
+                    "qualification",
+                    "description",
+                    "cargo",
+                    "function",
+                    "funcao",
+                    "relation",
+                    "relationship",
+                    "witness_type",
+                    "tipo_testemunha",
+                ):
+                    value = _safe_text(party_metadata.get(key))
+                    if value:
+                        metadata_notes.append(f"{key}: {value}")
+
+                party_line = (
+                    f"- {party_name} ({party_role}; {party_type}; status: {party_status})"
+                )
+                if metadata_notes:
+                    party_line += " — " + "; ".join(metadata_notes)
+
+                if party_status == "active":
+                    active_party_lines.append(party_line)
+                else:
+                    historical_party_lines.append(party_line)
+
+            if active_party_lines:
+                lines.append("Partes/pessoas ativas cadastradas no caso:\n" + "\n".join(active_party_lines))
+
+            if historical_party_lines:
+                lines.append("Partes/pessoas históricas cadastradas no caso:\n" + "\n".join(historical_party_lines))
+
+            representatives = (
+                db.query(CasePartyRepresentativeModel)
+                .filter(
+                    CasePartyRepresentativeModel.tenant_id == tenant_id,
+                    CasePartyRepresentativeModel.party_state_id == state.id,
+                )
+                .order_by(CasePartyRepresentativeModel.id.asc())
+                .all()
+            )
+            if representatives:
+                rep_lines = []
+                for representative in representatives[:20]:
+                    represented = party_name_by_key.get(
+                        representative.represented_party_key,
+                        representative.represented_party_key,
+                    )
+                    representative_name = party_name_by_key.get(
+                        representative.representative_party_key,
+                        representative.representative_party_key,
+                    )
+                    rep_type = _safe_text(representative.representation_type) or "representação"
+                    status = _safe_text(representative.status) or "status não informado"
+                    rep_lines.append(
+                        f"- {representative_name} representa {represented} ({rep_type}; status: {status})"
+                    )
+                lines.append("Representantes cadastrados:\n" + "\n".join(rep_lines))
+
+            relationships = (
+                db.query(CasePartyRelationshipModel)
+                .filter(
+                    CasePartyRelationshipModel.tenant_id == tenant_id,
+                    CasePartyRelationshipModel.party_state_id == state.id,
+                )
+                .order_by(CasePartyRelationshipModel.id.asc())
+                .all()
+            )
+            if relationships:
+                relationship_lines = []
+                for relationship in relationships[:20]:
+                    source = party_name_by_key.get(
+                        relationship.source_party_key,
+                        relationship.source_party_key,
+                    )
+                    target = party_name_by_key.get(
+                        relationship.target_party_key,
+                        relationship.target_party_key,
+                    )
+                    relationship_type = _safe_text(relationship.relationship_type) or "relação"
+                    status = _safe_text(relationship.status) or "status não informado"
+                    relationship_lines.append(
+                        f"- {source} -> {target}: {relationship_type} (status: {status})"
+                    )
+                lines.append("Relações entre partes/pessoas:\n" + "\n".join(relationship_lines))
+
+            events = (
+                db.query(CasePartyEventModel)
+                .filter(
+                    CasePartyEventModel.tenant_id == tenant_id,
+                    CasePartyEventModel.party_state_id == state.id,
+                )
+                .order_by(CasePartyEventModel.created_at.asc())
+                .all()
+            )
+            if events:
+                event_lines = []
+                for event in events[:20]:
+                    title = _safe_text(event.title) or _safe_text(event.event_type) or "evento"
+                    description = _safe_text(event.description)
+                    occurred_on = _safe_text(event.occurred_on)
+                    event_party_names = [
+                        party_name_by_key.get(party_key, party_key)
+                        for party_key in (event.party_keys or [])
+                    ]
+                    event_line = f"- {title}"
+                    if occurred_on:
+                        event_line += f" em {occurred_on}"
+                    if event_party_names:
+                        event_line += " — partes: " + ", ".join(event_party_names)
+                    if description:
+                        event_line += f". {description}"
+                    event_lines.append(event_line)
+                lines.append("Eventos relevantes de partes:\n" + "\n".join(event_lines))
+
+    attachments = (
+        db.query(CaseAttachment)
+        .filter(
+            CaseAttachment.tenant_id == tenant_id,
+            CaseAttachment.case_id == case.id,
+        )
+        .order_by(CaseAttachment.created_at.desc())
+        .all()
+    )
+
+    if attachments:
+        attachment_lines = []
+        for attachment in attachments[:20]:
+            filename = _safe_text(attachment.original_filename) or "arquivo sem nome"
+            category = _safe_text(attachment.category) or "outro"
+            description = _safe_text(attachment.description)
+            event_date = attachment.event_date.isoformat() if attachment.event_date else ""
+            line = f"- {filename} ({category})"
+            if event_date:
+                line += f" — data do evento: {event_date}"
+            if description:
+                line += f". {description}"
+            attachment_lines.append(line)
+
+        lines.append("Anexos/provas cadastrados no caso:\n" + "\n".join(attachment_lines))
+
+    return "\n\n".join(line for line in lines if line).strip()
+
+
 def _build_audiencia_estrategica_sections(
     case: Case,
     analysis_record,
+    db: Session | None = None,
+    tenant_id: int | None = None,
 ) -> list[dict]:
     case_number = _safe_text(getattr(case, "case_number", "")) or f"#{case.id}"
     case_title = _safe_text(getattr(case, "title", "")) or "Caso sem título"
@@ -345,6 +564,12 @@ def _build_audiencia_estrategica_sections(
     issues_text = "\n".join(f"- {item}" for item in issues if item)
     next_steps_text = "\n".join(f"- {item}" for item in next_steps if item)
 
+    structured_context = _build_audiencia_context_snapshot(
+        db=db,
+        case=case,
+        tenant_id=tenant_id,
+    )
+
     combined_context_text = " ".join(
         [
             case_number,
@@ -353,6 +578,7 @@ def _build_audiencia_estrategica_sections(
             technical_summary,
             " ".join(str(item) for item in issues if item),
             " ".join(str(item) for item in next_steps if item),
+            structured_context,
         ]
     )
 
@@ -365,14 +591,18 @@ def _build_audiencia_estrategica_sections(
         area=case_area,
     )
 
-    base_context = _paragraphs(
-        [
-            f"Caso: {case_number} — {case_title}.",
-            case_description,
-            technical_summary,
-            "Este roteiro é material de apoio estratégico para audiência/prova oral, sujeito à revisão e decisão final do advogado responsável.",
-        ]
-    )
+    base_context_items = [
+        f"Caso: {case_number} — {case_title}.",
+        case_description,
+        technical_summary,
+        "Este roteiro é material de apoio estratégico para audiência/prova oral, sujeito à revisão e decisão final do advogado responsável.",
+    ]
+    if structured_context:
+        base_context_items.append(
+            "Contexto estruturado adicional identificado no caso:\n" + structured_context
+        )
+
+    base_context = _paragraphs(base_context_items)
 
     common_metadata = {
         "origin_sources": ["case", "technical_analysis", "executive_summary", "attachments"],
@@ -3261,6 +3491,8 @@ def generate_assisted_draft(
         assisted_sections = _build_audiencia_estrategica_sections(
             case,
             analysis_record,
+            db=db,
+            tenant_id=current_user["tenant_id"],
         )
         version_notes = "Roteiro de audiência estratégica gerado a partir da análise do caso"
         version_source = "audiencia_estrategica_from_analysis"
