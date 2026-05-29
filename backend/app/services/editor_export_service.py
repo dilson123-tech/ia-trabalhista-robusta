@@ -27,6 +27,11 @@ def _include_section_in_final_export(section: Dict) -> bool:
     if not isinstance(metadata, dict):
         return True
 
+    # Audiência Estratégica é material interno de apoio, mas deve ser exportável
+    # em PDF próprio. "internal" aqui significa que não é peça para protocolo.
+    if metadata.get("document_family") == "audiencia_estrategica":
+        return True
+
     if metadata.get("include_in_final_pdf") is False:
         return False
 
