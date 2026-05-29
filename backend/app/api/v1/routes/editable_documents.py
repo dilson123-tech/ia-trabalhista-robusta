@@ -140,10 +140,118 @@ def _build_criminal_audiencia_person_specific_questions(context_text: str) -> st
     ])
 
 
+
+def _is_trabalhista_audiencia_area(area: str | None) -> bool:
+    normalized = (area or "").strip().lower().replace("_", " ").replace("-", " ")
+    normalized = " ".join(normalized.split())
+    return normalized in {
+        "trabalhista",
+        "trabalho",
+        "laboral",
+        "direito do trabalho",
+        "processo do trabalho",
+    }
+
+
+def _build_trabalhista_audiencia_person_specific_questions(context_text: str) -> str:
+    return "\n\n".join([
+        _paragraphs([
+            "Reclamante / empregado:",
+            "1. Qual era sua função, data de admissão, data de desligamento e rotina diária de trabalho?",
+            "2. Quem dava ordens diretas e fiscalizava a execução do serviço?",
+            "3. Qual era o horário real de entrada, saída e intervalo intrajornada?",
+            "4. Os controles de ponto refletiam a jornada efetivamente cumprida?",
+            "5. Havia horas extras habituais, trabalho em feriados, domingos ou supressão de intervalo?",
+            "6. Os pagamentos em holerite correspondiam ao que era efetivamente trabalhado?",
+            "7. Houve pagamento por fora, descontos indevidos, acúmulo de função ou alteração contratual relevante?",
+            "8. O FGTS era depositado corretamente durante todo o contrato?",
+            "9. Na rescisão, recebeu TRCT, guias, aviso-prévio, saldo de salário, férias, 13º salário e multa de 40% quando cabível?",
+            "10. Quais documentos, mensagens ou testemunhas confirmam sua versão?",
+        ]),
+        _paragraphs([
+            "Preposto / representante da reclamada:",
+            "1. O preposto tem conhecimento direto da rotina do reclamante ou fala apenas por documentos internos?",
+            "2. Qual era a função contratual e a função efetivamente exercida pelo reclamante?",
+            "3. Quem controlava jornada, pausas, escala, banco de horas e autorização de horas extras?",
+            "4. A empresa possui controles de ponto completos, assinados e compatíveis com a rotina real?",
+            "5. Como eram registradas horas extras, intervalos, faltas, atrasos e compensações?",
+            "6. A empresa confirma a entrega de holerites, comprovantes de pagamento e documentos rescisórios?",
+            "7. A empresa confirma recolhimento integral de FGTS, INSS e demais verbas durante o contrato?",
+            "8. Houve advertências, suspensões, acordos de compensação, banco de horas ou alteração contratual?",
+            "9. Quais documentos a empresa trouxe para comprovar sua versão?",
+            "10. Há algum ponto da rotina que o preposto não consiga confirmar por conhecimento próprio?",
+        ]),
+        _paragraphs([
+            "Testemunha do reclamante:",
+            "1. A testemunha trabalhou no mesmo setor, turno ou período do reclamante?",
+            "2. O que presenciou diretamente sobre jornada, intervalo, horas extras e controle de ponto?",
+            "3. A testemunha via o reclamante chegando antes, saindo depois ou trabalhando sem registro correto?",
+            "4. A testemunha presenciou ordens de superiores, metas, cobrança ou fiscalização da rotina?",
+            "5. A testemunha sabe informar se havia pagamento por fora, acúmulo de função ou desvio de função?",
+            "6. A testemunha presenciou condições de insalubridade, periculosidade, falta de EPI ou risco ocupacional?",
+            "7. O relato é baseado em convivência direta ou em comentário de terceiros?",
+            "8. Há contradição possível entre o relato da testemunha e documentos de ponto, holerites ou mensagens?",
+        ]),
+        _paragraphs([
+            "Testemunha da reclamada:",
+            "1. A testemunha trabalhou diretamente com o reclamante ou apenas conhece a rotina geral da empresa?",
+            "2. A testemunha consegue confirmar a jornada real do reclamante por conhecimento direto?",
+            "3. A testemunha acompanhava registro de ponto, intervalos, escalas e horas extras?",
+            "4. A testemunha sabe se havia autorização formal para horas extras ou banco de horas?",
+            "5. A testemunha presenciou entrega e uso efetivo de EPI, treinamentos ou fiscalização de segurança?",
+            "6. A testemunha tem cargo de confiança, vínculo hierárquico ou interesse que possa influenciar o depoimento?",
+            "7. O relato confirma documentos da empresa ou apenas reproduz procedimento padrão?",
+            "8. Há algum ponto que a testemunha não tenha presenciado diretamente?",
+        ]),
+        _paragraphs([
+            "Gestor / encarregado:",
+            "1. O gestor distribuía tarefas, controlava jornada ou autorizava horas extras do reclamante?",
+            "2. Como eram registradas ordens, metas, escalas, trocas de turno e necessidade de permanência após o horário?",
+            "3. Havia cobrança para iniciar atividades antes do registro de ponto ou continuar após o encerramento?",
+            "4. O gestor fiscalizava intervalo intrajornada, pausas, uso de EPI e condições do ambiente?",
+            "5. O gestor comunicava ao RH diferenças de jornada, faltas, atrasos ou ocorrências?",
+            "6. Havia acúmulo de função, substituição de colegas ou tarefas fora da função contratada?",
+            "7. O gestor consegue indicar documentos ou mensagens que confirmem sua versão?",
+        ]),
+        _paragraphs([
+            "RH / responsável por folha, ponto e rescisão:",
+            "1. Quem era responsável por ponto, holerites, banco de horas, férias, FGTS e verbas rescisórias?",
+            "2. Os controles de ponto foram conferidos antes do fechamento da folha?",
+            "3. Houve pagamento de horas extras, adicionais, DSR, férias, 13º salário, FGTS e verbas rescisórias?",
+            "4. Existem TRCT, recibos, comprovantes de pagamento, extrato de FGTS e guias rescisórias?",
+            "5. Houve acordo de compensação, banco de horas, descontos ou ajustes manuais no ponto?",
+            "6. Como a empresa apurou saldo de salário, aviso-prévio, férias, 13º e multa de 40% do FGTS?",
+            "7. Há divergência entre CTPS, contrato, holerites, ponto, TRCT e comprovantes?",
+        ]),
+        _paragraphs([
+            "Técnico de segurança / medicina do trabalho:",
+            "1. Existem PPP, LTCAT, PGR, PCMSO, laudos ambientais, fichas de EPI e registros de treinamento?",
+            "2. O reclamante estava exposto a agente insalubre, perigoso, calor, ruído, produtos químicos ou risco acentuado?",
+            "3. A exposição era habitual, intermitente ou eventual?",
+            "4. Os EPIs eram adequados, entregues, substituídos, fiscalizados e efetivamente usados?",
+            "5. Há registros de orientação, treinamento, fiscalização e advertência por não uso de EPI?",
+            "6. O ambiente foi avaliado por medição técnica ou apenas por procedimento interno?",
+            "7. Há divergência entre documentos ambientais e a rotina descrita por empregados/testemunhas?",
+        ]),
+        _paragraphs([
+            "Perito / responsável por laudo trabalhista:",
+            "1. Qual metodologia foi utilizada para avaliar jornada, ambiente, insalubridade, periculosidade ou nexo ocupacional?",
+            "2. A análise considerou documentos, inspeção, medições, entrevistas e rotina efetiva de trabalho?",
+            "3. Os EPIs eram suficientes para neutralizar ou reduzir o risco conforme documentação e prática real?",
+            "4. A conclusão depende de prova testemunhal, medição ambiental, documentos de segurança ou cálculo trabalhista?",
+            "5. Há limitações técnicas, ausência de documentos ou necessidade de diligência complementar?",
+            "6. O laudo confirma condição trabalhista específica ou apenas aponta necessidade de apuração?",
+        ]),
+    ])
+
+
 def _build_audiencia_person_specific_questions(
     context_text: str,
     area: str | None = None,
 ) -> str:
+    if _is_trabalhista_audiencia_area(area):
+        return _build_trabalhista_audiencia_person_specific_questions(context_text)
+
     if _is_criminal_audiencia_area(area):
         return _build_criminal_audiencia_person_specific_questions(context_text)
 
