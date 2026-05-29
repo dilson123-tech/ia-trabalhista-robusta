@@ -49,7 +49,104 @@ def _is_audiencia_estrategica_document_type(document_type: str | None) -> bool:
 
 
 
-def _build_audiencia_person_specific_questions(context_text: str) -> str:
+def _is_criminal_audiencia_area(area: str | None) -> bool:
+    normalized = (area or "").strip().lower().replace("_", " ").replace("-", " ")
+    normalized = " ".join(normalized.split())
+    return normalized in {
+        "criminal",
+        "penal",
+        "direito penal",
+        "processo penal",
+    }
+
+
+def _build_criminal_audiencia_person_specific_questions(context_text: str) -> str:
+    return "\n\n".join([
+        _paragraphs([
+            "Vítima / ofendido:",
+            "1. A vítima presenciou diretamente os fatos ou tomou conhecimento por terceiros?",
+            "2. A vítima reconhece o acusado? De onde o conhece?",
+            "3. O reconhecimento foi feito em quais condições e por qual procedimento?",
+            "4. Havia outras pessoas no local no momento dos fatos?",
+            "5. Existe divergência entre boletim de ocorrência, depoimento inicial e relato atual?",
+            "6. A vítima consegue separar o que viu diretamente do que ouviu de terceiros?",
+            "7. Há alguma relação anterior, conflito, dívida, ameaça ou motivo de animosidade envolvendo as partes?",
+        ]),
+        _paragraphs([
+            "Policial militar / agente da abordagem:",
+            "1. Qual foi o motivo objetivo da abordagem?",
+            "2. Houve denúncia anônima, flagrante visual, patrulhamento de rotina ou outra motivação concreta?",
+            "3. A denúncia foi registrada, documentada ou confirmada por outro meio?",
+            "4. Havia testemunhas independentes no momento da abordagem?",
+            "5. Houve uso de câmera corporal, viatura com gravação, imagem pública ou outro registro audiovisual?",
+            "6. Onde exatamente estavam os objetos apreendidos?",
+            "7. Quem tinha posse direta dos objetos no momento da abordagem?",
+            "8. A cadeia de custódia foi preservada desde a apreensão até a apresentação à autoridade policial?",
+        ]),
+        _paragraphs([
+            "Policial civil / investigador:",
+            "1. Quais diligências foram efetivamente realizadas durante a investigação?",
+            "2. Todas as testemunhas relevantes foram ouvidas?",
+            "3. Foram buscadas imagens, mensagens, laudos, registros telefônicos ou documentos complementares?",
+            "4. Houve alguma linha alternativa de investigação descartada? Por qual motivo?",
+            "5. A conclusão investigativa se baseia em prova direta, prova indireta ou presunção?",
+            "6. Há algum ponto relevante que permaneceu sem diligência complementar?",
+        ]),
+        _paragraphs([
+            "Delegado / autoridade policial:",
+            "1. Quais elementos concretos justificaram o indiciamento ou a conclusão policial?",
+            "2. Quais provas foram consideradas centrais para formar a convicção da autoridade policial?",
+            "3. Houve pedido de perícia, imagem, quebra de dados, reconhecimento ou oitiva complementar?",
+            "4. Alguma diligência relevante foi indeferida, dispensada ou não realizada?",
+            "5. A conclusão policial distingue materialidade, autoria e participação de cada envolvido?",
+        ]),
+        _paragraphs([
+            "Testemunha de acusação:",
+            "1. A testemunha presenciou diretamente os fatos?",
+            "2. Qual é a relação da testemunha com vítima, acusado, policiais ou demais envolvidos?",
+            "3. A testemunha consegue indicar data, local, horário aproximado e sequência dos acontecimentos?",
+            "4. A testemunha viu o acusado praticar a conduta atribuída a ele?",
+            "5. O relato contém algo que a testemunha sabe apenas por ouvir dizer?",
+            "6. Existe interesse, conflito, promessa, pressão ou vínculo que possa influenciar o depoimento?",
+        ]),
+        _paragraphs([
+            "Testemunha de defesa:",
+            "1. O que a testemunha presenciou diretamente?",
+            "2. A testemunha confirma álibi, ausência de posse, ausência de autoria, ausência de ameaça ou ausência de participação?",
+            "3. Há documento, imagem, mensagem ou outro elemento que confirme o relato?",
+            "4. O relato da testemunha é direto ou baseado em informação recebida de terceiros?",
+            "5. A testemunha consegue apontar data, local e circunstância com segurança?",
+            "6. Há algum ponto que possa gerar contradição com documentos ou depoimentos já existentes?",
+        ]),
+        _paragraphs([
+            "Acusado / réu:",
+            "1. A defesa pretende que o acusado exerça o direito ao silêncio ou apresente versão em audiência?",
+            "2. Onde o acusado afirma que estava no momento dos fatos?",
+            "3. Há prova documental, testemunhal ou digital que sustente essa versão?",
+            "4. O acusado conhecia a vítima, as testemunhas ou os policiais antes dos fatos?",
+            "5. Houve abordagem, prisão, apreensão ou reconhecimento? Como ocorreu?",
+            "6. Há risco de autoincriminação em alguma pergunta ou linha de esclarecimento?",
+            "7. Qual versão curta, objetiva e segura pode ser sustentada sem extrapolar as provas existentes?",
+        ]),
+        _paragraphs([
+            "Perito / responsável por laudo:",
+            "1. Qual metodologia foi utilizada no laudo ou exame técnico?",
+            "2. A cadeia de custódia foi documentada desde a coleta até a análise?",
+            "3. Houve lacre, identificação, registro de recebimento e preservação do material?",
+            "4. A conclusão é categórica, probabilística ou limitada pelas condições do exame?",
+            "5. O laudo vincula o acusado ao fato ou apenas confirma materialidade?",
+            "6. Há limitações técnicas, ausência de dados ou margem de incerteza relevante?",
+        ]),
+    ])
+
+
+def _build_audiencia_person_specific_questions(
+    context_text: str,
+    area: str | None = None,
+) -> str:
+    if _is_criminal_audiencia_area(area):
+        return _build_criminal_audiencia_person_specific_questions(context_text)
+
     normalized = (context_text or "").lower()
 
     has_pratic = "pratic sider" in normalized or "pratic" in normalized
@@ -151,7 +248,14 @@ def _build_audiencia_estrategica_sections(
         ]
     )
 
-    person_specific_questions = _build_audiencia_person_specific_questions(combined_context_text)
+    case_area = (
+        _safe_text(getattr(case, "legal_area", ""))
+        or _safe_text(getattr(case, "area", ""))
+    )
+    person_specific_questions = _build_audiencia_person_specific_questions(
+        combined_context_text,
+        area=case_area,
+    )
 
     base_context = _paragraphs(
         [
