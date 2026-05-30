@@ -351,10 +351,115 @@ def _build_consumidor_audiencia_person_specific_questions(context_text: str) -> 
     ])
 
 
+
+def _is_familia_audiencia_area(area: str | None) -> bool:
+    normalized = (area or "").strip().lower().replace("_", " ").replace("-", " ")
+    normalized = " ".join(normalized.split())
+    return normalized in {
+        "familia",
+        "família",
+        "family",
+        "direito de familia",
+        "direito de família",
+        "familia e sucessoes",
+        "família e sucessões",
+        "vara de familia",
+        "vara de família",
+    }
+
+
+def _build_familia_audiencia_person_specific_questions(context_text: str) -> str:
+    return "\n\n".join([
+        _paragraphs([
+            "Genitor / requerente:",
+            "1. Qual pedido principal está sendo discutido: guarda, alimentos, convivência, divórcio, união estável ou regulamentação de visitas?",
+            "2. Qual é a rotina atual da criança ou adolescente, incluindo moradia, escola, saúde, alimentação, transporte e atividades?",
+            "3. Quem exerce os cuidados diários e quem participa das decisões relevantes sobre educação, saúde e convivência?",
+            "4. Como ocorre a convivência com o outro genitor e quais dificuldades práticas existem?",
+            "5. Há registros de mensagens, acordos anteriores, comprovantes de despesas, relatórios escolares ou documentos médicos?",
+            "6. Qual é a renda, ocupação, condição econômica e capacidade contributiva das partes quando houver pedido de alimentos?",
+            "7. Há histórico de violência, ameaça, abandono, alienação parental, uso abusivo de álcool/drogas ou risco à criança?",
+            "8. O pedido atende ao melhor interesse da criança ou adolescente? Como isso será demonstrado em prova?",
+            "9. Há tentativa de acordo, mediação, composição familiar ou plano de convivência possível?",
+            "10. Quais fatos o advogado precisa confirmar antes de sustentar a tese em audiência?",
+        ]),
+        _paragraphs([
+            "Genitor / requerido:",
+            "1. O requerido concorda com guarda, convivência, alimentos ou partilha nos termos pedidos?",
+            "2. Qual é sua participação real na rotina da criança, escola, saúde, lazer, transporte e despesas?",
+            "3. Alega impossibilidade financeira, alteração de renda, desemprego, nova família ou outras obrigações?",
+            "4. Existem comprovantes de pagamento, transferências, compras, despesas diretas ou ajuda informal?",
+            "5. Há divergência entre a rotina narrada pelo requerente e a rotina efetivamente praticada?",
+            "6. O requerido afirma impedimento de convivência, afastamento injustificado ou dificuldade criada pela outra parte?",
+            "7. Há elementos que indiquem risco, negligência, alienação parental ou conflito prejudicial à criança?",
+            "8. O requerido propõe plano alternativo de guarda, convivência, alimentos ou responsabilidades?",
+            "9. Alguma afirmação depende de prova documental, testemunhal, estudo social ou avaliação psicossocial?",
+        ]),
+        _paragraphs([
+            "Criança / adolescente, quando houver escuta adequada:",
+            "1. A oitiva é recomendável, necessária e compatível com idade, maturidade e proteção emocional?",
+            "2. A criança/adolescente demonstra vínculo com ambos os genitores ou cuidadores?",
+            "3. Há sinais de pressão, indução, medo, conflito de lealdade ou fala treinada?",
+            "4. A rotina escolar, social, familiar e de saúde está preservada?",
+            "5. A manifestação deve ser colhida por equipe técnica, escuta especializada ou meio menos invasivo?",
+            "6. Há risco de exposição indevida, revitimização ou agravamento do conflito familiar?",
+        ]),
+        _paragraphs([
+            "Responsável financeiro / alimentos:",
+            "1. Qual é a renda formal e informal de cada parte?",
+            "2. Existem holerites, extratos, declaração de imposto, MEI, contrato, carteira de trabalho ou indícios de renda não declarada?",
+            "3. Quais são as despesas comprovadas da criança ou adolescente?",
+            "4. Há gastos com escola, material, transporte, plano de saúde, medicamentos, alimentação, moradia e atividades extras?",
+            "5. O valor pedido ou oferecido observa necessidade, possibilidade e proporcionalidade?",
+            "6. Existem outros filhos, dependentes, dívidas relevantes ou alteração financeira recente?",
+            "7. Há pagamentos informais que precisam ser reconhecidos ou organizados documentalmente?",
+        ]),
+        _paragraphs([
+            "Testemunha familiar:",
+            "1. A testemunha convive diretamente com a criança/adolescente e com as partes?",
+            "2. O que presenciou sobre rotina, cuidado, convivência, comportamento, despesas e participação parental?",
+            "3. O relato é baseado em observação direta ou em informação recebida de uma das partes?",
+            "4. A testemunha presenciou impedimento de visitas, abandono, conflito, ameaça, negligência ou tentativa de acordo?",
+            "5. Há vínculo afetivo, dependência econômica, inimizade ou interesse que possa influenciar o depoimento?",
+            "6. O relato confirma documentos, mensagens, comprovantes ou histórico do caso?",
+        ]),
+        _paragraphs([
+            "Testemunha escolar / cuidador / profissional próximo:",
+            "1. A testemunha acompanha a rotina escolar, saúde, cuidados, horários ou comportamento da criança?",
+            "2. Quem leva e busca a criança, participa de reuniões, acompanha tarefas e responde a chamados da escola?",
+            "3. Houve mudança de comportamento, faltas, queda de desempenho, ansiedade, medo ou conflito familiar perceptível?",
+            "4. A escola/cuidador recebeu informações divergentes dos genitores?",
+            "5. Existem relatórios, comunicados, agendas, mensagens ou registros escolares relevantes?",
+            "6. O relato é técnico/profissional ou apenas impressão pessoal?",
+        ]),
+        _paragraphs([
+            "Assistente social / equipe técnica:",
+            "1. Quais elementos foram observados sobre moradia, rede de apoio, rotina, vínculos e capacidade de cuidado?",
+            "2. Foram ouvidas as partes, criança/adolescente, familiares, escola ou profissionais de saúde?",
+            "3. O estudo social identificou risco, vulnerabilidade, negligência, alienação parental ou conflito intenso?",
+            "4. A conclusão recomenda guarda, convivência, acompanhamento, mediação ou nova avaliação?",
+            "5. Há limitações no estudo, ausência de entrevista, documentação incompleta ou necessidade de diligência complementar?",
+            "6. A recomendação está alinhada ao melhor interesse da criança/adolescente?",
+        ]),
+        _paragraphs([
+            "Psicólogo / perito psicossocial:",
+            "1. Qual metodologia foi utilizada na avaliação psicossocial?",
+            "2. Foram observados vínculos afetivos, conflito de lealdade, medo, indução, sofrimento emocional ou resistência injustificada?",
+            "3. A avaliação diferencia conflito conjugal de risco parental concreto?",
+            "4. Há sinais compatíveis com alienação parental, violência psicológica, negligência ou manipulação?",
+            "5. A conclusão é definitiva ou recomenda acompanhamento, reavaliação, terapia familiar ou estudo complementar?",
+            "6. A manifestação técnica preserva a criança/adolescente de exposição excessiva ao conflito?",
+        ]),
+    ])
+
+
 def _build_audiencia_person_specific_questions(
     context_text: str,
     area: str | None = None,
 ) -> str:
+    if _is_familia_audiencia_area(area):
+        return _build_familia_audiencia_person_specific_questions(context_text)
+
     if _is_consumidor_audiencia_area(area):
         return _build_consumidor_audiencia_person_specific_questions(context_text)
 
