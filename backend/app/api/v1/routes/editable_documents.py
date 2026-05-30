@@ -254,10 +254,110 @@ def _build_trabalhista_audiencia_person_specific_questions(context_text: str) ->
     ])
 
 
+
+def _is_consumidor_audiencia_area(area: str | None) -> bool:
+    normalized = (area or "").strip().lower().replace("_", " ").replace("-", " ")
+    normalized = " ".join(normalized.split())
+    return normalized in {
+        "consumidor",
+        "consumer",
+        "direito do consumidor",
+        "relacao de consumo",
+        "relação de consumo",
+    }
+
+
+def _build_consumidor_audiencia_person_specific_questions(context_text: str) -> str:
+    return "\n\n".join([
+        _paragraphs([
+            "Consumidor / autor:",
+            "1. Qual produto, serviço, contrato, cobrança, negativação ou atendimento originou o problema?",
+            "2. Quando o consumidor percebeu o defeito, cobrança indevida, falha do serviço ou inscrição negativa?",
+            "3. O consumidor tentou resolver administrativamente? Por quais canais e em quais datas?",
+            "4. Existem protocolos, prints, e-mails, mensagens, gravações, contratos, faturas ou comprovantes?",
+            "5. O consumidor sofreu bloqueio, interrupção de serviço, restrição de crédito, prejuízo financeiro ou constrangimento?",
+            "6. O consumidor reconhece a contratação, compra, dívida ou transação discutida?",
+            "7. Houve informação clara sobre preço, prazo, juros, multa, tarifa, garantia, cancelamento ou risco?",
+            "8. O dano alegado é material, moral, ambos ou apenas obrigação de fazer/não fazer?",
+            "9. Há algo que possa indicar culpa exclusiva do consumidor, uso indevido, atraso ou contratação válida?",
+            "10. Qual providência concreta o consumidor busca: cancelamento, baixa de negativação, restituição, indenização, reparo, troca ou cumprimento de oferta?",
+        ]),
+        _paragraphs([
+            "Fornecedor / empresa ré:",
+            "1. A empresa reconhece a relação de consumo e a contratação discutida?",
+            "2. Quais documentos demonstram contratação, aceite, entrega, prestação do serviço ou origem da cobrança?",
+            "3. A empresa possui gravações, logs, contrato, pedido, nota fiscal, faturas, protocolos ou histórico de atendimento?",
+            "4. Houve falha reconhecida, cancelamento solicitado, contestação de cobrança ou reclamação prévia?",
+            "5. A negativação, cobrança ou restrição foi precedida de comunicação adequada?",
+            "6. A empresa consegue demonstrar que a informação ao consumidor foi clara, ostensiva e suficiente?",
+            "7. Houve oferta, publicidade, promessa comercial ou condição contratual diferente da executada?",
+            "8. A empresa adotou providência para corrigir o problema após reclamação?",
+            "9. Há política interna, prazo de resposta, garantia, assistência técnica ou canal de ouvidoria aplicável?",
+            "10. Algum ponto da defesa depende apenas de procedimento padrão sem prova individual do caso?",
+        ]),
+        _paragraphs([
+            "Atendente / suporte / SAC / ouvidoria:",
+            "1. O atendimento foi realizado por qual canal: telefone, WhatsApp, e-mail, chat, app, loja física ou ouvidoria?",
+            "2. Qual protocolo foi aberto e qual solução foi prometida ao consumidor?",
+            "3. O consumidor informou cobrança indevida, defeito, fraude, cancelamento, negativação ou falha de serviço?",
+            "4. Houve orientação para aguardar prazo, reenviar documentos, pagar valor, cancelar serviço ou registrar nova reclamação?",
+            "5. O atendimento registrou corretamente o pedido do consumidor?",
+            "6. O consumidor recebeu resposta final clara e documentada?",
+            "7. Há divergência entre o que foi dito no atendimento e o que a empresa alega no processo?",
+        ]),
+        _paragraphs([
+            "Representante comercial / vendedor / loja:",
+            "1. Qual oferta, promessa, preço, prazo, garantia ou condição foi apresentada ao consumidor?",
+            "2. O consumidor recebeu contrato, nota fiscal, termo de garantia, regulamento ou comprovante da oferta?",
+            "3. Houve diferença entre publicidade/oferta e produto ou serviço efetivamente entregue?",
+            "4. O consumidor foi informado sobre limitações, fidelidade, multa, juros, tarifa ou condições de cancelamento?",
+            "5. O vendedor presenciou reclamação, tentativa de troca, cancelamento ou contestação?",
+            "6. Há comissão, meta, vínculo ou interesse que possa influenciar o relato?",
+        ]),
+        _paragraphs([
+            "Testemunha do consumidor:",
+            "1. A testemunha presenciou diretamente o defeito, falha de serviço, cobrança, atendimento ou constrangimento?",
+            "2. A testemunha acompanhou tentativa de solução administrativa?",
+            "3. A testemunha viu efeitos práticos como interrupção de serviço, recusa de atendimento, negativação, perda financeira ou exposição pública?",
+            "4. O relato é baseado em fato presenciado ou em informação contada pelo consumidor?",
+            "5. Há mensagens, fotos, vídeos, comprovantes ou protocolos que confirmem o relato?",
+        ]),
+        _paragraphs([
+            "Testemunha do fornecedor:",
+            "1. A testemunha conhece o caso concreto ou apenas explica o procedimento padrão da empresa?",
+            "2. A testemunha participou da contratação, cobrança, entrega, assistência técnica ou atendimento?",
+            "3. A testemunha consegue confirmar a regularidade da cobrança, negativação, serviço ou produto com base em documentos do caso?",
+            "4. O relato depende de sistema interno, protocolo ou log que possa ser exibido nos autos?",
+            "5. Há algum ponto que a testemunha não tenha presenciado diretamente?",
+        ]),
+        _paragraphs([
+            "Responsável financeiro / cobrança / negativação:",
+            "1. Qual é a origem exata da dívida, cobrança, tarifa, juros, multa ou negativação?",
+            "2. A empresa possui contrato, fatura, comprovante de uso, aceite ou documento que demonstre o débito?",
+            "3. O consumidor contestou a cobrança antes da negativação ou ajuizamento?",
+            "4. A inscrição em cadastro restritivo observou valor, data, comunicação e identificação corretos?",
+            "5. Houve baixa, acordo, pagamento parcial, cancelamento ou duplicidade de cobrança?",
+            "6. Há risco de cobrança por serviço não contratado, fraude, erro sistêmico ou dívida prescrita?",
+        ]),
+        _paragraphs([
+            "Técnico / assistência / perito do produto ou serviço:",
+            "1. Qual defeito, vício, falha técnica ou limitação foi constatada?",
+            "2. O problema decorre de fabricação, instalação, mau uso, desgaste, ausência de manutenção ou falha do serviço?",
+            "3. Houve tentativa de reparo, troca, reembolso ou assistência técnica dentro do prazo?",
+            "4. Existem laudo, ordem de serviço, fotos, vídeos, logs ou relatório técnico?",
+            "5. A conclusão técnica é categórica ou depende de análise complementar?",
+            "6. O defeito comprometeu uso, segurança, funcionalidade ou valor do produto/serviço?",
+        ]),
+    ])
+
+
 def _build_audiencia_person_specific_questions(
     context_text: str,
     area: str | None = None,
 ) -> str:
+    if _is_consumidor_audiencia_area(area):
+        return _build_consumidor_audiencia_person_specific_questions(context_text)
+
     if _is_trabalhista_audiencia_area(area):
         return _build_trabalhista_audiencia_person_specific_questions(context_text)
 
