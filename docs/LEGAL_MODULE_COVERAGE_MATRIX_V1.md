@@ -74,7 +74,7 @@ Critérios:
 | Trabalhista | VERDE | Validado com E2E, aprovação e PDF |
 | Consumidor | VERDE | Validado com E2E, Contexto V2, aprovação e PDF |
 | Família | VERDE | Validado com E2E, Contexto V2, aprovação e PDF |
-| Previdenciário/BPC-LOAS | VERMELHO | Próximo ciclo recomendado |
+| Previdenciário/BPC-LOAS | VERDE | Validado com E2E, Contexto V2, aprovação e PDF |
 | Civil/Ambiental | AMARELO | Existe como área, mas audiência específica ainda pendente |
 | Empresarial/Contratos/Cobrança | VERMELHO | Planejado para etapa posterior |
 
@@ -158,13 +158,13 @@ Critérios:
 
 | Tipo de caso | Status | Observação |
 |---|---:|---|
-| Audiência estratégica previdenciária | VERMELHO | Próximo ciclo recomendado |
-| BPC/LOAS | VERMELHO | Prioridade alta |
+| Audiência estratégica previdenciária | VERDE | Validada em E2E/PDF para BPC/LOAS |
+| BPC/LOAS | VERDE | Coberto no fluxo validado com prova médica/social, CadÚnico, renda familiar e INSS |
 | Auxílio-doença / benefício por incapacidade | VERMELHO | Pendente |
 | Aposentadoria por invalidez | VERMELHO | Pendente |
 | Aposentadoria por idade | VERMELHO | Pendente |
 | Revisão de benefício | VERMELHO | Pendente |
-| Perícia médica / social | VERMELHO | Pendente |
+| Perícia médica / social | VERDE | Coberta no roteiro validado com perito médico e assistente social/avaliador social |
 
 ---
 
@@ -199,17 +199,17 @@ Antes de transformar um item AMARELO em VERDE, deve existir pelo menos:
 
 A próxima prioridade técnica recomendada é:
 
-`Previdenciário/BPC-LOAS — Audiência Estratégica V1`
+`Civil/Ambiental — Audiência Estratégica V1`
 
 Motivo:
 
-- alto volume;
-- muitos documentos;
-- necessidade de prova médica/social;
-- renda familiar;
-- cuidador;
-- perícia;
-- INSS;
+- responsabilidade civil;
+- dano ambiental ou de vizinhança;
+- necessidade de laudos;
+- perícia técnica;
+- fiscalização;
+- testemunhas;
+- nexo causal;
 - forte aderência ao Contexto V2.
 
 ---
