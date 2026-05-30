@@ -172,6 +172,77 @@ Temas contemplados:
 - restituição;
 - obrigação de fazer/não fazer.
 
+
+### 4.5 Família
+
+A Audiência Estratégica Família está validada com fluxo E2E e PDF.
+
+Papéis contemplados:
+
+- genitor / requerente;
+- genitor / requerido;
+- criança / adolescente, quando houver escuta adequada;
+- responsável financeiro / alimentos;
+- testemunha familiar;
+- testemunha escolar / cuidador / profissional próximo;
+- assistente social / equipe técnica;
+- psicólogo / perito psicossocial.
+
+Temas contemplados:
+
+- guarda;
+- alimentos;
+- convivência;
+- divórcio;
+- união estável;
+- alienação parental;
+- renda;
+- rotina da criança;
+- melhor interesse da criança/adolescente;
+- estudo social;
+- avaliação psicossocial;
+- testemunhas familiares;
+- prova documental.
+
+### 4.6 Previdenciário/BPC-LOAS
+
+A Audiência Estratégica Previdenciário/BPC-LOAS está validada com fluxo E2E e PDF.
+
+Papéis contemplados:
+
+- requerente / segurado;
+- familiar cuidador / responsável pela rotina;
+- representante legal / procurador;
+- médico assistente / profissional de saúde;
+- perito médico;
+- assistente social / avaliador social;
+- servidor / representante do INSS;
+- testemunha sobre rotina, incapacidade e vulnerabilidade.
+
+Temas contemplados:
+
+- BPC/LOAS;
+- benefício assistencial;
+- benefício por incapacidade;
+- deficiência;
+- impedimento de longo prazo;
+- incapacidade funcional;
+- laudos médicos;
+- receitas;
+- exames;
+- CadÚnico;
+- NIS;
+- renda familiar;
+- grupo familiar;
+- cuidador;
+- avaliação social;
+- perícia médica;
+- INSS;
+- indeferimento administrativo;
+- rotina diária;
+- vulnerabilidade;
+- prova testemunhal.
+
 ---
 
 ## 5. Contexto Estruturado V2
@@ -247,6 +318,10 @@ Linha oficial do módulo Audiência Estratégica:
 - `v0.1.23-trabalhista-audiencia-estrategica-v1`
 - `v0.1.24-audiencia-pessoas-contexto-v2`
 - `v0.1.25-consumidor-audiencia-estrategica-v1`
+- `v0.1.26-audiencia-estrategica-relatorio-comercial-v1`
+- `v0.1.27-familia-audiencia-estrategica-v1`
+- `v0.1.28-legal-module-coverage-matrix-v1`
+- `v0.1.29-previdenciario-bpc-loas-audiencia-estrategica-v1`
 
 ---
 
@@ -263,8 +338,8 @@ Linha oficial do módulo Audiência Estratégica:
 - Trabalhista com E2E/PDF: 100%
 - Consumidor com E2E/PDF: 100%
 - Contexto Estruturado V2: 100%
-- Família: planejado
-- Previdenciário/BPC-LOAS: planejado
+- Família com E2E/PDF: 100%
+- Previdenciário/BPC-LOAS com E2E/PDF: 100%
 - Civil/Ambiental: planejado
 - Empresarial/Contratos/Cobrança: planejado para etapa posterior
 
@@ -324,15 +399,18 @@ Próxima área recomendada para Audiência Estratégica:
 
 ### 12.2 Previdenciário/BPC-LOAS
 
-Possível evolução:
+Status atual:
 
-- segurado;
-- requerente;
+- validado com E2E/PDF;
+- cobre requerente/segurado;
 - familiar cuidador;
-- médico;
-- assistente social;
-- prova de incapacidade;
-- miserabilidade;
+- médico assistente;
+- perito médico;
+- assistente social/avaliador social;
+- servidor/representante do INSS;
+- testemunha sobre rotina, incapacidade e vulnerabilidade;
+- prova médica/social;
+- CadÚnico;
 - renda familiar;
 - perícia.
 
@@ -375,7 +453,9 @@ Atualmente, o módulo cobre:
 - Cível;
 - Criminal;
 - Trabalhista;
-- Consumidor.
+- Consumidor;
+- Família;
+- Previdenciário/BPC-LOAS.
 
 Com Contexto Estruturado V2, ele passa a aproveitar dados reais cadastrados no caso, tornando o produto mais próximo da rotina prática de um escritório de advocacia.
 
