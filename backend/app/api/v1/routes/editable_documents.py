@@ -453,10 +453,123 @@ def _build_familia_audiencia_person_specific_questions(context_text: str) -> str
     ])
 
 
+
+def _is_previdenciario_audiencia_area(area: str | None) -> bool:
+    normalized = (area or "").strip().lower().replace("_", " ").replace("-", " ").replace("/", " ")
+    normalized = " ".join(normalized.split())
+    return normalized in {
+        "previdenciario",
+        "previdenciário",
+        "direito previdenciario",
+        "direito previdenciário",
+        "previdenciario bpc loas",
+        "previdenciário bpc loas",
+        "bpc",
+        "loas",
+        "bpc loas",
+        "beneficio assistencial",
+        "benefício assistencial",
+        "beneficio previdenciario",
+        "benefício previdenciário",
+        "inss",
+        "seguridade social",
+    }
+
+
+def _build_previdenciario_audiencia_person_specific_questions(context_text: str) -> str:
+    return "\n\n".join([
+        _paragraphs([
+            "Requerente / segurado:",
+            "1. Qual benefício está sendo discutido: BPC/LOAS, benefício por incapacidade, aposentadoria, revisão ou outro benefício previdenciário?",
+            "2. Qual é a idade, escolaridade, profissão, histórico de trabalho e situação atual do requerente?",
+            "3. No caso de BPC/LOAS, qual deficiência, impedimento de longo prazo, condição social ou vulnerabilidade fundamenta o pedido?",
+            "4. No caso de incapacidade, quais atividades o requerente não consegue realizar e desde quando?",
+            "5. Existem laudos médicos, receitas, exames, atestados, prontuários, relatórios terapêuticos ou documentos de reabilitação?",
+            "6. O requerente já passou por perícia médica, avaliação social, atendimento no CRAS ou indeferimento administrativo do INSS?",
+            "7. Há CadÚnico, NIS, comprovante de renda familiar, composição familiar e despesas essenciais atualizados?",
+            "8. O requerente recebe ajuda de familiares, terceiros, benefício assistencial, pensão, aposentadoria ou renda informal?",
+            "9. A condição alegada é permanente, temporária, progressiva, intermitente ou dependente de tratamento contínuo?",
+            "10. Quais pontos o advogado precisa confirmar para evitar contradição entre relato, documentos e perícia?",
+        ]),
+        _paragraphs([
+            "Familiar cuidador / responsável pela rotina:",
+            "1. O familiar acompanha a rotina diária, cuidados pessoais, medicação, alimentação, deslocamento e consultas?",
+            "2. Quais limitações concretas observa na vida diária do requerente?",
+            "3. O requerente depende de ajuda para banho, alimentação, locomoção, higiene, comunicação, controle de medicação ou atos da vida civil?",
+            "4. Quem mora na mesma residência e qual é a renda real de cada integrante do grupo familiar?",
+            "5. Existem despesas relevantes com remédios, fraldas, transporte, consultas, exames, alimentação especial ou adaptações?",
+            "6. Há rede de apoio, cuidador informal, vizinhos, familiares próximos ou assistência pública?",
+            "7. O relato do cuidador é compatível com laudos, receitas, CadÚnico, fotos, comprovantes e demais documentos?",
+            "8. Há risco de o familiar exagerar, omitir renda ou desconhecer informações importantes?",
+        ]),
+        _paragraphs([
+            "Representante legal / procurador:",
+            "1. Qual é o vínculo com o requerente e há procuração, curatela, tutela, guarda ou representação formal?",
+            "2. Quem organizou o pedido administrativo, documentos médicos, CadÚnico e comprovantes de renda?",
+            "3. O representante conhece diretamente a situação social, médica e financeira do requerente?",
+            "4. Houve indeferimento administrativo? Qual motivo foi apontado pelo INSS?",
+            "5. Foram juntados documentos atualizados ou há lacunas de prova médica/social?",
+            "6. Há necessidade de atualizar CadÚnico, renda familiar, laudos ou composição do grupo familiar antes da audiência/perícia?",
+        ]),
+        _paragraphs([
+            "Médico assistente / profissional de saúde:",
+            "1. Qual diagnóstico, CID, histórico clínico e evolução do quadro?",
+            "2. A condição gera incapacidade laboral, impedimento de longo prazo, limitação funcional ou necessidade de cuidado contínuo?",
+            "3. Desde quando o profissional acompanha o requerente e com qual frequência?",
+            "4. Quais exames, prontuários, relatórios, terapias, medicamentos ou tratamentos confirmam o quadro?",
+            "5. A limitação é compatível com idade, escolaridade, profissão e realidade social do requerente?",
+            "6. Existe possibilidade de reabilitação, melhora, tratamento, adaptação ou retorno ao trabalho?",
+            "7. O relatório médico é objetivo, datado, assinado e suficiente para dialogar com a perícia?",
+        ]),
+        _paragraphs([
+            "Perito médico:",
+            "1. Qual metodologia foi usada na avaliação pericial?",
+            "2. A perícia considerou documentos médicos, histórico clínico, exames, medicamentos e relato funcional?",
+            "3. A conclusão diferencia diagnóstico de incapacidade funcional ou impedimento de longo prazo?",
+            "4. A perícia avaliou compatibilidade entre limitações, profissão, idade, escolaridade e possibilidade de reabilitação?",
+            "5. Há divergência entre laudo pericial e documentos do médico assistente?",
+            "6. A conclusão é categórica, parcial, temporária ou depende de complementação documental?",
+            "7. No BPC/LOAS, a perícia considerou impedimento de longo prazo e barreiras sociais, não apenas doença isolada?",
+        ]),
+        _paragraphs([
+            "Assistente social / avaliador social:",
+            "1. A avaliação social verificou moradia, renda familiar, despesas, vulnerabilidade, acessibilidade e rede de apoio?",
+            "2. Quem compõe o grupo familiar e quais rendas devem ou não entrar no cálculo?",
+            "3. O CadÚnico estava atualizado e compatível com a realidade encontrada?",
+            "4. Há gastos extraordinários com saúde, transporte, alimentação, medicação ou cuidados?",
+            "5. A moradia apresenta barreiras físicas, precariedade, dependência de terceiros ou risco social?",
+            "6. A conclusão social é compatível com documentos, visitas, entrevistas e comprovantes?",
+            "7. Há necessidade de nova avaliação social, estudo complementar ou atualização documental?",
+        ]),
+        _paragraphs([
+            "Servidor / representante do INSS:",
+            "1. Qual foi o motivo objetivo do indeferimento administrativo?",
+            "2. Faltou qualidade de segurado, carência, incapacidade, deficiência, renda, CadÚnico ou documentação essencial?",
+            "3. Quais documentos foram analisados no processo administrativo?",
+            "4. Houve exigência não cumprida, pendência documental ou divergência cadastral?",
+            "5. A decisão administrativa analisou todos os documentos médicos e sociais apresentados?",
+            "6. O indeferimento se baseou em perícia, avaliação social, critério de renda ou outro fundamento?",
+            "7. Há informação no CNIS, CadÚnico, Meu INSS ou processo administrativo que precise ser confrontada?",
+        ]),
+        _paragraphs([
+            "Testemunha sobre rotina, incapacidade e vulnerabilidade:",
+            "1. A testemunha convive diretamente com o requerente ou apenas sabe por comentários?",
+            "2. O que presencia sobre limitações, dependência de terceiros, dificuldade de locomoção, trabalho, estudo ou cuidados pessoais?",
+            "3. A testemunha conhece a renda, moradia, despesas e situação social da família?",
+            "4. Viu o requerente tentando trabalhar, estudar, se deslocar, buscar tratamento ou depender de ajuda?",
+            "5. O relato confirma laudos, receitas, CadÚnico, comprovantes e demais documentos?",
+            "6. Há vínculo familiar, ajuda financeira, interesse ou conflito que possa influenciar o depoimento?",
+        ]),
+    ])
+
+
 def _build_audiencia_person_specific_questions(
     context_text: str,
     area: str | None = None,
 ) -> str:
+    if _is_previdenciario_audiencia_area(area):
+        return _build_previdenciario_audiencia_person_specific_questions(context_text)
+
     if _is_familia_audiencia_area(area):
         return _build_familia_audiencia_person_specific_questions(context_text)
 
