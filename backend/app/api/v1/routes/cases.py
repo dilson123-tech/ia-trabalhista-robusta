@@ -1,3 +1,5 @@
+import datetime as dt
+
 from fastapi.responses import Response
 from fastapi import APIRouter, Depends, HTTPException
 from app.services.viability_engine import calculate_viability
@@ -165,9 +167,13 @@ def create_case(
     enforce_plan_limits(db, current_user["tenant_id"], PlanAction.CASE_CREATE)
 
     # Pydantic v2: usar model_dump() em vez de dict()
+    payload_data = payload.model_dump()
+    if payload_data.get("client_whatsapp_consent") and not payload_data.get("client_whatsapp_consent_at"):
+        payload_data["client_whatsapp_consent_at"] = dt.datetime.now(dt.UTC)
+
     case = Case(
         tenant_id=current_user["tenant_id"],
-        **payload.model_dump(),
+        **payload_data,
     )
     db.add(case)
     db.flush()
@@ -182,6 +188,10 @@ def create_case(
         "description": case.description,
         "legal_area": getattr(case, "legal_area", None),
         "action_type": getattr(case, "action_type", None),
+        "client_name": getattr(case, "client_name", None),
+        "client_whatsapp": getattr(case, "client_whatsapp", None),
+        "client_whatsapp_consent": getattr(case, "client_whatsapp_consent", False),
+        "client_whatsapp_consent_at": getattr(case, "client_whatsapp_consent_at", None),
         "status": case.status,
         "created_at": case.created_at,
         "updated_at": case.updated_at,

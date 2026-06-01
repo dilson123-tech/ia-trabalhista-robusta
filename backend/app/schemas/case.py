@@ -8,6 +8,10 @@ class CaseBase(BaseModel):
     description: str | None = None
     legal_area: str | None = None
     action_type: str | None = None
+    client_name: str | None = None
+    client_whatsapp: str | None = None
+    client_whatsapp_consent: bool = False
+    client_whatsapp_consent_at: datetime | None = None
     status: str = "draft"
 
 

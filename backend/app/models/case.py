@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import datetime as dt
 
-from sqlalchemy import String, Text, DateTime, func, ForeignKey, UniqueConstraint
+from sqlalchemy import String, Text, DateTime, Boolean, func, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -23,6 +23,18 @@ class Case(Base):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     legal_area: Mapped[str | None] = mapped_column(String(60), nullable=True)
     action_type: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    client_name: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    client_whatsapp: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    client_whatsapp_consent: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default="false",
+    )
+    client_whatsapp_consent_at: Mapped[dt.datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
     status: Mapped[str] = mapped_column(
         String(30), nullable=False, default="draft"
     )
