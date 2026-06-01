@@ -40,6 +40,10 @@ export type CaseItem = {
   description: string
   legal_area: string
   action_type?: string
+  client_name?: string | null
+  client_whatsapp?: string | null
+  client_whatsapp_consent?: boolean
+  client_whatsapp_consent_at?: string | null
   status: string
   tenant_id: number
   created_at: string
@@ -52,6 +56,9 @@ export type CaseCreatePayload = {
   description?: string
   legal_area?: string
   action_type?: string
+  client_name?: string
+  client_whatsapp?: string
+  client_whatsapp_consent?: boolean
   status?: string
 }
 

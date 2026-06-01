@@ -167,6 +167,9 @@ function App() {
     description: '',
     legal_area: 'trabalhista',
     action_type: '',
+    client_name: '',
+    client_whatsapp: '',
+    client_whatsapp_consent: false,
     status: 'draft',
   })
 
@@ -184,7 +187,7 @@ function App() {
 
     if (!normalizedCaseSearch) return true
 
-    const haystack = `${caso.case_number} ${caso.title} ${caso.description ?? ''}`.toLowerCase()
+    const haystack = `${caso.case_number} ${caso.title} ${caso.description ?? ''} ${caso.client_name ?? ''} ${caso.client_whatsapp ?? ''}`.toLowerCase()
     return haystack.includes(normalizedCaseSearch)
   })
 
@@ -468,8 +471,8 @@ function App() {
   }
 
   function handleNewCaseFieldChange(
-    field: 'case_number' | 'title' | 'description' | 'legal_area' | 'action_type' | 'status',
-    value: string,
+    field: 'case_number' | 'title' | 'description' | 'legal_area' | 'action_type' | 'client_name' | 'client_whatsapp' | 'client_whatsapp_consent' | 'status',
+    value: string | boolean,
   ) {
     setNewCaseForm((prev) => ({
       ...prev,
@@ -489,6 +492,9 @@ function App() {
         description: newCaseForm.description.trim() || undefined,
         legal_area: newCaseForm.legal_area,
         action_type: newCaseForm.action_type.trim() || undefined,
+        client_name: newCaseForm.client_name.trim() || undefined,
+        client_whatsapp: newCaseForm.client_whatsapp.replace(/\D/g, '') || undefined,
+        client_whatsapp_consent: Boolean(newCaseForm.client_whatsapp_consent),
         status: newCaseForm.status,
       })
 
@@ -503,6 +509,9 @@ function App() {
         description: '',
         legal_area: 'trabalhista',
         action_type: '',
+        client_name: '',
+        client_whatsapp: '',
+        client_whatsapp_consent: false,
         status: 'draft',
       })
       setNewCaseSuccess(`Caso "${createdCase.title}" criado com sucesso.`)

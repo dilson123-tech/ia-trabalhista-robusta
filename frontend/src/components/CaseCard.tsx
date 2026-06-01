@@ -56,6 +56,42 @@ export function CaseCard({
         <span className="case-card__status">{getStatusLabel(caso.status)}</span>
       </div>
 
+
+      {(caso.client_name || caso.client_whatsapp) ? (
+        <div
+          style={{
+            marginBottom: '12px',
+            padding: '12px',
+            border: '1px solid rgba(255,255,255,0.08)',
+            borderRadius: '10px',
+          }}
+        >
+          {caso.client_name ? (
+            <p style={{ margin: '0 0 6px 0' }}>
+              <strong>Cliente:</strong> {caso.client_name}
+            </p>
+          ) : null}
+
+          {caso.client_whatsapp ? (
+            <p style={{ margin: '0 0 6px 0' }}>
+              <strong>WhatsApp:</strong> {caso.client_whatsapp}
+            </p>
+          ) : null}
+
+          {caso.client_whatsapp_consent ? (
+            <p
+              style={{
+                margin: 0,
+                fontSize: '0.9rem',
+                opacity: 0.85,
+              }}
+            >
+              ✓ Cliente autorizou contato por WhatsApp
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
       <div className="case-card__meta">
         <span className="case-card__meta-pill">
           <strong>ID:</strong> {caso.id}
@@ -117,6 +153,23 @@ export function CaseCard({
             >
               {isLoadingPdf ? 'Abrindo PDF...' : 'PDF Executivo'}
             </button>
+
+            {caso.client_whatsapp ? (
+              <a
+                href={`https://wa.me/${caso.client_whatsapp}?text=${encodeURIComponent(
+                  'Olá, estamos entrando em contato sobre seu caso.'
+                )}`}
+                target="_blank"
+                rel="noreferrer"
+                className="case-card__action case-card__action--analysis"
+                style={{
+                  textDecoration: 'none',
+                  textAlign: 'center',
+                }}
+              >
+                Abrir WhatsApp
+              </a>
+            ) : null}
           </>
         ) : (
           <button
