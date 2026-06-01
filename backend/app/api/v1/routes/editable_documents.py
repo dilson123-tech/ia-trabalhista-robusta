@@ -563,12 +563,119 @@ def _build_previdenciario_audiencia_person_specific_questions(context_text: str)
     ])
 
 
+
+def _is_civil_ambiental_audiencia_area(area: str | None) -> bool:
+    normalized = (area or "").strip().lower().replace("_", " ").replace("-", " ")
+    normalized = " ".join(normalized.split())
+    return normalized in {
+        "civil ambiental",
+        "civel ambiental",
+        "cível ambiental",
+        "ambiental",
+        "direito ambiental",
+        "responsabilidade civil ambiental",
+        "civil e ambiental",
+        "civel e ambiental",
+        "cível e ambiental",
+        "vizinhanca",
+        "vizinhança",
+        "direito de vizinhanca",
+        "direito de vizinhança",
+        "dano ambiental",
+        "dano de vizinhanca",
+        "dano de vizinhança",
+    }
+
+
+def _build_civil_ambiental_audiencia_person_specific_questions(context_text: str) -> str:
+    return "\n\n".join([
+        _paragraphs([
+            "Autor / prejudicado:",
+            "1. Qual dano concreto é alegado: ambiental, material, moral, de vizinhança, saúde, propriedade, ruído, fumaça, odor, infiltração ou outro?",
+            "2. Quando o dano começou e como evoluiu ao longo do tempo?",
+            "3. O autor consegue indicar local, datas, frequência, intensidade e pessoas afetadas?",
+            "4. Existem fotos, vídeos, mensagens, notificações, boletins, protocolos, laudos, orçamentos ou relatórios técnicos?",
+            "5. Houve tentativa de solução extrajudicial, reclamação administrativa, notificação, acordo ou contato prévio com a parte ré?",
+            "6. O dano permanece ativo ou já cessou? Se cessou, quando e por qual motivo?",
+            "7. Qual prejuízo precisa ser provado: reparação, obrigação de fazer/não fazer, indenização, recuperação ambiental ou cessação da atividade?",
+            "8. Há elementos que demonstrem responsabilidade civil, nexo causal entre a conduta da parte ré e o dano alegado?",
+        ]),
+        _paragraphs([
+            "Réu / causador alegado do dano:",
+            "1. O réu reconhece a atividade, obra, emissão, descarte, ruído, intervenção, construção ou conduta apontada como causadora do dano?",
+            "2. A atividade possui licença, alvará, autorização, projeto técnico, ART/RRT, relatório ambiental ou documento equivalente?",
+            "3. Quais medidas preventivas, corretivas ou mitigadoras foram adotadas?",
+            "4. O réu recebeu reclamação, notificação, auto de infração, vistoria, laudo ou comunicação de órgão público?",
+            "5. Existem documentos técnicos que afastem o nexo causal ou indiquem causa alternativa?",
+            "6. Há manutenção, controle, medição, isolamento, reparo, adequação ou plano de regularização documentado?",
+            "7. O réu consegue demonstrar que a atividade respeita limites legais, técnicos, ambientais, urbanísticos ou de vizinhança?",
+        ]),
+        _paragraphs([
+            "Testemunha do autor:",
+            "1. A testemunha presenciou diretamente o dano, incômodo, impacto ambiental, ruído, fumaça, odor, infiltração, descarte ou alteração no imóvel/local?",
+            "2. Desde quando observa os fatos e com qual frequência?",
+            "3. A testemunha consegue diferenciar percepção pessoal de informação recebida de terceiros?",
+            "4. O relato confirma fotos, vídeos, laudos, protocolos, mensagens ou reclamações administrativas?",
+            "5. A testemunha também foi afetada ou possui interesse direto no resultado do processo?",
+            "6. Há outro possível causador do dano ou fonte alternativa do problema?",
+        ]),
+        _paragraphs([
+            "Testemunha da defesa:",
+            "1. A testemunha conhece a rotina da atividade, obra, imóvel, empresa ou local discutido?",
+            "2. Presenciou medidas de prevenção, manutenção, mitigação, reparo ou controle do possível dano?",
+            "3. A testemunha consegue explicar se o dano alegado poderia ter outra origem?",
+            "4. O relato é baseado em vistoria direta, rotina técnica, documentos ou apenas procedimento padrão?",
+            "5. Existe vínculo hierárquico, comercial, familiar ou econômico com o réu?",
+            "6. Há contradição possível entre o depoimento e fotos, laudos, autos de fiscalização ou documentos do caso?",
+        ]),
+        _paragraphs([
+            "Perito / técnico ambiental ou de engenharia:",
+            "1. Qual metodologia foi utilizada para avaliar o dano, o nexo causal, a extensão e a origem provável do problema?",
+            "2. Foram realizadas medições, inspeção no local, análise de fotos/vídeos, documentos técnicos, licenças, projetos ou histórico de manutenção?",
+            "3. A conclusão é categórica, provável, parcial ou dependente de complementação?",
+            "4. O laudo diferencia dano ambiental, dano de vizinhança, defeito construtivo, desgaste natural, mau uso ou causa externa?",
+            "5. Há necessidade de nova vistoria, medição técnica, perícia complementar, análise laboratorial ou inspeção judicial?",
+            "6. Quais medidas de reparação, mitigação, obrigação de fazer/não fazer ou monitoramento são tecnicamente recomendáveis?",
+            "7. O laudo delimita extensão do dano, custo estimado, urgência e risco de agravamento?",
+        ]),
+        _paragraphs([
+            "Fiscalização / órgão público:",
+            "1. Houve vistoria, auto de infração, notificação, embargo, multa, relatório, licença, autorização ou procedimento administrativo?",
+            "2. Qual órgão atuou: prefeitura, defesa civil, órgão ambiental, vigilância sanitária, corpo de bombeiros ou outro?",
+            "3. A fiscalização constatou irregularidade, risco, dano, descumprimento de norma ou necessidade de adequação?",
+            "4. Foram concedidos prazos, exigências, condicionantes ou medidas corretivas?",
+            "5. O fiscal ou servidor participou diretamente da vistoria ou apenas relata informações do procedimento administrativo?",
+            "6. Há divergência entre o relatório público, laudo privado e relato das partes?",
+        ]),
+        _paragraphs([
+            "Vizinho / comunidade afetada:",
+            "1. A pessoa mora, trabalha ou frequenta a região afetada?",
+            "2. O incômodo ou dano atinge apenas o autor ou também outros moradores/comerciantes/comunidade?",
+            "3. Qual é a frequência, horário, intensidade e duração do problema?",
+            "4. Houve reclamações coletivas, abaixo-assinado, mensagens, protocolos, reuniões ou tentativa de composição?",
+            "5. A comunidade percebeu melhora, piora ou mudança após alguma intervenção da parte ré?",
+            "6. O relato indica dano individual, coletivo, ambiental difuso ou conflito comum de vizinhança?",
+        ]),
+        _paragraphs([
+            "Responsável por documentos, fotos, vídeos ou laudos:",
+            "1. Quem produziu fotos, vídeos, medições, relatórios, laudos, orçamentos ou registros técnicos?",
+            "2. Quando e em quais condições o material foi produzido?",
+            "3. O documento preserva data, autoria, local, integridade e contexto suficiente para ser usado como prova?",
+            "4. O material mostra o dano diretamente ou apenas indícios?",
+            "5. Há cadeia de custódia, metadados, assinatura técnica, ART/RRT, protocolo ou identificação do responsável?",
+            "6. O documento pode ser confrontado com vistoria, perícia judicial ou relatório de fiscalização?",
+        ]),
+    ])
+
 def _build_audiencia_person_specific_questions(
     context_text: str,
     area: str | None = None,
 ) -> str:
     if _is_previdenciario_audiencia_area(area):
         return _build_previdenciario_audiencia_person_specific_questions(context_text)
+
+    if _is_civil_ambiental_audiencia_area(area):
+        return _build_civil_ambiental_audiencia_person_specific_questions(context_text)
 
     if _is_familia_audiencia_area(area):
         return _build_familia_audiencia_person_specific_questions(context_text)
