@@ -4,6 +4,7 @@ from app.api.v1.routes.health import router as health_router
 from app.api.v1.routes.auth import router as auth_router
 from app.api.v1.routes.cases import router as cases_router
 from app.api.v1.routes.case_attachments import router as case_attachments_router
+from app.api.v1.routes.case_contact_logs import router as case_contact_logs_router
 from app.api.v1.routes.usage import router as usage_router
 from app.api.v1.routes.admin import router as admin_router
 from app.api.v1.routes.webhooks import router as webhooks_router
@@ -19,6 +20,7 @@ api_router.include_router(health_router)
 api_router.include_router(auth_router)
 api_router.include_router(cases_router)
 api_router.include_router(case_attachments_router)
+api_router.include_router(case_contact_logs_router)
 api_router.include_router(usage_router)
 api_router.include_router(editable_documents_router)
 api_router.include_router(case_party_states_router)
