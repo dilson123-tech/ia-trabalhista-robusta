@@ -1,5 +1,7 @@
 import type { CaseItem } from '../services/api'
 
+type WhatsAppTemplateKey = 'documents' | 'evidence' | 'hearing' | 'status_update' | 'confirm_data'
+
 type CaseCardProps = {
   caso: CaseItem
   selectedCaseId: number | null
@@ -18,6 +20,7 @@ type CaseCardProps = {
   onLoadExecutiveSummary: (caseId: number) => void
   onLoadExecutiveReport: (caseId: number) => void
   onOpenExecutivePdf: (caseId: number) => void
+  onOpenWhatsAppTemplate: (caseId: number, whatsapp: string, templateKey: WhatsAppTemplateKey) => void
   onRegisterWhatsAppContact: (caseId: number) => void
   onSelectCase: (caseId: number) => void
 }
@@ -40,6 +43,7 @@ export function CaseCard({
   onLoadExecutiveSummary,
   onLoadExecutiveReport,
   onOpenExecutivePdf,
+  onOpenWhatsAppTemplate,
   onRegisterWhatsAppContact,
   onSelectCase,
 }: CaseCardProps) {
@@ -180,6 +184,67 @@ export function CaseCard({
                 >
                   Registrar contato
                 </button>
+
+                <div
+                  style={{
+                    display: 'grid',
+                    gap: '8px',
+                    marginTop: '8px',
+                    width: '100%',
+                  }}
+                >
+                  <p
+                    style={{
+                      fontSize: '0.86rem',
+                      margin: '0',
+                      opacity: 0.82,
+                      width: '100%',
+                    }}
+                  >
+                    Mensagens prontas:
+                  </p>
+
+                  <button
+                    type="button"
+                    onClick={() => onOpenWhatsAppTemplate(caso.id, caso.client_whatsapp || '', 'documents')}
+                    className="case-card__action case-card__action--summary"
+                  >
+                    Pedir documentos
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => onOpenWhatsAppTemplate(caso.id, caso.client_whatsapp || '', 'evidence')}
+                    className="case-card__action case-card__action--summary"
+                  >
+                    Pedir provas
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => onOpenWhatsAppTemplate(caso.id, caso.client_whatsapp || '', 'hearing')}
+                    className="case-card__action case-card__action--summary"
+                  >
+                    Lembrar audiência
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => onOpenWhatsAppTemplate(caso.id, caso.client_whatsapp || '', 'status_update')}
+                    className="case-card__action case-card__action--summary"
+                  >
+                    Avisar andamento
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => onOpenWhatsAppTemplate(caso.id, caso.client_whatsapp || '', 'confirm_data')}
+                    className="case-card__action case-card__action--summary"
+                  >
+                    Confirmar dados
+                  </button>
+                </div>
+
               </>
             ) : null}
           </>

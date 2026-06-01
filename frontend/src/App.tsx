@@ -12,6 +12,44 @@ import { getPlanLabel as getCatalogPlanLabel, getPlanPricing, getPlanStatusLabel
 
 const AUTH_TOKEN_STORAGE_KEY = 'ia_trabalhista_auth_token'
 
+type WhatsAppContactTemplateKey = 'documents' | 'evidence' | 'hearing' | 'status_update' | 'confirm_data'
+
+const WHATSAPP_CONTACT_TEMPLATES: Record<
+  WhatsAppContactTemplateKey,
+  { label: string; summary: string; message: string }
+> = {
+  documents: {
+    label: 'Pedir documentos',
+    summary: 'Solicitação de documentos pelo WhatsApp',
+    message:
+      'Olá, estamos entrando em contato sobre seu caso. Por favor, envie os documentos relacionados ao processo para que possamos avançar na análise.',
+  },
+  evidence: {
+    label: 'Pedir provas',
+    summary: 'Solicitação de provas pelo WhatsApp',
+    message:
+      'Olá, estamos entrando em contato sobre seu caso. Por favor, envie as provas que tiver disponíveis, como fotos, vídeos, comprovantes, prints, conversas ou documentos relacionados.',
+  },
+  hearing: {
+    label: 'Lembrar audiência',
+    summary: 'Lembrete de audiência pelo WhatsApp',
+    message:
+      'Olá, estamos entrando em contato para lembrar sobre a audiência do seu caso. Por favor, confirme o recebimento desta mensagem e mantenha atenção às orientações do escritório.',
+  },
+  status_update: {
+    label: 'Avisar andamento',
+    summary: 'Aviso de andamento pelo WhatsApp',
+    message:
+      'Olá, estamos entrando em contato para informar que houve andamento no seu caso. Em caso de dúvida, responda esta mensagem para alinharmos os próximos passos.',
+  },
+  confirm_data: {
+    label: 'Confirmar dados',
+    summary: 'Confirmação de dados pelo WhatsApp',
+    message:
+      'Olá, estamos entrando em contato sobre seu caso. Por favor, confirme se seus dados de contato e informações principais continuam corretos.',
+  },
+}
+
 function App() {
   const [token, setToken] = useState(() => {
     if (typeof window === 'undefined') return ''
@@ -467,6 +505,45 @@ function App() {
       }
     } finally {
       setExecutivePdfLoading(false)
+    }
+  }
+
+  async function handleOpenWhatsAppTemplate(
+    caseId: number,
+    whatsapp: string,
+    templateKey: WhatsAppContactTemplateKey,
+  ) {
+    const digits = whatsapp.replace(/\D/g, '')
+    const template = WHATSAPP_CONTACT_TEMPLATES[templateKey]
+
+    if (!digits) {
+      setCaseActionError('WhatsApp do cliente não informado.')
+      return
+    }
+
+    setCaseActionLoadingId(caseId)
+    setCaseActionError('')
+    setCaseActionSuccess('')
+    setSelectedCaseId(caseId)
+
+    try {
+      await createCaseContactLog(token, caseId, {
+        contact_type: 'whatsapp',
+        direction: 'outgoing',
+        summary: template.summary,
+        note: `Mensagem pronta aberta: ${template.label}`,
+      })
+
+      const url = `https://wa.me/${digits}?text=${encodeURIComponent(template.message)}`
+      window.open(url, '_blank', 'noopener,noreferrer')
+      setCaseActionSuccess(`${template.label}: WhatsApp aberto e contato registrado.`)
+    } catch (err) {
+      const fallback = handleApiFailure(err, 'Não foi possível abrir e registrar a mensagem pronta.')
+      if (fallback) {
+        setCaseActionError(fallback)
+      }
+    } finally {
+      setCaseActionLoadingId(null)
     }
   }
 
@@ -1401,6 +1478,9 @@ function App() {
                       onLoadExecutiveSummary={handleLoadExecutiveSummary}
                       onLoadExecutiveReport={handleLoadExecutiveReport}
                       onOpenExecutivePdf={handleOpenExecutivePdf}
+                      onOpenWhatsAppTemplate={(caseId, whatsapp, templateKey) => {
+                        void handleOpenWhatsAppTemplate(caseId, whatsapp, templateKey)
+                      }}
                       onRegisterWhatsAppContact={(caseId) => {
                         void handleRegisterWhatsAppContact(caseId)
                       }}
