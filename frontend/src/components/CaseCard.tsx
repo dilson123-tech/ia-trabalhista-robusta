@@ -18,6 +18,7 @@ type CaseCardProps = {
   onLoadExecutiveSummary: (caseId: number) => void
   onLoadExecutiveReport: (caseId: number) => void
   onOpenExecutivePdf: (caseId: number) => void
+  onRegisterWhatsAppContact: (caseId: number) => void
   onSelectCase: (caseId: number) => void
 }
 
@@ -39,6 +40,7 @@ export function CaseCard({
   onLoadExecutiveSummary,
   onLoadExecutiveReport,
   onOpenExecutivePdf,
+  onRegisterWhatsAppContact,
   onSelectCase,
 }: CaseCardProps) {
   const isSelected = selectedCaseId === caso.id
@@ -155,20 +157,30 @@ export function CaseCard({
             </button>
 
             {caso.client_whatsapp ? (
-              <a
-                href={`https://wa.me/${caso.client_whatsapp}?text=${encodeURIComponent(
-                  'Olá, estamos entrando em contato sobre seu caso.'
-                )}`}
-                target="_blank"
-                rel="noreferrer"
-                className="case-card__action case-card__action--analysis"
-                style={{
-                  textDecoration: 'none',
-                  textAlign: 'center',
-                }}
-              >
-                Abrir WhatsApp
-              </a>
+              <>
+                <a
+                  href={`https://wa.me/${caso.client_whatsapp}?text=${encodeURIComponent(
+                    'Olá, estamos entrando em contato sobre seu caso.'
+                  )}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="case-card__action case-card__action--analysis"
+                  style={{
+                    textDecoration: 'none',
+                    textAlign: 'center',
+                  }}
+                >
+                  Abrir WhatsApp
+                </a>
+
+                <button
+                  type="button"
+                  onClick={() => onRegisterWhatsAppContact(caso.id)}
+                  className="case-card__action case-card__action--summary"
+                >
+                  Registrar contato
+                </button>
+              </>
             ) : null}
           </>
         ) : (
