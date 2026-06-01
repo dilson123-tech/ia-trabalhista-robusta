@@ -24,3 +24,5 @@ from .tenant_usage_event import TenantUsageEvent
 from .billing_request import BillingRequest  # noqa: F401
 from .subscription import Subscription  # noqa: F401
 from .usage_counter import UsageCounter  # noqa: F401
+
+from .case_contact_log import CaseContactLog  # noqa: F401

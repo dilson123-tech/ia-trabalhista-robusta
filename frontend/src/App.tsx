@@ -1,7 +1,7 @@
 import './App.css'
 import { useEffect, useState, type KeyboardEvent } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
-import { ApiError, cleanupDemoCases, createPlanChangeCheckout, createCase, getCases, getCaseAnalysis, getLegalModules, getExecutiveSummary, getExecutiveReport, getExecutivePdf, getUsageSummaryV2, login, updateCaseStatus, type CaseItem, type CaseAnalysisResponse, type ExecutiveSummaryResponse, type ExecutiveReportResponse, type LegalModule, type UsageSummaryV2Response } from './services/api'
+import { ApiError, cleanupDemoCases, createPlanChangeCheckout, createCase, createCaseContactLog, getCases, getCaseAnalysis, getLegalModules, getExecutiveSummary, getExecutiveReport, getExecutivePdf, getUsageSummaryV2, login, updateCaseStatus, type CaseItem, type CaseAnalysisResponse, type ExecutiveSummaryResponse, type ExecutiveReportResponse, type LegalModule, type UsageSummaryV2Response } from './services/api'
 import { ExpansionWorkspace } from './components/expansion/ExpansionWorkspace'
 import { CaseFiltersBar } from './components/CaseFiltersBar'
 import { CaseCard } from './components/CaseCard'
@@ -467,6 +467,30 @@ function App() {
       }
     } finally {
       setExecutivePdfLoading(false)
+    }
+  }
+
+  async function handleRegisterWhatsAppContact(caseId: number) {
+    setCaseActionLoadingId(caseId)
+    setCaseActionError('')
+    setCaseActionSuccess('')
+    setSelectedCaseId(caseId)
+
+    try {
+      await createCaseContactLog(token, caseId, {
+        contact_type: 'whatsapp',
+        direction: 'outgoing',
+        summary: 'Contato realizado via WhatsApp',
+      })
+
+      setCaseActionSuccess('Contato via WhatsApp registrado com sucesso.')
+    } catch (err) {
+      const fallback = handleApiFailure(err, 'Não foi possível registrar o contato via WhatsApp.')
+      if (fallback) {
+        setCaseActionError(fallback)
+      }
+    } finally {
+      setCaseActionLoadingId(null)
     }
   }
 
@@ -1377,6 +1401,9 @@ function App() {
                       onLoadExecutiveSummary={handleLoadExecutiveSummary}
                       onLoadExecutiveReport={handleLoadExecutiveReport}
                       onOpenExecutivePdf={handleOpenExecutivePdf}
+                      onRegisterWhatsAppContact={(caseId) => {
+                        void handleRegisterWhatsAppContact(caseId)
+                      }}
                       onSelectCase={(caseId) => {
                         setSelectedCaseId(caseId)
                       }}

@@ -787,3 +787,33 @@ export async function deleteCaseAttachment(
     await parseError(response, "Erro ao excluir prova/anexo")
   }
 }
+
+
+export type CaseContactLogCreatePayload = {
+  contact_type: string
+  direction: string
+  summary: string
+  note?: string
+}
+
+export async function createCaseContactLog(
+  token: string,
+  caseId: number,
+  payload: CaseContactLogCreatePayload,
+): Promise<void> {
+  const response = await fetch(
+    `${API_URL}/cases/${caseId}/contact-logs`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    },
+  )
+
+  if (!response.ok) {
+    await parseError(response, "Erro ao registrar contato")
+  }
+}
