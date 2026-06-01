@@ -245,6 +245,43 @@ Temas contemplados:
 
 ---
 
+### 4.7 Civil/Ambiental
+
+A Audiência Estratégica Civil/Ambiental está validada com fluxo E2E e PDF.
+
+O fluxo foi validado com caso QA envolvendo responsabilidade civil ambiental, dano de vizinhança, ruído, fumaça, odor, infiltração, descarte irregular, laudo técnico, auto de fiscalização, prova documental, vizinhos/comunidade afetada, nexo causal, obrigação de fazer/não fazer, reparação e indenização.
+
+Papéis contemplados no roteiro:
+
+- autor / prejudicado;
+- réu / causador alegado do dano;
+- testemunha do autor;
+- testemunha da defesa;
+- perito / técnico ambiental ou de engenharia;
+- fiscalização / órgão público;
+- vizinho / comunidade afetada;
+- responsável por documentos, fotos, vídeos ou laudos.
+
+Validações técnicas registradas:
+
+- helper específico Civil/Ambiental;
+- detector de área Civil/Ambiental;
+- preservação do tipo documental único `AUDIENCIA_ESTRATEGICA`;
+- preservação do Contexto V2;
+- geração de roteiro assistido;
+- aprovação da versão 3;
+- exportação PDF válida;
+- blindagem contra contaminação previdenciária, família, consumidor, trabalhista, criminal e cível fallback.
+
+Checkpoint:
+
+`QA_CIVIL_AMBIENTAL_AUDIENCIA_ESTRATEGICA_FLOW_OK`
+
+Tag:
+
+`v0.1.31-civil-ambiental-audiencia-estrategica-v1`
+
+
 ## 5. Contexto Estruturado V2
 
 O módulo evoluiu para usar contexto estruturado do caso.
@@ -340,7 +377,7 @@ Linha oficial do módulo Audiência Estratégica:
 - Contexto Estruturado V2: 100%
 - Família com E2E/PDF: 100%
 - Previdenciário/BPC-LOAS com E2E/PDF: 100%
-- Civil/Ambiental: planejado
+- Civil/Ambiental com E2E/PDF: 100%
 - Empresarial/Contratos/Cobrança: planejado para etapa posterior
 
 ---
@@ -416,16 +453,36 @@ Status atual:
 
 ### 12.3 Civil/Ambiental
 
-Possível evolução:
+Civil/Ambiental deixou de ser apenas planejado e passou a ter fluxo validado tecnicamente em `v0.1.31-civil-ambiental-audiencia-estrategica-v1`.
 
-- dano;
-- vizinhança;
-- responsabilidade civil;
-- laudos;
-- fiscalização;
-- testemunhas;
-- perícia;
-- nexo causal.
+O ciclo validou:
+
+- responsabilidade civil ambiental;
+- dano ambiental;
+- dano de vizinhança;
+- ruído;
+- fumaça;
+- odor;
+- infiltração;
+- descarte irregular;
+- laudo técnico;
+- auto de fiscalização;
+- fotos e vídeos;
+- órgão público/fiscalização;
+- perito ou técnico ambiental/engenharia;
+- vizinhos/comunidade afetada;
+- nexo causal;
+- obrigação de fazer;
+- obrigação de não fazer;
+- reparação/indenização;
+- Contexto V2;
+- aprovação de versão;
+- exportação PDF.
+
+Status comercial/técnico:
+
+`VERDE — validado para uso jurídico supervisionado`
+
 
 ### 12.4 Interface guiada
 
@@ -455,7 +512,8 @@ Atualmente, o módulo cobre:
 - Trabalhista;
 - Consumidor;
 - Família;
-- Previdenciário/BPC-LOAS.
+- Previdenciário/BPC-LOAS;
+- Civil/Ambiental.
 
 Com Contexto Estruturado V2, ele passa a aproveitar dados reais cadastrados no caso, tornando o produto mais próximo da rotina prática de um escritório de advocacia.
 

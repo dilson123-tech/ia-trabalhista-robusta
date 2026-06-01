@@ -75,7 +75,7 @@ Critérios:
 | Consumidor | VERDE | Validado com E2E, Contexto V2, aprovação e PDF |
 | Família | VERDE | Validado com E2E, Contexto V2, aprovação e PDF |
 | Previdenciário/BPC-LOAS | VERDE | Validado com E2E, Contexto V2, aprovação e PDF |
-| Civil/Ambiental | AMARELO | Existe como área, mas audiência específica ainda pendente |
+| Civil/Ambiental | VERDE | Validado com E2E, Contexto V2, aprovação e PDF |
 | Empresarial/Contratos/Cobrança | VERMELHO | Planejado para etapa posterior |
 
 ---
@@ -182,6 +182,21 @@ Frase recomendada:
 
 ---
 
+## Civil/Ambiental
+
+| Item | Status | Observação |
+| --- | --- | --- |
+| Audiência estratégica Civil/Ambiental | VERDE | Validada em E2E/PDF |
+| Responsabilidade civil ambiental | VERDE | Coberta no fluxo validado com prova técnica, laudo, fiscalização e nexo causal |
+| Dano ambiental | VERDE | Coberto no fluxo validado |
+| Dano de vizinhança | VERDE | Coberto no fluxo validado |
+| Ruído / fumaça / odor / infiltração | VERDE | Coberto no cenário QA |
+| Descarte irregular / dano causado por empresa vizinha | VERDE | Coberto no cenário QA |
+| Fotos / vídeos / laudo / auto de fiscalização | VERDE | Coberto pelo Contexto V2 e anexos/provas |
+| Obrigação de fazer/não fazer | VERDE | Coberta no roteiro validado |
+| Perícia / técnico ambiental ou engenharia | VERDE | Coberto no roteiro validado |
+| Fiscalização / órgão público | VERDE | Coberto no roteiro validado |
+
 ## 5. Regra técnica
 
 Antes de transformar um item AMARELO em VERDE, deve existir pelo menos:
@@ -197,27 +212,14 @@ Antes de transformar um item AMARELO em VERDE, deve existir pelo menos:
 
 ## 6. Próxima prioridade recomendada
 
-A próxima prioridade técnica recomendada é:
+Com Civil/Ambiental validado tecnicamente em `v0.1.31-civil-ambiental-audiencia-estrategica-v1`, a próxima prioridade recomendada é comercial/documental:
 
-`Civil/Ambiental — Audiência Estratégica V1`
+`Atualizar apresentação comercial da Audiência Estratégica multiárea para advogado/escritório`
 
-Motivo:
+Justificativa:
 
-- responsabilidade civil;
-- dano ambiental ou de vizinhança;
-- necessidade de laudos;
-- perícia técnica;
-- fiscalização;
-- testemunhas;
-- nexo causal;
-- forte aderência ao Contexto V2.
-
----
-
-## 7. Conclusão
-
-A Plataforma IA Jurídica Pro não precisa implementar todos os tipos de processo um por um antes de ser útil.
-
-Mas precisa classificar corretamente o nível de cobertura de cada área e subtipo.
-
-Esta matriz é a regra oficial para impedir promessa excessiva e, ao mesmo tempo, valorizar o que já foi realmente construído, testado, validado e tagueado.
+- a Audiência Estratégica agora tem cobertura validada em Cível base/contexto, Criminal, Trabalhista, Consumidor, Família, Previdenciário/BPC-LOAS e Civil/Ambiental;
+- Civil/Ambiental saiu do estado AMARELO e passou a ter E2E, Contexto V2, aprovação e PDF;
+- a plataforma já tem evidência técnica suficiente para montar material comercial mais forte;
+- novos módulos, como Empresarial/Contratos/Cobrança, devem entrar depois, sem atropelar o pacote comercial atual;
+- itens ainda AMARELOS continuam exigindo revisão reforçada e não devem ser vendidos como especialização completa.
