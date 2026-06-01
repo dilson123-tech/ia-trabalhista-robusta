@@ -4,6 +4,9 @@ type NewCaseFormState = {
   description: string
   legal_area: string
   action_type: string
+  client_name: string
+  client_whatsapp: string
+  client_whatsapp_consent: boolean
   status: string
 }
 
@@ -17,8 +20,8 @@ type DashboardTopPanelProps = {
   error: string
   newCaseForm: NewCaseFormState
   onNewCaseFieldChange: (
-    field: 'case_number' | 'title' | 'description' | 'legal_area' | 'action_type' | 'status',
-    value: string,
+    field: 'case_number' | 'title' | 'description' | 'legal_area' | 'action_type' | 'client_name' | 'client_whatsapp' | 'client_whatsapp_consent' | 'status',
+    value: string | boolean,
   ) => void
   newCaseLoading: boolean
   onCreateNewCase: () => void
@@ -213,6 +216,38 @@ export function DashboardTopPanel({
               onChange={(e) => onNewCaseFieldChange('action_type', e.target.value)}
               placeholder="Tipo de ação (opcional)"
             />
+
+            <input
+              className="form-control"
+              value={newCaseForm.client_name}
+              onChange={(e) => onNewCaseFieldChange('client_name', e.target.value)}
+              placeholder="Nome do cliente (opcional)"
+            />
+
+            <input
+              className="form-control"
+              value={newCaseForm.client_whatsapp}
+              onChange={(e) => onNewCaseFieldChange('client_whatsapp', e.target.value)}
+              placeholder="WhatsApp do cliente com DDD. Ex: 47999999999"
+            />
+
+            <label
+              className="form-control"
+              style={{
+                alignItems: 'center',
+                display: 'flex',
+                gap: '10px',
+                minHeight: '46px',
+              }}
+            >
+              <input
+                checked={newCaseForm.client_whatsapp_consent}
+                onChange={(e) => onNewCaseFieldChange('client_whatsapp_consent', e.target.checked)}
+                type="checkbox"
+              />
+              Cliente autorizou contato por WhatsApp
+            </label>
+
 
             <select
               className="form-control"
