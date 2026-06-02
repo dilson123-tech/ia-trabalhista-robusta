@@ -1,4 +1,4 @@
-import type { CaseContactLogItem, CaseItem } from '../services/api'
+import type { CaseContactLogItem, CaseItem, CasePartyItem, CasePartyStateDetailItem } from '../services/api'
 
 type WhatsAppTemplateKey = 'documents' | 'evidence' | 'hearing' | 'status_update' | 'confirm_data'
 
@@ -12,7 +12,9 @@ type CaseCardProps = {
   isLoadingReport: boolean
   isLoadingPdf: boolean
   isLoadingContactLogs: boolean
+  isLoadingWitnessGrid: boolean
   contactLogs: CaseContactLogItem[]
+  partyState: CasePartyStateDetailItem | null
   analysisLoading: boolean
   executiveSummaryLoading: boolean
   executiveReportLoading: boolean
@@ -23,6 +25,8 @@ type CaseCardProps = {
   onLoadExecutiveReport: (caseId: number) => void
   onOpenExecutivePdf: (caseId: number) => void
   onLoadCaseContactLogs: (caseId: number) => void
+  onLoadWitnessGrid: (caseId: number) => void
+  onAddWitness: (caso: CaseItem) => void
   onOpenWhatsAppTemplate: (caseId: number, whatsapp: string, templateKey: WhatsAppTemplateKey) => void
   onRegisterWhatsAppContact: (caseId: number) => void
   onSelectCase: (caseId: number) => void
@@ -38,7 +42,9 @@ export function CaseCard({
   isLoadingReport,
   isLoadingPdf,
   isLoadingContactLogs,
+  isLoadingWitnessGrid,
   contactLogs,
+  partyState,
   analysisLoading,
   executiveSummaryLoading,
   executiveReportLoading,
@@ -49,6 +55,8 @@ export function CaseCard({
   onLoadExecutiveReport,
   onOpenExecutivePdf,
   onLoadCaseContactLogs,
+  onLoadWitnessGrid,
+  onAddWitness,
   onOpenWhatsAppTemplate,
   onRegisterWhatsAppContact,
   onSelectCase,
@@ -66,6 +74,34 @@ export function CaseCard({
     }).format(date)
   }
 
+  function getPartyMetadataText(party: CasePartyItem, key: string) {
+    const value = party.party_metadata?.[key]
+
+    if (typeof value === 'string') return value
+    if (typeof value === 'number' || typeof value === 'boolean') return String(value)
+    if (Array.isArray(value)) {
+      return value
+        .filter((item) => typeof item === 'string')
+        .join(', ')
+    }
+
+    return ''
+  }
+
+  const witnessParties = (partyState?.parties ?? []).filter((party) => {
+    const role = party.role.toLowerCase()
+    return (
+      role.includes('testemunha') ||
+      role.includes('depoente') ||
+      role.includes('preposto') ||
+      role.includes('representante') ||
+      role.includes('perito') ||
+      role.includes('fiscal') ||
+      role.includes('cuidador') ||
+      role.includes('vizinho')
+    )
+  })
+
   return (
     <article className={`case-card ${isSelected ? 'case-card--selected' : ''}`}>
       <div className="case-card__header">
@@ -77,7 +113,6 @@ export function CaseCard({
 
         <span className="case-card__status">{getStatusLabel(caso.status)}</span>
       </div>
-
 
       {(caso.client_name || caso.client_whatsapp) ? (
         <div
@@ -260,7 +295,6 @@ export function CaseCard({
                     Confirmar dados
                   </button>
                 </div>
-
               </>
             ) : null}
           </>
@@ -274,6 +308,108 @@ export function CaseCard({
           </button>
         )}
       </div>
+
+      <div
+        style={{
+          marginTop: '12px',
+          padding: '12px',
+          border: '1px solid rgba(255,255,255,0.08)',
+          borderRadius: '10px',
+        }}
+      >
+        <div
+          style={{
+            alignItems: 'center',
+            display: 'flex',
+            gap: '10px',
+            justifyContent: 'space-between',
+            marginBottom: '8px',
+          }}
+        >
+          <strong>Testemunhas/depoentes</strong>
+
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'flex-end' }}>
+            <button
+              type="button"
+              onClick={() => onLoadWitnessGrid(caso.id)}
+              className="case-card__action case-card__action--summary"
+              style={{ padding: '6px 10px' }}
+            >
+              {isLoadingWitnessGrid ? 'Carregando...' : 'Atualizar'}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onAddWitness(caso)}
+              className="case-card__action case-card__action--analysis"
+              style={{ padding: '6px 10px' }}
+            >
+              Adicionar V1
+            </button>
+          </div>
+        </div>
+
+        {partyState ? (
+          witnessParties.length > 0 ? (
+            <div style={{ display: 'grid', gap: '8px' }}>
+              {witnessParties.slice(0, 6).map((party) => {
+                const preparationStatus = getPartyMetadataText(party, 'preparation_status') || party.status
+                const whatKnows = getPartyMetadataText(party, 'what_knows')
+                const confirmsFacts = getPartyMetadataText(party, 'confirms_facts')
+                const riskLevel = getPartyMetadataText(party, 'risk_level')
+                const sensitivePoints = getPartyMetadataText(party, 'sensitive_points')
+
+                return (
+                  <div
+                    key={party.id}
+                    style={{
+                      borderTop: '1px solid rgba(255,255,255,0.08)',
+                      paddingTop: '8px',
+                    }}
+                  >
+                    <p style={{ margin: '0 0 4px 0' }}>
+                      <strong>{party.name}</strong> — {party.role} / {preparationStatus}
+                    </p>
+
+                    {whatKnows ? (
+                      <p style={{ margin: '0 0 4px 0', opacity: 0.88 }}>
+                        <strong>O que sabe:</strong> {whatKnows}
+                      </p>
+                    ) : null}
+
+                    {confirmsFacts ? (
+                      <p style={{ margin: '0 0 4px 0', opacity: 0.88 }}>
+                        <strong>Confirma:</strong> {confirmsFacts}
+                      </p>
+                    ) : null}
+
+                    {riskLevel ? (
+                      <p style={{ margin: '0 0 4px 0', opacity: 0.82 }}>
+                        <strong>Risco:</strong> {riskLevel}
+                      </p>
+                    ) : null}
+
+                    {sensitivePoints ? (
+                      <p style={{ margin: 0, opacity: 0.82 }}>
+                        <strong>Pontos sensíveis:</strong> {sensitivePoints}
+                      </p>
+                    ) : null}
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            <p style={{ margin: 0, opacity: 0.82 }}>
+              Grade carregada, mas ainda sem testemunhas/depoentes cadastrados.
+            </p>
+          )
+        ) : (
+          <p style={{ margin: 0, opacity: 0.82 }}>
+            Clique em Atualizar para carregar a grade ou em Adicionar V1 para cadastrar a primeira pessoa.
+          </p>
+        )}
+      </div>
+
       {(contactLogs.length > 0 || caso.client_whatsapp) ? (
         <div
           style={{
@@ -331,7 +467,6 @@ export function CaseCard({
           )}
         </div>
       ) : null}
-
     </article>
   )
 }

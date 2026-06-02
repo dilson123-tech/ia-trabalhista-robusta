@@ -1,7 +1,7 @@
 import './App.css'
 import { useEffect, useState, type KeyboardEvent } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
-import { ApiError, cleanupDemoCases, createPlanChangeCheckout, createCase, createCaseContactLog, getCases, listCaseContactLogs, getCaseAnalysis, getLegalModules, getExecutiveSummary, getExecutiveReport, getExecutivePdf, getUsageSummaryV2, login, updateCaseStatus, type CaseContactLogItem, type CaseItem, type CaseAnalysisResponse, type ExecutiveSummaryResponse, type ExecutiveReportResponse, type LegalModule, type UsageSummaryV2Response } from './services/api'
+import { ApiError, cleanupDemoCases, createPlanChangeCheckout, createCase, createCaseContactLog, createCasePartyState, addCaseParty, getCasePartyState, getCases, listCaseContactLogs, listCasePartyStates, getCaseAnalysis, getLegalModules, getExecutiveSummary, getExecutiveReport, getExecutivePdf, getUsageSummaryV2, login, updateCaseStatus, type CaseContactLogItem, type CaseItem, type CasePartyStateDetailItem, type CaseAnalysisResponse, type ExecutiveSummaryResponse, type ExecutiveReportResponse, type LegalModule, type UsageSummaryV2Response } from './services/api'
 import { ExpansionWorkspace } from './components/expansion/ExpansionWorkspace'
 import { CaseFiltersBar } from './components/CaseFiltersBar'
 import { CaseCard } from './components/CaseCard'
@@ -90,6 +90,8 @@ function App() {
   const [caseActionSuccess, setCaseActionSuccess] = useState('')
   const [contactLogsByCaseId, setContactLogsByCaseId] = useState<Record<number, CaseContactLogItem[]>>({})
   const [contactLogsLoadingId, setContactLogsLoadingId] = useState<number | null>(null)
+  const [partyStatesByCaseId, setPartyStatesByCaseId] = useState<Record<number, CasePartyStateDetailItem | null>>({})
+  const [witnessGridLoadingId, setWitnessGridLoadingId] = useState<number | null>(null)
   const [cleanupDemoLoading, setCleanupDemoLoading] = useState(false)
   const [usageSummary, setUsageSummary] = useState<UsageSummaryV2Response | null>(null)
   const [usageLoading, setUsageLoading] = useState(false)
@@ -325,6 +327,9 @@ function App() {
     setNewCaseSuccess('')
     setCaseActionError('')
     setCaseActionSuccess('')
+    setContactLogsByCaseId({})
+    setPartyStatesByCaseId({})
+    setWitnessGridLoadingId(null)
     setCaseSearchTerm('')
     setCaseStatusFilter('main')
     setCleanupDemoLoading(false)
@@ -527,6 +532,110 @@ function App() {
       }
     } finally {
       setContactLogsLoadingId(null)
+    }
+  }
+
+
+  async function handleLoadWitnessGrid(caseId: number) {
+    setWitnessGridLoadingId(caseId)
+    setCaseActionError('')
+    setSelectedCaseId(caseId)
+
+    try {
+      const states = await listCasePartyStates(token, caseId)
+      if (states.length === 0) {
+        setPartyStatesByCaseId((prev) => ({
+          ...prev,
+          [caseId]: null,
+        }))
+        setCaseActionSuccess('Nenhuma grade de pessoas criada ainda para este caso.')
+        return
+      }
+
+      const detail = await getCasePartyState(token, states[0].id)
+      setPartyStatesByCaseId((prev) => ({
+        ...prev,
+        [caseId]: detail,
+      }))
+    } catch (err) {
+      const fallback = handleApiFailure(err, 'Não foi possível carregar a grade de testemunhas/depoentes.')
+      if (fallback) {
+        setCaseActionError(fallback)
+      }
+    } finally {
+      setWitnessGridLoadingId(null)
+    }
+  }
+
+  async function handleAddWitnessToCase(caso: CaseItem) {
+    const name = window.prompt('Nome da testemunha/depoente:')
+    if (!name?.trim()) return
+
+    const role =
+      window.prompt(
+        'Papel na audiência/prova oral:',
+        'testemunha',
+      )?.trim() || 'testemunha'
+
+    const whatKnows =
+      window.prompt(
+        'O que essa pessoa sabe ou confirma? Pode deixar curto para o V1:',
+        '',
+      )?.trim() || 'A revisar com o advogado.'
+
+    setWitnessGridLoadingId(caso.id)
+    setCaseActionError('')
+    setCaseActionSuccess('')
+    setSelectedCaseId(caso.id)
+
+    try {
+      const existingStates = await listCasePartyStates(token, caso.id)
+      const existingState =
+        existingStates.length > 0 ? await getCasePartyState(token, existingStates[0].id) : null
+
+      const partyPayload = {
+        key: `witness_${Date.now()}`,
+        name: name.trim(),
+        role,
+        party_type: 'person',
+        status: 'active',
+        is_original_party: true,
+        metadata: {
+          grid_source: 'case_witness_grid_v1',
+          preparation_status: 'pendente',
+          what_knows: whatKnows,
+          confirms_facts: whatKnows,
+          risk_level: 'a revisar',
+          sensitive_points: 'A revisar pelo advogado antes da audiência.',
+          recommended_questions: 'A gerar/refinar na Audiência Estratégica.',
+          dangerous_questions: 'Evitar perguntas que induzam resposta ou sugiram versão pronta.',
+        },
+      }
+
+      const nextState = existingState
+        ? await addCaseParty(token, existingState.id, partyPayload)
+        : await createCasePartyState(token, {
+            case_id: caso.id,
+            area: caso.legal_area || 'civel',
+            parties: [partyPayload],
+            metadata: {
+              source: 'case_witness_grid_v1',
+              witness_grid_enabled: true,
+            },
+          })
+
+      setPartyStatesByCaseId((prev) => ({
+        ...prev,
+        [caso.id]: nextState,
+      }))
+      setCaseActionSuccess('Testemunha/depoente adicionado à grade do caso.')
+    } catch (err) {
+      const fallback = handleApiFailure(err, 'Não foi possível adicionar testemunha/depoente ao caso.')
+      if (fallback) {
+        setCaseActionError(fallback)
+      }
+    } finally {
+      setWitnessGridLoadingId(null)
     }
   }
 
@@ -1481,6 +1590,7 @@ function App() {
                   const isLoadingPdf = executivePdfLoading && selectedCaseId === caso.id
                   const isLoadingContactLogs = contactLogsLoadingId === caso.id
 
+                    const isLoadingWitnessGrid = witnessGridLoadingId === caso.id
                   return (
                     <CaseCard
                       key={caso.id}
@@ -1493,7 +1603,9 @@ function App() {
                       isLoadingReport={isLoadingReport}
                       isLoadingPdf={isLoadingPdf}
                       isLoadingContactLogs={isLoadingContactLogs}
-                      contactLogs={contactLogsByCaseId[caso.id] ?? []}
+                      isLoadingWitnessGrid={isLoadingWitnessGrid}
+                        contactLogs={contactLogsByCaseId[caso.id] ?? []}
+                        partyState={partyStatesByCaseId[caso.id] ?? null}
                       analysisLoading={analysisLoading}
                       executiveSummaryLoading={executiveSummaryLoading}
                       executiveReportLoading={executiveReportLoading}
@@ -1508,7 +1620,13 @@ function App() {
                       onLoadCaseContactLogs={(caseId) => {
                         void handleLoadCaseContactLogs(caseId)
                       }}
-                      onOpenWhatsAppTemplate={(caseId, whatsapp, templateKey) => {
+                      onLoadWitnessGrid={(caseId) => {
+                          void handleLoadWitnessGrid(caseId)
+                        }}
+                        onAddWitness={(targetCase) => {
+                          void handleAddWitnessToCase(targetCase)
+                        }}
+                        onOpenWhatsAppTemplate={(caseId, whatsapp, templateKey) => {
                         void handleOpenWhatsAppTemplate(caseId, whatsapp, templateKey)
                       }}
                       onRegisterWhatsAppContact={(caseId) => {
