@@ -2,6 +2,20 @@ import type { CaseContactLogItem, CaseItem, CasePartyItem, CasePartyStateDetailI
 
 type WhatsAppTemplateKey = 'documents' | 'evidence' | 'hearing' | 'status_update' | 'confirm_data'
 
+export type CaseReadinessSnapshot = {
+  score: number
+  statusLabel: string
+  statusTone: 'critical' | 'preparing' | 'almost' | 'ready'
+  contactLogCount: number
+  witnessCount: number
+  attachmentCount: number
+  checklistTotal: number
+  checklistOpen: number
+  checklistValidated: number
+  missingItems: string[]
+  loadedAt: string
+}
+
 type CaseCardProps = {
   caso: CaseItem
   selectedCaseId: number | null
@@ -12,9 +26,11 @@ type CaseCardProps = {
   isLoadingReport: boolean
   isLoadingPdf: boolean
   isLoadingContactLogs: boolean
+  isLoadingReadiness: boolean
   isLoadingWitnessGrid: boolean
   contactLogs: CaseContactLogItem[]
   partyState: CasePartyStateDetailItem | null
+  readiness: CaseReadinessSnapshot | null
   analysisLoading: boolean
   executiveSummaryLoading: boolean
   executiveReportLoading: boolean
@@ -27,6 +43,7 @@ type CaseCardProps = {
   onLoadCaseContactLogs: (caseId: number) => void
   onLoadWitnessGrid: (caseId: number) => void
   onAddWitness: (caso: CaseItem) => void
+  onLoadReadiness: (caso: CaseItem) => void
   onOpenWhatsAppTemplate: (caseId: number, whatsapp: string, templateKey: WhatsAppTemplateKey) => void
   onRegisterWhatsAppContact: (caseId: number) => void
   onSelectCase: (caseId: number) => void
@@ -42,9 +59,11 @@ export function CaseCard({
   isLoadingReport,
   isLoadingPdf,
   isLoadingContactLogs,
+  isLoadingReadiness,
   isLoadingWitnessGrid,
   contactLogs,
   partyState,
+  readiness,
   analysisLoading,
   executiveSummaryLoading,
   executiveReportLoading,
@@ -57,6 +76,7 @@ export function CaseCard({
   onLoadCaseContactLogs,
   onLoadWitnessGrid,
   onAddWitness,
+  onLoadReadiness,
   onOpenWhatsAppTemplate,
   onRegisterWhatsAppContact,
   onSelectCase,
@@ -161,6 +181,73 @@ export function CaseCard({
         {isSelected ? (
           <span className="case-card__focus-badge">Caso em foco</span>
         ) : null}
+      </div>
+
+      <div
+        style={{
+          marginTop: '12px',
+          padding: '12px',
+          border: '1px solid rgba(111, 214, 178, 0.22)',
+          borderRadius: '10px',
+          background: 'rgba(111, 214, 178, 0.06)',
+        }}
+      >
+        <div
+          style={{
+            alignItems: 'center',
+            display: 'flex',
+            gap: '10px',
+            justifyContent: 'space-between',
+            marginBottom: '8px',
+          }}
+        >
+          <strong>Prontidão do caso</strong>
+
+          <button
+            type="button"
+            onClick={() => onLoadReadiness(caso)}
+            className="case-card__action case-card__action--summary"
+            style={{ padding: '6px 10px' }}
+          >
+            {isLoadingReadiness ? 'Calculando...' : 'Atualizar prontidão'}
+          </button>
+        </div>
+
+        {readiness ? (
+          <>
+            <p style={{ margin: '0 0 8px 0' }}>
+              <strong>{readiness.score}%</strong> — {readiness.statusLabel}
+            </p>
+
+            <div className="case-card__meta" style={{ marginBottom: '8px' }}>
+              <span className="case-card__meta-pill">Contatos: {readiness.contactLogCount}</span>
+              <span className="case-card__meta-pill">Testemunhas: {readiness.witnessCount}</span>
+              <span className="case-card__meta-pill">Checklist: {readiness.checklistValidated}/{readiness.checklistTotal}</span>
+              <span className="case-card__meta-pill">Pendências: {readiness.checklistOpen}</span>
+              <span className="case-card__meta-pill">Anexos: {readiness.attachmentCount}</span>
+            </div>
+
+            {readiness.missingItems.length > 0 ? (
+              <ul style={{ margin: '0 0 8px 18px', opacity: 0.86 }}>
+                {readiness.missingItems.slice(0, 4).map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            ) : (
+              <p style={{ margin: '0 0 8px 0', opacity: 0.86 }}>
+                Caso sem pendências operacionais principais na régua V1.
+              </p>
+            )}
+
+            <p style={{ margin: 0, fontSize: '0.86rem', opacity: 0.78 }}>
+              “Pronto” significa pronto para revisão humana do advogado, não protocolo automático.
+            </p>
+          </>
+        ) : (
+          <p style={{ margin: 0, opacity: 0.82 }}>
+            Clique em Atualizar prontidão para consolidar cliente, contatos, testemunhas, checklist e anexos.
+          </p>
+        )}
       </div>
 
       <div className="case-card__actions">

@@ -1,10 +1,10 @@
 import './App.css'
 import { useEffect, useState, type KeyboardEvent } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
-import { ApiError, cleanupDemoCases, createPlanChangeCheckout, createCase, createCaseContactLog, createCasePartyState, addCaseParty, getCasePartyState, getCases, listCaseContactLogs, listCasePartyStates, getCaseAnalysis, getLegalModules, getExecutiveSummary, getExecutiveReport, getExecutivePdf, getUsageSummaryV2, login, updateCaseStatus, type CaseContactLogItem, type CaseItem, type CasePartyStateDetailItem, type CaseAnalysisResponse, type ExecutiveSummaryResponse, type ExecutiveReportResponse, type LegalModule, type UsageSummaryV2Response } from './services/api'
+import { ApiError, cleanupDemoCases, createPlanChangeCheckout, createCase, createCaseContactLog, createCasePartyState, addCaseParty, getCasePartyState, getCases, listCaseAttachments, listCaseContactLogs, listCaseEvidenceChecklist, listCasePartyStates, getCaseAnalysis, getLegalModules, getExecutiveSummary, getExecutiveReport, getExecutivePdf, getUsageSummaryV2, login, updateCaseStatus, type CaseAttachmentItem, type CaseContactLogItem, type CaseEvidenceChecklistItem, type CaseItem, type CasePartyStateDetailItem, type CaseAnalysisResponse, type ExecutiveSummaryResponse, type ExecutiveReportResponse, type LegalModule, type UsageSummaryV2Response } from './services/api'
 import { ExpansionWorkspace } from './components/expansion/ExpansionWorkspace'
 import { CaseFiltersBar } from './components/CaseFiltersBar'
-import { CaseCard } from './components/CaseCard'
+import { CaseCard, type CaseReadinessSnapshot } from './components/CaseCard'
 import { DashboardTopPanel } from './components/DashboardTopPanel'
 import { LoginPanel } from './components/LoginPanel'
 import { CaseFocusPanel } from './components/CaseFocusPanel'
@@ -92,6 +92,8 @@ function App() {
   const [contactLogsLoadingId, setContactLogsLoadingId] = useState<number | null>(null)
   const [partyStatesByCaseId, setPartyStatesByCaseId] = useState<Record<number, CasePartyStateDetailItem | null>>({})
   const [witnessGridLoadingId, setWitnessGridLoadingId] = useState<number | null>(null)
+  const [readinessByCaseId, setReadinessByCaseId] = useState<Record<number, CaseReadinessSnapshot | null>>({})
+  const [readinessLoadingId, setReadinessLoadingId] = useState<number | null>(null)
   const [cleanupDemoLoading, setCleanupDemoLoading] = useState(false)
   const [usageSummary, setUsageSummary] = useState<UsageSummaryV2Response | null>(null)
   const [usageLoading, setUsageLoading] = useState(false)
@@ -515,6 +517,116 @@ function App() {
     }
   }
 
+
+  function countWitnessParties(partyState: CasePartyStateDetailItem | null) {
+    return (partyState?.parties ?? []).filter((party) => {
+      const role = party.role.toLowerCase()
+      return (
+        role.includes('testemunha') ||
+        role.includes('depoente') ||
+        role.includes('preposto') ||
+        role.includes('representante') ||
+        role.includes('perito') ||
+        role.includes('fiscal') ||
+        role.includes('cuidador') ||
+        role.includes('vizinho')
+      )
+    }).length
+  }
+
+  function buildCaseReadinessSnapshot(
+    caso: CaseItem,
+    contactLogs: CaseContactLogItem[],
+    partyState: CasePartyStateDetailItem | null,
+    attachments: CaseAttachmentItem[],
+    checklistItems: CaseEvidenceChecklistItem[],
+  ): CaseReadinessSnapshot {
+    const witnessCount = countWitnessParties(partyState)
+    const openChecklistCount = checklistItems.filter((item) =>
+      ['pending', 'requested', 'needs_review'].includes(item.status),
+    ).length
+    const validatedChecklistCount = checklistItems.filter((item) => item.status === 'validated').length
+
+    const checks = [
+      {
+        label: 'Cliente/contato cadastrado',
+        ok: Boolean(caso.client_name || caso.client_whatsapp),
+        weight: 12,
+        missing: 'Cadastrar cliente ou contato principal do caso.',
+      },
+      {
+        label: 'WhatsApp informado',
+        ok: Boolean(caso.client_whatsapp),
+        weight: 12,
+        missing: 'Informar WhatsApp do cliente para comunicação operacional.',
+      },
+      {
+        label: 'Consentimento WhatsApp',
+        ok: Boolean(caso.client_whatsapp_consent),
+        weight: 10,
+        missing: 'Confirmar autorização de contato por WhatsApp.',
+      },
+      {
+        label: 'Histórico de contato',
+        ok: contactLogs.length > 0,
+        weight: 14,
+        missing: 'Registrar pelo menos um contato com o cliente.',
+      },
+      {
+        label: 'Testemunhas/depoentes',
+        ok: witnessCount > 0,
+        weight: 14,
+        missing: 'Cadastrar testemunha, depoente, preposto ou pessoa relevante.',
+      },
+      {
+        label: 'Checklist de provas',
+        ok: checklistItems.length > 0 && openChecklistCount === 0,
+        weight: 20,
+        missing:
+          checklistItems.length === 0
+            ? 'Cadastrar checklist de provas e pendências.'
+            : `Resolver ${openChecklistCount} pendência(s) aberta(s) no checklist.`,
+      },
+      {
+        label: 'Anexos/provas',
+        ok: attachments.length > 0,
+        weight: 18,
+        missing: 'Anexar pelo menos uma prova/documento ao caso.',
+      },
+    ]
+
+    const score = checks.reduce((sum, check) => sum + (check.ok ? check.weight : 0), 0)
+    const missingItems = checks.filter((check) => !check.ok).map((check) => check.missing)
+
+    let statusLabel = 'Crítico'
+    let statusTone: CaseReadinessSnapshot['statusTone'] = 'critical'
+
+    if (score >= 85) {
+      statusLabel = 'Pronto para revisão do advogado'
+      statusTone = 'ready'
+    } else if (score >= 65) {
+      statusLabel = 'Quase pronto'
+      statusTone = 'almost'
+    } else if (score >= 40) {
+      statusLabel = 'Em preparação'
+      statusTone = 'preparing'
+    }
+
+    return {
+      score,
+      statusLabel,
+      statusTone,
+      contactLogCount: contactLogs.length,
+      witnessCount,
+      attachmentCount: attachments.length,
+      checklistTotal: checklistItems.length,
+      checklistOpen: openChecklistCount,
+      checklistValidated: validatedChecklistCount,
+      missingItems,
+      loadedAt: new Date().toISOString(),
+    }
+  }
+
   async function handleLoadCaseContactLogs(caseId: number) {
     setContactLogsLoadingId(caseId)
     setCaseActionError('')
@@ -636,6 +748,50 @@ function App() {
       }
     } finally {
       setWitnessGridLoadingId(null)
+    }
+  }
+
+
+  async function handleLoadCaseReadiness(caso: CaseItem) {
+    setReadinessLoadingId(caso.id)
+    setCaseActionError('')
+    setCaseActionSuccess('')
+    setSelectedCaseId(caso.id)
+
+    try {
+      const [contactLogs, states, attachments, checklistItems] = await Promise.all([
+        listCaseContactLogs(token, caso.id),
+        listCasePartyStates(token, caso.id),
+        listCaseAttachments(token, caso.id),
+        listCaseEvidenceChecklist(token, caso.id),
+      ])
+
+      const partyState =
+        states.length > 0 ? await getCasePartyState(token, states[0].id) : null
+
+      setContactLogsByCaseId((prev) => ({
+        ...prev,
+        [caso.id]: contactLogs,
+      }))
+
+      setPartyStatesByCaseId((prev) => ({
+        ...prev,
+        [caso.id]: partyState,
+      }))
+
+      setReadinessByCaseId((prev) => ({
+        ...prev,
+        [caso.id]: buildCaseReadinessSnapshot(caso, contactLogs, partyState, attachments, checklistItems),
+      }))
+
+      setCaseActionSuccess('Prontidão do caso atualizada.')
+    } catch (err) {
+      const fallback = handleApiFailure(err, 'Não foi possível calcular a prontidão do caso.')
+      if (fallback) {
+        setCaseActionError(fallback)
+      }
+    } finally {
+      setReadinessLoadingId(null)
     }
   }
 
@@ -1590,6 +1746,7 @@ function App() {
                   const isLoadingPdf = executivePdfLoading && selectedCaseId === caso.id
                   const isLoadingContactLogs = contactLogsLoadingId === caso.id
 
+                    const isLoadingReadiness = readinessLoadingId === caso.id
                     const isLoadingWitnessGrid = witnessGridLoadingId === caso.id
                   return (
                     <CaseCard
@@ -1603,9 +1760,11 @@ function App() {
                       isLoadingReport={isLoadingReport}
                       isLoadingPdf={isLoadingPdf}
                       isLoadingContactLogs={isLoadingContactLogs}
+                      isLoadingReadiness={isLoadingReadiness}
                       isLoadingWitnessGrid={isLoadingWitnessGrid}
                         contactLogs={contactLogsByCaseId[caso.id] ?? []}
                         partyState={partyStatesByCaseId[caso.id] ?? null}
+                          readiness={readinessByCaseId[caso.id] ?? null}
                       analysisLoading={analysisLoading}
                       executiveSummaryLoading={executiveSummaryLoading}
                       executiveReportLoading={executiveReportLoading}
@@ -1626,6 +1785,9 @@ function App() {
                         onAddWitness={(targetCase) => {
                           void handleAddWitnessToCase(targetCase)
                         }}
+                          onLoadReadiness={(targetCase) => {
+                            void handleLoadCaseReadiness(targetCase)
+                          }}
                         onOpenWhatsAppTemplate={(caseId, whatsapp, templateKey) => {
                         void handleOpenWhatsAppTemplate(caseId, whatsapp, templateKey)
                       }}
