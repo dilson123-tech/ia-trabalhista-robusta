@@ -1,4 +1,4 @@
-import type { CaseItem } from '../services/api'
+import type { CaseContactLogItem, CaseItem } from '../services/api'
 
 type WhatsAppTemplateKey = 'documents' | 'evidence' | 'hearing' | 'status_update' | 'confirm_data'
 
@@ -11,6 +11,8 @@ type CaseCardProps = {
   isLoadingSummary: boolean
   isLoadingReport: boolean
   isLoadingPdf: boolean
+  isLoadingContactLogs: boolean
+  contactLogs: CaseContactLogItem[]
   analysisLoading: boolean
   executiveSummaryLoading: boolean
   executiveReportLoading: boolean
@@ -20,6 +22,7 @@ type CaseCardProps = {
   onLoadExecutiveSummary: (caseId: number) => void
   onLoadExecutiveReport: (caseId: number) => void
   onOpenExecutivePdf: (caseId: number) => void
+  onLoadCaseContactLogs: (caseId: number) => void
   onOpenWhatsAppTemplate: (caseId: number, whatsapp: string, templateKey: WhatsAppTemplateKey) => void
   onRegisterWhatsAppContact: (caseId: number) => void
   onSelectCase: (caseId: number) => void
@@ -34,6 +37,8 @@ export function CaseCard({
   isLoadingSummary,
   isLoadingReport,
   isLoadingPdf,
+  isLoadingContactLogs,
+  contactLogs,
   analysisLoading,
   executiveSummaryLoading,
   executiveReportLoading,
@@ -43,12 +48,23 @@ export function CaseCard({
   onLoadExecutiveSummary,
   onLoadExecutiveReport,
   onOpenExecutivePdf,
+  onLoadCaseContactLogs,
   onOpenWhatsAppTemplate,
   onRegisterWhatsAppContact,
   onSelectCase,
 }: CaseCardProps) {
   const isSelected = selectedCaseId === caso.id
   const isArchived = caso.status === 'archived'
+
+  function formatContactLogDate(value: string) {
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return value
+
+    return new Intl.DateTimeFormat('pt-BR', {
+      dateStyle: 'short',
+      timeStyle: 'short',
+    }).format(date)
+  }
 
   return (
     <article className={`case-card ${isSelected ? 'case-card--selected' : ''}`}>
@@ -258,6 +274,64 @@ export function CaseCard({
           </button>
         )}
       </div>
+      {(contactLogs.length > 0 || caso.client_whatsapp) ? (
+        <div
+          style={{
+            marginTop: '12px',
+            padding: '12px',
+            border: '1px solid rgba(255,255,255,0.08)',
+            borderRadius: '10px',
+          }}
+        >
+          <div
+            style={{
+              alignItems: 'center',
+              display: 'flex',
+              gap: '10px',
+              justifyContent: 'space-between',
+              marginBottom: '8px',
+            }}
+          >
+            <strong>Histórico de contatos</strong>
+
+            <button
+              type="button"
+              onClick={() => onLoadCaseContactLogs(caso.id)}
+              className="case-card__action case-card__action--summary"
+              style={{ padding: '6px 10px' }}
+            >
+              {isLoadingContactLogs ? 'Carregando...' : 'Atualizar'}
+            </button>
+          </div>
+
+          {contactLogs.length > 0 ? (
+            <div style={{ display: 'grid', gap: '8px' }}>
+              {contactLogs.slice(0, 5).map((log) => (
+                <div
+                  key={log.id}
+                  style={{
+                    borderTop: '1px solid rgba(255,255,255,0.08)',
+                    paddingTop: '8px',
+                  }}
+                >
+                  <p style={{ margin: '0 0 4px 0' }}>
+                    <strong>{formatContactLogDate(log.occurred_at)}</strong> — {log.contact_type} / {log.direction}
+                  </p>
+                  <p style={{ margin: '0 0 4px 0' }}>{log.summary}</p>
+                  {log.note ? (
+                    <p style={{ margin: 0, opacity: 0.82 }}>{log.note}</p>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p style={{ margin: 0, opacity: 0.82 }}>
+              Nenhum contato registrado carregado ainda.
+            </p>
+          )}
+        </div>
+      ) : null}
+
     </article>
   )
 }

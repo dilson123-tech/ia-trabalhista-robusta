@@ -789,6 +789,20 @@ export async function deleteCaseAttachment(
 }
 
 
+export type CaseContactLogItem = {
+  id: number
+  tenant_id: number
+  case_id: number
+  contact_type: string
+  direction: string
+  summary: string
+  note?: string | null
+  occurred_at: string
+  created_by_user_id?: number | null
+  created_at: string
+  updated_at: string
+}
+
 export type CaseContactLogCreatePayload = {
   contact_type: string
   direction: string
@@ -816,4 +830,22 @@ export async function createCaseContactLog(
   if (!response.ok) {
     await parseError(response, "Erro ao registrar contato")
   }
+}
+
+
+export async function listCaseContactLogs(
+  token: string,
+  caseId: number,
+): Promise<CaseContactLogItem[]> {
+  const response = await fetch(`${API_URL}/cases/${caseId}/contact-logs`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+
+  if (!response.ok) {
+    await parseError(response, "Erro ao buscar histórico de contatos")
+  }
+
+  return response.json()
 }
