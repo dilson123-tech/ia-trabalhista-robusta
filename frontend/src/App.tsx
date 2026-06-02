@@ -1,7 +1,7 @@
 import './App.css'
 import { useEffect, useState, type KeyboardEvent } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
-import { ApiError, cleanupDemoCases, createPlanChangeCheckout, createCase, createCaseContactLog, getCases, getCaseAnalysis, getLegalModules, getExecutiveSummary, getExecutiveReport, getExecutivePdf, getUsageSummaryV2, login, updateCaseStatus, type CaseItem, type CaseAnalysisResponse, type ExecutiveSummaryResponse, type ExecutiveReportResponse, type LegalModule, type UsageSummaryV2Response } from './services/api'
+import { ApiError, cleanupDemoCases, createPlanChangeCheckout, createCase, createCaseContactLog, getCases, listCaseContactLogs, getCaseAnalysis, getLegalModules, getExecutiveSummary, getExecutiveReport, getExecutivePdf, getUsageSummaryV2, login, updateCaseStatus, type CaseContactLogItem, type CaseItem, type CaseAnalysisResponse, type ExecutiveSummaryResponse, type ExecutiveReportResponse, type LegalModule, type UsageSummaryV2Response } from './services/api'
 import { ExpansionWorkspace } from './components/expansion/ExpansionWorkspace'
 import { CaseFiltersBar } from './components/CaseFiltersBar'
 import { CaseCard } from './components/CaseCard'
@@ -88,6 +88,8 @@ function App() {
   const [caseActionLoadingId, setCaseActionLoadingId] = useState<number | null>(null)
   const [caseActionError, setCaseActionError] = useState('')
   const [caseActionSuccess, setCaseActionSuccess] = useState('')
+  const [contactLogsByCaseId, setContactLogsByCaseId] = useState<Record<number, CaseContactLogItem[]>>({})
+  const [contactLogsLoadingId, setContactLogsLoadingId] = useState<number | null>(null)
   const [cleanupDemoLoading, setCleanupDemoLoading] = useState(false)
   const [usageSummary, setUsageSummary] = useState<UsageSummaryV2Response | null>(null)
   const [usageLoading, setUsageLoading] = useState(false)
@@ -508,6 +510,26 @@ function App() {
     }
   }
 
+  async function handleLoadCaseContactLogs(caseId: number) {
+    setContactLogsLoadingId(caseId)
+    setCaseActionError('')
+
+    try {
+      const logs = await listCaseContactLogs(token, caseId)
+      setContactLogsByCaseId((prev) => ({
+        ...prev,
+        [caseId]: logs,
+      }))
+    } catch (err) {
+      const fallback = handleApiFailure(err, 'Não foi possível carregar o histórico de contatos.')
+      if (fallback) {
+        setCaseActionError(fallback)
+      }
+    } finally {
+      setContactLogsLoadingId(null)
+    }
+  }
+
   async function handleOpenWhatsAppTemplate(
     caseId: number,
     whatsapp: string,
@@ -533,6 +555,7 @@ function App() {
         summary: template.summary,
         note: `Mensagem pronta aberta: ${template.label}`,
       })
+      await handleLoadCaseContactLogs(caseId)
 
       const url = `https://wa.me/${digits}?text=${encodeURIComponent(template.message)}`
       window.open(url, '_blank', 'noopener,noreferrer')
@@ -559,6 +582,7 @@ function App() {
         direction: 'outgoing',
         summary: 'Contato realizado via WhatsApp',
       })
+      await handleLoadCaseContactLogs(caseId)
 
       setCaseActionSuccess('Contato via WhatsApp registrado com sucesso.')
     } catch (err) {
@@ -1455,6 +1479,7 @@ function App() {
                   const isLoadingSummary = executiveSummaryLoading && selectedCaseId === caso.id
                   const isLoadingReport = executiveReportLoading && selectedCaseId === caso.id
                   const isLoadingPdf = executivePdfLoading && selectedCaseId === caso.id
+                  const isLoadingContactLogs = contactLogsLoadingId === caso.id
 
                   return (
                     <CaseCard
@@ -1467,6 +1492,8 @@ function App() {
                       isLoadingSummary={isLoadingSummary}
                       isLoadingReport={isLoadingReport}
                       isLoadingPdf={isLoadingPdf}
+                      isLoadingContactLogs={isLoadingContactLogs}
+                      contactLogs={contactLogsByCaseId[caso.id] ?? []}
                       analysisLoading={analysisLoading}
                       executiveSummaryLoading={executiveSummaryLoading}
                       executiveReportLoading={executiveReportLoading}
@@ -1478,6 +1505,9 @@ function App() {
                       onLoadExecutiveSummary={handleLoadExecutiveSummary}
                       onLoadExecutiveReport={handleLoadExecutiveReport}
                       onOpenExecutivePdf={handleOpenExecutivePdf}
+                      onLoadCaseContactLogs={(caseId) => {
+                        void handleLoadCaseContactLogs(caseId)
+                      }}
                       onOpenWhatsAppTemplate={(caseId, whatsapp, templateKey) => {
                         void handleOpenWhatsAppTemplate(caseId, whatsapp, templateKey)
                       }}
