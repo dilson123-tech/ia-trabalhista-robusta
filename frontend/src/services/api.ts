@@ -975,3 +975,149 @@ export async function addCaseParty(
 
   return response.json()
 }
+
+export type CaseEvidenceChecklistStatus =
+  | "pending"
+  | "requested"
+  | "received"
+  | "validated"
+  | "waived"
+  | "needs_review"
+
+export type CaseEvidenceChecklistPriority =
+  | "low"
+  | "normal"
+  | "high"
+  | "urgent"
+
+export type CaseEvidenceChecklistCategory =
+  | "documento"
+  | "prova_documental"
+  | "prova_oral"
+  | "prova_tecnica"
+  | "comprovante"
+  | "contrato"
+  | "mensagem"
+  | "foto_video"
+  | "documento_pessoal"
+  | "outro"
+
+export type CaseEvidenceChecklistItem = {
+  id: number
+  tenant_id: number
+  case_id: number
+  attachment_id?: number | null
+  item_key: string
+  title: string
+  category: string
+  status: string
+  priority: string
+  requested_from?: string | null
+  due_date?: string | null
+  notes?: string | null
+  checklist_metadata: Record<string, unknown>
+  created_at: string
+  updated_at: string
+}
+
+export type CaseEvidenceChecklistCreatePayload = {
+  item_key?: string
+  title: string
+  category?: CaseEvidenceChecklistCategory
+  status?: CaseEvidenceChecklistStatus
+  priority?: CaseEvidenceChecklistPriority
+  requested_from?: string
+  due_date?: string
+  notes?: string
+  attachment_id?: number | null
+  metadata?: Record<string, unknown>
+}
+
+export type CaseEvidenceChecklistUpdatePayload = {
+  title?: string
+  category?: CaseEvidenceChecklistCategory
+  status?: CaseEvidenceChecklistStatus
+  priority?: CaseEvidenceChecklistPriority
+  requested_from?: string
+  due_date?: string
+  notes?: string
+  attachment_id?: number | null
+  metadata?: Record<string, unknown>
+}
+
+export async function listCaseEvidenceChecklist(
+  token: string,
+  caseId: number,
+): Promise<CaseEvidenceChecklistItem[]> {
+  const response = await fetch(`${API_URL}/cases/${caseId}/evidence-checklist`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+
+  if (!response.ok) {
+    await parseError(response, "Erro ao listar checklist de provas e pendências")
+  }
+
+  return response.json()
+}
+
+export async function createCaseEvidenceChecklistItem(
+  token: string,
+  caseId: number,
+  payload: CaseEvidenceChecklistCreatePayload,
+): Promise<CaseEvidenceChecklistItem> {
+  const response = await fetch(`${API_URL}/cases/${caseId}/evidence-checklist`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  })
+
+  if (!response.ok) {
+    await parseError(response, "Erro ao criar item do checklist de provas")
+  }
+
+  return response.json()
+}
+
+export async function updateCaseEvidenceChecklistItem(
+  token: string,
+  caseId: number,
+  itemId: number,
+  payload: CaseEvidenceChecklistUpdatePayload,
+): Promise<CaseEvidenceChecklistItem> {
+  const response = await fetch(`${API_URL}/cases/${caseId}/evidence-checklist/${itemId}`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  })
+
+  if (!response.ok) {
+    await parseError(response, "Erro ao atualizar item do checklist de provas")
+  }
+
+  return response.json()
+}
+
+export async function deleteCaseEvidenceChecklistItem(
+  token: string,
+  caseId: number,
+  itemId: number,
+): Promise<void> {
+  const response = await fetch(`${API_URL}/cases/${caseId}/evidence-checklist/${itemId}`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+
+  if (!response.ok) {
+    await parseError(response, "Erro ao excluir item do checklist de provas")
+  }
+}

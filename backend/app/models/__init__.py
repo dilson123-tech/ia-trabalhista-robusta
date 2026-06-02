@@ -26,3 +26,4 @@ from .subscription import Subscription  # noqa: F401
 from .usage_counter import UsageCounter  # noqa: F401
 
 from .case_contact_log import CaseContactLog  # noqa: F401
+from .case_evidence_checklist import CaseEvidenceChecklistItem  # noqa: F401
