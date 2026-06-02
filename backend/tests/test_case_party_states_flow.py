@@ -3,11 +3,16 @@ import uuid
 
 from app.main import app
 from app.core.settings import settings
+from app.api.v1.routes import cases as cases_routes
 
 client = TestClient(app)
 
 
 def _auth_headers(monkeypatch):
+    def _skip_plan_limits(*args, **kwargs):
+        return None
+
+    monkeypatch.setattr(cases_routes, "enforce_plan_limits", _skip_plan_limits)
     monkeypatch.setattr(settings, "ALLOW_SEED_ADMIN", True)
     monkeypatch.setattr(settings, "ADMIN_SEED_TOKEN", "test-seed-token")
 
@@ -190,3 +195,92 @@ def test_case_party_state_authenticated_succession_flow(monkeypatch):
     assert "claimant_1" in historical_keys
     assert len(snapshot["succession_relationships"]) == 1
     assert snapshot["succession_relationships"][0]["target_party_key"] == "claimant_successor_1"
+
+def test_case_party_state_witness_grid_add_and_update_flow(monkeypatch):
+    headers = _auth_headers(monkeypatch)
+
+    create_case_payload = {
+        "case_number": f"WITNESS-{uuid.uuid4().hex[:8]}",
+        "title": "Caso de teste da grade de testemunhas",
+        "description": "Validação da grade de testemunhas/depoentes baseada em case_party_states.",
+        "legal_area": "civel",
+        "action_type": "Roteiro de audiência",
+        "status": "draft",
+    }
+
+    r_case = client.post("/api/v1/cases", json=create_case_payload, headers=headers)
+    assert r_case.status_code == 200
+    case_id = r_case.json()["id"]
+
+    r_create_state = client.post(
+        "/api/v1/case-party-states",
+        json={
+            "case_id": case_id,
+            "area": "civel",
+            "parties": [],
+            "metadata": {
+                "source": "test_case_party_state_witness_grid_add_and_update_flow",
+                "witness_grid_enabled": True,
+            },
+        },
+        headers=headers,
+    )
+    assert r_create_state.status_code == 200
+    state_id = r_create_state.json()["id"]
+
+    r_add_witness = client.post(
+        f"/api/v1/case-party-states/{state_id}/parties",
+        json={
+            "key": "witness_grid_1",
+            "name": "João Testemunha",
+            "role": "testemunha",
+            "party_type": "person",
+            "status": "active",
+            "is_original_party": True,
+            "metadata": {
+                "grid_source": "case_witness_grid_v1",
+                "preparation_status": "pendente",
+                "what_knows": "Presenciou os fatos principais narrados no caso.",
+                "confirms_facts": "Confirma presença das partes e cronologia básica.",
+                "risk_level": "médio",
+                "sensitive_points": "Advogado deve revisar contradições antes da audiência.",
+                "recommended_questions": "Perguntar o que viu, quando viu e quem estava presente.",
+                "dangerous_questions": "Evitar induzir resposta ou sugerir versão pronta.",
+            },
+        },
+        headers=headers,
+    )
+    assert r_add_witness.status_code == 200
+    witness_detail = r_add_witness.json()
+
+    witness = next(
+        party for party in witness_detail["parties"] if party["party_key"] == "witness_grid_1"
+    )
+    assert witness["role"] == "testemunha"
+    assert witness["party_metadata"]["grid_source"] == "case_witness_grid_v1"
+    assert witness["party_metadata"]["preparation_status"] == "pendente"
+    assert witness["party_metadata"]["what_knows"].startswith("Presenciou")
+
+    assert any(event["event_type"] == "party_registered" for event in witness_detail["events"])
+
+    r_update_witness = client.patch(
+        f"/api/v1/case-party-states/{state_id}/party-data",
+        json={
+            "party_key": "witness_grid_1",
+            "description": "Grade de testemunhas atualizada no fluxo operacional.",
+            "metadata": {
+                "preparation_status": "preparada",
+                "risk_level": "baixo",
+            },
+        },
+        headers=headers,
+    )
+    assert r_update_witness.status_code == 200
+    updated_detail = r_update_witness.json()
+
+    updated_witness = next(
+        party for party in updated_detail["parties"] if party["party_key"] == "witness_grid_1"
+    )
+    assert updated_witness["party_metadata"]["preparation_status"] == "preparada"
+    assert updated_witness["party_metadata"]["risk_level"] == "baixo"
+    assert any(event["event_type"] == "party_data_updated" for event in updated_detail["events"])

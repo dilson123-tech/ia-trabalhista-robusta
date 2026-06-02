@@ -849,3 +849,129 @@ export async function listCaseContactLogs(
 
   return response.json()
 }
+
+export type CasePartyItem = {
+  id: number
+  tenant_id: number
+  party_state_id: number
+  party_key: string
+  name: string
+  role: string
+  party_type: string
+  document_id?: string | null
+  status: string
+  is_original_party: boolean
+  party_metadata: Record<string, unknown>
+  created_at: string
+  updated_at: string
+}
+
+export type CasePartyStateItem = {
+  id: number
+  tenant_id: number
+  case_id: number
+  area: string
+  state_metadata: Record<string, unknown>
+  created_at: string
+  updated_at: string
+}
+
+export type CasePartyStateDetailItem = CasePartyStateItem & {
+  parties: CasePartyItem[]
+  representatives: unknown[]
+  relationships: unknown[]
+  events: unknown[]
+}
+
+export type CasePartyCreatePayload = {
+  key: string
+  name: string
+  role: string
+  party_type?: string
+  document_id?: string | null
+  status?: string
+  is_original_party?: boolean
+  metadata?: Record<string, unknown>
+}
+
+export type CasePartyStateCreatePayload = {
+  case_id: number
+  area: string
+  parties?: CasePartyCreatePayload[]
+  metadata?: Record<string, unknown>
+}
+
+export async function listCasePartyStates(
+  token: string,
+  caseId: number,
+): Promise<CasePartyStateItem[]> {
+  const response = await fetch(`${API_URL}/case-party-states/case/${caseId}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+
+  if (!response.ok) {
+    await parseError(response, "Erro ao buscar partes/pessoas do caso")
+  }
+
+  return response.json()
+}
+
+export async function getCasePartyState(
+  token: string,
+  stateId: number,
+): Promise<CasePartyStateDetailItem> {
+  const response = await fetch(`${API_URL}/case-party-states/${stateId}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+
+  if (!response.ok) {
+    await parseError(response, "Erro ao carregar grade de pessoas do caso")
+  }
+
+  return response.json()
+}
+
+export async function createCasePartyState(
+  token: string,
+  payload: CasePartyStateCreatePayload,
+): Promise<CasePartyStateDetailItem> {
+  const response = await fetch(`${API_URL}/case-party-states`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  })
+
+  if (!response.ok) {
+    await parseError(response, "Erro ao criar grade de pessoas do caso")
+  }
+
+  return response.json()
+}
+
+export async function addCaseParty(
+  token: string,
+  stateId: number,
+  payload: CasePartyCreatePayload,
+): Promise<CasePartyStateDetailItem> {
+  const response = await fetch(`${API_URL}/case-party-states/${stateId}/parties`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  })
+
+  if (!response.ok) {
+    await parseError(response, "Erro ao adicionar testemunha/depoente")
+  }
+
+  return response.json()
+}

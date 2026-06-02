@@ -22,6 +22,7 @@ from app.modules.parties_succession.contracts import (
 )
 from app.modules.parties_succession.service import PartiesSuccessionService
 from app.schemas.case_party_state import (
+    CasePartyIn,
     CasePartyStateCreate,
     CasePartyStateDetailOut,
     CasePartyStateOut,
@@ -379,6 +380,77 @@ def get_case_party_state(
         state_id=state_id,
         tenant_id=current_user["tenant_id"],
     )
+    return _build_state_detail_payload(db, state)
+
+
+
+@router.post(
+    "/{state_id}/parties",
+    response_model=CasePartyStateDetailOut,
+    dependencies=[Depends(require_role("admin", "advogado"))],
+)
+def add_case_party(
+    state_id: int,
+    payload: CasePartyIn,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_auth),
+):
+    state = _get_state_or_404(
+        db,
+        state_id=state_id,
+        tenant_id=current_user["tenant_id"],
+    )
+
+    existing_party = (
+        db.query(CasePartyModel)
+        .filter(
+            CasePartyModel.tenant_id == current_user["tenant_id"],
+            CasePartyModel.party_state_id == state.id,
+            CasePartyModel.party_key == payload.key,
+        )
+        .first()
+    )
+    if existing_party:
+        raise HTTPException(status_code=409, detail="Party already exists in case party state")
+
+    metadata = dict(payload.metadata or {})
+
+    db.add(
+        CasePartyModel(
+            tenant_id=current_user["tenant_id"],
+            party_state_id=state.id,
+            party_key=payload.key,
+            name=payload.name,
+            role=payload.role,
+            party_type=payload.party_type,
+            document_id=payload.document_id,
+            status=payload.status,
+            is_original_party=payload.is_original_party,
+            party_metadata=metadata,
+        )
+    )
+    db.add(
+        CasePartyEventModel(
+            tenant_id=current_user["tenant_id"],
+            party_state_id=state.id,
+            event_type="party_registered",
+            title=f"Pessoa cadastrada: {payload.name}",
+            description=metadata.get("description") or "Pessoa/parte adicionada ao estado estruturado do caso.",
+            occurred_on=None,
+            party_keys=[payload.key],
+            event_metadata={
+                "source": "api_add_case_party",
+                "role": payload.role,
+                "party_type": payload.party_type,
+                "metadata": metadata,
+            },
+        )
+    )
+
+    _touch_state(db, state.id)
+    db.commit()
+    db.refresh(state)
+
     return _build_state_detail_payload(db, state)
 
 
