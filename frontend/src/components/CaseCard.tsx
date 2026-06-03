@@ -199,7 +199,7 @@ export function CaseCard({
 
       <div className="case-card__meta">
         <span className="case-card__meta-pill">
-          <strong>ID:</strong> {caso.id}
+          <strong>Registro interno:</strong> #{caso.id}
         </span>
 
         <span className="case-card__meta-pill">

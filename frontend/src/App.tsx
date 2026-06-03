@@ -3,7 +3,6 @@ import { useEffect, useState, type KeyboardEvent } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { ApiError, cleanupDemoCases, createPlanChangeCheckout, createCase, createCaseContactLog, createCasePartyState, addCaseParty, getCasePartyState, getCases, listCaseAttachments, listCaseContactLogs, listCaseEvidenceChecklist, listCasePartyStates, getCaseAnalysis, getLegalModules, getExecutiveSummary, getExecutiveReport, getExecutivePdf, getUsageSummaryV2, login, updateCaseStatus, type CaseAttachmentItem, type CaseContactLogItem, type CaseEvidenceChecklistItem, type CaseItem, type CasePartyStateDetailItem, type CaseAnalysisResponse, type ExecutiveSummaryResponse, type ExecutiveReportResponse, type LegalModule, type UsageSummaryV2Response } from './services/api'
 import { ExpansionWorkspace } from './components/expansion/ExpansionWorkspace'
-import { CaseFiltersBar } from './components/CaseFiltersBar'
 import { CaseCard, type CaseInternalDossierSnapshot, type CaseReadinessSnapshot } from './components/CaseCard'
 import { DashboardTopPanel } from './components/DashboardTopPanel'
 import { LoginPanel } from './components/LoginPanel'
@@ -233,7 +232,7 @@ function App() {
 
     if (!normalizedCaseSearch) return true
 
-    const haystack = `${caso.case_number} ${caso.title} ${caso.description ?? ''} ${caso.client_name ?? ''} ${caso.client_whatsapp ?? ''}`.toLowerCase()
+    const haystack = `${caso.id} ${caso.case_number} ${caso.title} ${caso.description ?? ''} ${caso.legal_area ?? ''} ${caso.action_type ?? ''} ${caso.status ?? ''} ${caso.client_name ?? ''} ${caso.client_whatsapp ?? ''}`.toLowerCase()
     return haystack.includes(normalizedCaseSearch)
   })
 
@@ -1809,6 +1808,218 @@ function App() {
           <div className="cases-layout__list">
             <section className="insight-card">
               <div className="insight-head">
+                {loaded && filteredCases.length > 0 ? (
+                  <div
+                    style={{
+                      border: '1px solid rgba(148, 163, 184, 0.16)',
+                      borderRadius: '18px',
+                      padding: '14px',
+                      marginBottom: '16px',
+                      background: 'rgba(15, 23, 42, 0.22)',
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        gap: '12px',
+                        alignItems: 'flex-start',
+                        marginBottom: '12px',
+                        flexWrap: 'wrap',
+                      }}
+                    >
+                      <div>
+                        <p className="insight-kicker">Carteira jurídica</p>
+                        <strong>Casos do escritório — abra um caso por vez</strong>
+                        <p style={{ margin: '6px 0 0', color: 'var(--muted-text)' }}>
+                          Resultado filtrado: {filteredCases.length} registro(s). Base carregada: {cases.length} registro(s) técnicos.
+                        </p>
+                        <p style={{ margin: '6px 0 0', color: 'var(--muted-text)' }}>
+                          A carteira mostra registros da base em formato compacto. Busque pelo caso real e abra apenas um por vez.
+                        </p>
+                      </div>
+                      <span className="insight-badge">
+                        {selectedCase ? `Aberto: #${selectedCase.id}` : 'Nenhum caso aberto'}
+                      </span>
+                    </div>
+
+                    <div
+                      style={{
+                        display: 'grid',
+                        gap: '10px',
+                        marginBottom: '12px',
+                      }}
+                    >
+                      <input
+                        type="search"
+                        value={caseSearchTerm}
+                        onChange={(event) => setCaseSearchTerm(event.target.value)}
+                        placeholder="Buscar por cliente, processo, WhatsApp, ID ou área"
+                        style={{
+                          width: '100%',
+                          border: '1px solid rgba(148, 163, 184, 0.20)',
+                          borderRadius: '12px',
+                          padding: '12px 13px',
+                          background: 'rgba(15, 23, 42, 0.42)',
+                          color: 'var(--text-primary)',
+                          outline: 'none',
+                        }}
+                      />
+
+                      <div
+                        style={{
+                          display: 'flex',
+                          gap: '8px',
+                          flexWrap: 'wrap',
+                        }}
+                      >
+                        <select
+                          value={caseStatusFilter}
+                          onChange={(event) => setCaseStatusFilter(event.target.value)}
+                          style={{
+                            flex: '1 1 180px',
+                            border: '1px solid rgba(148, 163, 184, 0.20)',
+                            borderRadius: '12px',
+                            padding: '11px 12px',
+                            background: 'rgba(15, 23, 42, 0.42)',
+                            color: 'var(--text-primary)',
+                          }}
+                        >
+                          <option value="main">Carteira principal</option>
+                          <option value="all">Todos os casos</option>
+                          <option value="draft">Rascunhos</option>
+                          <option value="active">Ativos</option>
+                          <option value="review">Em revisão</option>
+                          <option value="archived">Arquivados</option>
+                        </select>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCaseSearchTerm('')
+                            setCaseStatusFilter('main')
+                          }}
+                          className="case-card__action case-card__action--summary"
+                          style={{ padding: '10px 13px' }}
+                        >
+                          Limpar
+                        </button>
+                      </div>
+                    </div>
+
+                    <div
+                      data-panel-section="case-compact-actions-v1"
+                      style={{
+                        display: 'flex',
+                        gap: '8px',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        flexWrap: 'wrap',
+                        marginBottom: '12px',
+                      }}
+                    >
+                      <div style={{ display: 'grid', gap: '6px' }}>
+                        {caseActionError ? (
+                          <p className="status-message status-message--error" style={{ margin: 0 }}>
+                            {caseActionError}
+                          </p>
+                        ) : null}
+                        {caseActionSuccess ? (
+                          <p className="status-message status-message--success" style={{ margin: 0 }}>
+                            {caseActionSuccess}
+                          </p>
+                        ) : null}
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void handleCleanupDemo()
+                        }}
+                        disabled={cleanupDemoLoading}
+                        className="case-card__action case-card__action--summary"
+                        style={{ padding: '10px 13px' }}
+                      >
+                        {cleanupDemoLoading ? 'Limpando...' : 'Limpar demonstração'}
+                      </button>
+                    </div>
+
+                    <div
+                      style={{
+                        display: 'grid',
+                        gap: '8px',
+                        maxHeight: '420px',
+                        overflowY: 'auto',
+                        paddingRight: '4px',
+                      }}
+                    >
+                      {filteredCases.map((caso) => {
+                        const isSelectedCase = selectedCaseId === caso.id
+
+                        return (
+                          <button
+                            key={`case-compact-${caso.id}`}
+                            type="button"
+                            onClick={() => setSelectedCaseId(caso.id)}
+                            style={{
+                              width: '100%',
+                              border: isSelectedCase
+                                ? '1px solid rgba(245, 158, 11, 0.38)'
+                                : '1px solid rgba(148, 163, 184, 0.16)',
+                              borderRadius: '14px',
+                              padding: '12px',
+                              background: isSelectedCase
+                                ? 'rgba(245, 158, 11, 0.12)'
+                                : 'rgba(15, 23, 42, 0.28)',
+                              color: 'var(--text-primary)',
+                              cursor: 'pointer',
+                              textAlign: 'left',
+                            }}
+                          >
+                            <div
+                              style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                gap: '10px',
+                                alignItems: 'flex-start',
+                                flexWrap: 'wrap',
+                              }}
+                            >
+                              <div>
+                                <strong style={{ display: 'block', marginBottom: '4px' }}>
+                                  {caso.title}
+                                </strong>
+                                <span style={{ color: 'var(--muted-text)', fontSize: '0.86rem' }}>
+                                  {caso.case_number}
+                                </span>
+                              </div>
+
+                              <span className="case-card__meta-pill">
+                                {isSelectedCase ? 'Caso aberto' : 'Abrir caso'}
+                              </span>
+                            </div>
+
+                            <div className="case-card__meta" style={{ marginTop: '8px' }}>
+                              <span className="case-card__meta-pill">Caso: {caso.case_number}</span>
+                              <span className="case-card__meta-pill">{getStatusLabel(caso.status)}</span>
+                              {caso.client_name ? (
+                                <span className="case-card__meta-pill">{caso.client_name}</span>
+                              ) : null}
+                            </div>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ) : null}
+
+                {loaded && filteredCases.length > 0 && !selectedCase ? (
+                  <p className="insight-empty">
+                    Nenhum caso aberto. Clique em “Abrir caso” na lista compacta para trabalhar em um caso por vez.
+                  </p>
+                ) : null}
+
+
                 <div>
                   <p className="insight-kicker">Carteira jurídica</p>
                   <h2 className="insight-title">Casos do escritório</h2>
@@ -1829,26 +2040,6 @@ function App() {
                 <p className="insight-empty">Nenhum caso encontrado para este token.</p>
               ) : null}
 
-              {loaded && cases.length > 0 ? (
-                <CaseFiltersBar
-                  filteredCount={filteredCases.length}
-                  totalCount={cases.length}
-                  caseSearchTerm={caseSearchTerm}
-                  onCaseSearchTermChange={setCaseSearchTerm}
-                  caseStatusFilter={caseStatusFilter}
-                  onCaseStatusFilterChange={setCaseStatusFilter}
-                  onResetFilters={() => {
-                    setCaseSearchTerm('')
-                    setCaseStatusFilter('main')
-                  }}
-                  onCleanupDemo={() => {
-                    void handleCleanupDemo()
-                  }}
-                  cleanupDemoLoading={cleanupDemoLoading}
-                  caseActionError={caseActionError}
-                  caseActionSuccess={caseActionSuccess}
-                />
-              ) : null}
 
               {loaded && !loading && cases.length > 0 && filteredCases.length === 0 ? (
                 <p className="insight-empty">Nenhum caso encontrado para os filtros atuais.</p>
@@ -1860,7 +2051,7 @@ function App() {
                   gap: '12px',
                 }}
               >
-                {filteredCases.map((caso) => {
+                {filteredCases.filter((caso) => caso.id === selectedCaseId).map((caso) => {
                   const isArchiving = caseActionLoadingId === caso.id
                   const isAnalyzing = analysisLoading && selectedCaseId === caso.id
                   const isLoadingSummary = executiveSummaryLoading && selectedCaseId === caso.id

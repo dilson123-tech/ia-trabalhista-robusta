@@ -1,7 +1,7 @@
 export type ExpansionModule = 'editor' | 'evidence' | 'succession' | 'appeals'
 
 type ExpansionModulesNavProps = {
-  activeModule: ExpansionModule
+  activeModule: ExpansionModule | null
   onChange: (module: ExpansionModule) => void
 }
 
