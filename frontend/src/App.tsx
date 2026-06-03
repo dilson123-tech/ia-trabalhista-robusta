@@ -1,7 +1,8 @@
 import './App.css'
 import { useEffect, useState, type KeyboardEvent } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
-import { ApiError, cleanupDemoCases, createPlanChangeCheckout, createCase, createCaseContactLog, createCasePartyState, addCaseParty, getCasePartyState, getCases, listCaseAttachments, listCaseContactLogs, listCaseEvidenceChecklist, listCasePartyStates, getCaseAnalysis, getLegalModules, getExecutiveSummary, getExecutiveReport, getExecutivePdf, getUsageSummaryV2, login, updateCaseStatus, type CaseAttachmentItem, type CaseContactLogItem, type CaseEvidenceChecklistItem, type CaseItem, type CasePartyStateDetailItem, type CaseAnalysisResponse, type ExecutiveSummaryResponse, type ExecutiveReportResponse, type LegalModule, type UsageSummaryV2Response } from './services/api'
+import { ApiError, cleanupDemoCases, createPlanChangeCheckout, createCase, createCaseContactLog, createCasePartyState, addCaseParty,
+  deleteCaseParty, getCasePartyState, getCases, listCaseAttachments, listCaseContactLogs, listCaseEvidenceChecklist, listCasePartyStates, getCaseAnalysis, getLegalModules, getExecutiveSummary, getExecutiveReport, getExecutivePdf, getUsageSummaryV2, login, updateCaseStatus, type CaseAttachmentItem, type CaseContactLogItem, type CaseEvidenceChecklistItem, type CaseItem, type CasePartyStateDetailItem, type CaseAnalysisResponse, type ExecutiveSummaryResponse, type ExecutiveReportResponse, type LegalModule, type UsageSummaryV2Response } from './services/api'
 import { ExpansionWorkspace } from './components/expansion/ExpansionWorkspace'
 import { CaseCard, type CaseInternalDossierSnapshot, type CaseReadinessSnapshot } from './components/CaseCard'
 import { DashboardTopPanel } from './components/DashboardTopPanel'
@@ -681,20 +682,26 @@ function App() {
   }
 
   async function handleAddWitnessToCase(caso: CaseItem) {
+    setCaseActionError('')
+    setCaseActionSuccess('')
+
     const name = window.prompt('Nome da testemunha/depoente:')
-    if (!name?.trim()) return
+    if (!name?.trim()) {
+      setCaseActionError('Informe o nome da testemunha/depoente antes de salvar.')
+      return
+    }
 
-    const role =
-      window.prompt(
-        'Papel na audiência/prova oral:',
-        'testemunha',
-      )?.trim() || 'testemunha'
+    const role = window.prompt('Papel na audiência/prova oral:', 'testemunha')?.trim()
+    if (!role) {
+      setCaseActionError('Informe o papel da pessoa antes de salvar.')
+      return
+    }
 
-    const whatKnows =
-      window.prompt(
-        'O que essa pessoa sabe ou confirma? Pode deixar curto para o V1:',
-        '',
-      )?.trim() || 'A revisar com o advogado.'
+    const whatKnows = window.prompt('O que essa pessoa sabe ou confirma? Campo obrigatório:', '')?.trim()
+    if (!whatKnows) {
+      setCaseActionError('Informe o que a testemunha/depoente sabe ou confirma antes de salvar.')
+      return
+    }
 
     setWitnessGridLoadingId(caso.id)
     setCaseActionError('')
@@ -813,6 +820,60 @@ function App() {
       loadedAt: new Date().toISOString(),
     }
   }
+
+  async function handleClearWitnessesFromCase(caso: CaseItem) {
+    const partyState = partyStatesByCaseId[caso.id]
+    const witnessParties = (partyState?.parties ?? []).filter((party) => {
+      const role = party.role.toLowerCase()
+      return (
+        role.includes('testemunha') ||
+        role.includes('depoente') ||
+        role.includes('preposto') ||
+        role.includes('representante') ||
+        role.includes('perito') ||
+        role.includes('fiscal') ||
+        role.includes('cuidador') ||
+        role.includes('vizinho') ||
+        (party.party_metadata?.grid_source === 'case_witness_grid_v1')
+      )
+    })
+
+    if (!partyState || witnessParties.length === 0) {
+      setCaseActionError('Não há testemunhas/depoentes carregados para limpar neste caso.')
+      return
+    }
+
+    const confirmed = window.confirm(
+      `Limpar ${witnessParties.length} testemunha(s)/depoente(s) deste caso? Essa ação remove apenas a grade de pessoas, não apaga o caso nem os anexos.`,
+    )
+    if (!confirmed) return
+
+    setWitnessGridLoadingId(caso.id)
+    setCaseActionError('')
+    setCaseActionSuccess('')
+    setSelectedCaseId(caso.id)
+
+    try {
+      let nextState = partyState
+      for (const party of witnessParties) {
+        nextState = await deleteCaseParty(token, nextState.id, party.id)
+      }
+
+      setPartyStatesByCaseId((prev) => ({
+        ...prev,
+        [caso.id]: nextState,
+      }))
+      setCaseActionSuccess('Testemunhas/depoentes removidos da grade do caso.')
+    } catch (err) {
+      const fallback = handleApiFailure(err, 'Não foi possível limpar as testemunhas/depoentes do caso.')
+      if (fallback) {
+        setCaseActionError(fallback)
+      }
+    } finally {
+      setWitnessGridLoadingId(null)
+    }
+  }
+
 
   async function handleLoadCaseReadiness(caso: CaseItem) {
     setReadinessLoadingId(caso.id)
@@ -2101,6 +2162,9 @@ function App() {
                         onAddWitness={(targetCase) => {
                           void handleAddWitnessToCase(targetCase)
                         }}
+                          onClearWitnesses={(targetCase) => {
+                            void handleClearWitnessesFromCase(targetCase)
+                          }}
                           onLoadReadiness={(targetCase) => {
                             void handleLoadCaseReadiness(targetCase)
                           }}

@@ -976,6 +976,26 @@ export async function addCaseParty(
   return response.json()
 }
 
+export async function deleteCaseParty(
+  token: string,
+  stateId: number,
+  partyId: number,
+): Promise<CasePartyStateDetailItem> {
+  const response = await fetch(`${API_URL}/case-party-states/${stateId}/parties/${partyId}`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+
+  if (!response.ok) {
+    await parseError(response, "Erro ao remover testemunha/depoente")
+  }
+
+  return response.json()
+}
+
+
 export type CaseEvidenceChecklistStatus =
   | "pending"
   | "requested"

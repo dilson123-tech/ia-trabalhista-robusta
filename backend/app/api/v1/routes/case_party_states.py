@@ -454,6 +454,62 @@ def add_case_party(
     return _build_state_detail_payload(db, state)
 
 
+@router.delete(
+    "/{state_id}/parties/{party_id}",
+    response_model=CasePartyStateDetailOut,
+    dependencies=[Depends(require_role("admin", "advogado"))],
+)
+def delete_case_party(
+    state_id: int,
+    party_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_auth),
+):
+    state = _get_state_or_404(
+        db,
+        state_id=state_id,
+        tenant_id=current_user["tenant_id"],
+    )
+
+    party = (
+        db.query(CasePartyModel)
+        .filter(
+            CasePartyModel.tenant_id == current_user["tenant_id"],
+            CasePartyModel.party_state_id == state.id,
+            CasePartyModel.id == party_id,
+        )
+        .first()
+    )
+
+    if party is None:
+        raise HTTPException(status_code=404, detail="Party not found in case party state")
+
+    party_name = party.name
+    party_key = party.party_key
+    party_role = party.role
+
+    db.delete(party)
+    db.add(
+        CasePartyEventModel(
+            tenant_id=current_user["tenant_id"],
+            party_state_id=state.id,
+            event_type="party_deleted",
+            title=f"Pessoa removida: {party_name}",
+            description="Pessoa/testemunha removida da grade estruturada do caso.",
+            occurred_on=None,
+            party_keys=[party_key],
+            event_metadata={
+                "source": "api_delete_case_party",
+                "role": party_role,
+                "party_id": party_id,
+            },
+        )
+    )
+    db.commit()
+
+    return _build_state_detail_payload(db, state)
+
+
 @router.post(
     "/{state_id}/representatives",
     response_model=CasePartyStateDetailOut,
