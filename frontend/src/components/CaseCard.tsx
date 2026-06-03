@@ -67,6 +67,7 @@ type CaseCardProps = {
   onLoadCaseContactLogs: (caseId: number) => void
   onLoadWitnessGrid: (caseId: number) => void
   onAddWitness: (caso: CaseItem) => void
+    onClearWitnesses: (caso: CaseItem) => void
   onLoadReadiness: (caso: CaseItem) => void
   onLoadDossier: (caso: CaseItem) => void
   onOpenWhatsAppTemplate: (caseId: number, whatsapp: string, templateKey: WhatsAppTemplateKey) => void
@@ -103,6 +104,7 @@ export function CaseCard({
   onLoadCaseContactLogs,
   onLoadWitnessGrid,
   onAddWitness,
+    onClearWitnesses,
   onLoadReadiness,
   onLoadDossier,
   onOpenWhatsAppTemplate,
@@ -552,6 +554,17 @@ export function CaseCard({
             >
               Adicionar V1
             </button>
+
+              {witnessParties.length > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => onClearWitnesses(caso)}
+                  className="case-card__action case-card__action--summary"
+                  style={{ padding: '6px 10px' }}
+                >
+                  Limpar testemunhas
+                </button>
+              ) : null}
           </div>
         </div>
 
