@@ -13,6 +13,13 @@ type ExpansionWorkspaceProps = {
   pieceReadyRequestId?: number
 }
 
+const moduleLabels: Record<ExpansionModule, string> = {
+  editor: 'Editor Jurídico Vivo',
+  evidence: 'Provas e Anexos',
+  succession: 'Partes e Sucessão',
+  appeals: 'Decisão e Recurso',
+}
+
 export function ExpansionWorkspace({
   token,
   selectedCaseId,
@@ -20,7 +27,7 @@ export function ExpansionWorkspace({
   forcedModule,
   pieceReadyRequestId,
 }: ExpansionWorkspaceProps) {
-  const [activeModule, setActiveModule] = useState<ExpansionModule>('editor')
+  const [activeModule, setActiveModule] = useState<ExpansionModule | null>(null)
 
   useEffect(() => {
     if (!forcedModule) return
@@ -50,22 +57,55 @@ export function ExpansionWorkspace({
         </p>
       </section>
 
-      <ExpansionModulesNav
-        activeModule={activeModule}
-        onChange={setActiveModule}
-      />
-
-      {activeModule === 'editor' ? (
-        <EditorModulePanel
-          token={token}
-          selectedCaseId={selectedCaseId}
-          selectedCaseArea={selectedCaseArea}
-          pieceReadyRequestId={pieceReadyRequestId}
+      {activeModule === null ? (
+        <ExpansionModulesNav
+          activeModule={activeModule}
+          onChange={setActiveModule}
         />
-      ) : null}
-      {activeModule === 'evidence' ? <EvidenceModulePanel token={token} selectedCaseId={selectedCaseId} /> : null}
-      {activeModule === 'succession' ? <SuccessionModulePanel selectedCaseId={selectedCaseId} /> : null}
-      {activeModule === 'appeals' ? <AppealsModulePanel selectedCaseId={selectedCaseId} /> : null}
+      ) : (
+        <>
+          <section className="section-card">
+            <div className="section-head">
+              <div>
+                <p className="insight-kicker">Módulo aberto</p>
+                <h2 className="section-heading">{moduleLabels[activeModule]}</h2>
+                <p className="section-description">
+                  Trabalhe em um módulo por vez. Volte aos módulos quando quiser trocar de área.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                className="case-card__action case-card__action--summary"
+                onClick={() => setActiveModule(null)}
+              >
+                Voltar aos módulos
+              </button>
+            </div>
+          </section>
+
+          {activeModule === 'editor' ? (
+            <EditorModulePanel
+              token={token}
+              selectedCaseId={selectedCaseId}
+              selectedCaseArea={selectedCaseArea}
+              pieceReadyRequestId={pieceReadyRequestId}
+            />
+          ) : null}
+
+          {activeModule === 'evidence' ? (
+            <EvidenceModulePanel token={token} selectedCaseId={selectedCaseId} />
+          ) : null}
+
+          {activeModule === 'succession' ? (
+            <SuccessionModulePanel selectedCaseId={selectedCaseId} />
+          ) : null}
+
+          {activeModule === 'appeals' ? (
+            <AppealsModulePanel selectedCaseId={selectedCaseId} />
+          ) : null}
+        </>
+      )}
     </>
   )
 }
