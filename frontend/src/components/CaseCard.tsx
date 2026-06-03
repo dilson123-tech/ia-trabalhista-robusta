@@ -16,6 +16,28 @@ export type CaseReadinessSnapshot = {
   loadedAt: string
 }
 
+export type CaseInternalDossierSnapshot = {
+  caseId: number
+  caseTitle: string
+  caseNumber: string
+  clientName: string
+  clientWhatsapp: string
+  readinessScore: number
+  readinessStatus: string
+  contactLogCount: number
+  witnessCount: number
+  attachmentCount: number
+  checklistTotal: number
+  checklistOpen: number
+  checklistValidated: number
+  lastContactSummary: string | null
+  keyPeople: string[]
+  evidenceSummary: string[]
+  openChecklistItems: string[]
+  nextSteps: string[]
+  loadedAt: string
+}
+
 type CaseCardProps = {
   caso: CaseItem
   selectedCaseId: number | null
@@ -27,10 +49,12 @@ type CaseCardProps = {
   isLoadingPdf: boolean
   isLoadingContactLogs: boolean
   isLoadingReadiness: boolean
+  isLoadingDossier: boolean
   isLoadingWitnessGrid: boolean
   contactLogs: CaseContactLogItem[]
   partyState: CasePartyStateDetailItem | null
   readiness: CaseReadinessSnapshot | null
+  dossier: CaseInternalDossierSnapshot | null
   analysisLoading: boolean
   executiveSummaryLoading: boolean
   executiveReportLoading: boolean
@@ -44,6 +68,7 @@ type CaseCardProps = {
   onLoadWitnessGrid: (caseId: number) => void
   onAddWitness: (caso: CaseItem) => void
   onLoadReadiness: (caso: CaseItem) => void
+  onLoadDossier: (caso: CaseItem) => void
   onOpenWhatsAppTemplate: (caseId: number, whatsapp: string, templateKey: WhatsAppTemplateKey) => void
   onRegisterWhatsAppContact: (caseId: number) => void
   onSelectCase: (caseId: number) => void
@@ -60,10 +85,12 @@ export function CaseCard({
   isLoadingPdf,
   isLoadingContactLogs,
   isLoadingReadiness,
+  isLoadingDossier,
   isLoadingWitnessGrid,
   contactLogs,
   partyState,
   readiness,
+  dossier,
   analysisLoading,
   executiveSummaryLoading,
   executiveReportLoading,
@@ -77,6 +104,7 @@ export function CaseCard({
   onLoadWitnessGrid,
   onAddWitness,
   onLoadReadiness,
+  onLoadDossier,
   onOpenWhatsAppTemplate,
   onRegisterWhatsAppContact,
   onSelectCase,
@@ -246,6 +274,97 @@ export function CaseCard({
         ) : (
           <p style={{ margin: 0, opacity: 0.82 }}>
             Clique em Atualizar prontidão para consolidar cliente, contatos, testemunhas, checklist e anexos.
+          </p>
+        )}
+      </div>
+
+      <div
+        style={{
+          marginTop: '12px',
+          padding: '12px',
+          border: '1px solid rgba(96, 165, 250, 0.22)',
+          borderRadius: '10px',
+          background: 'rgba(96, 165, 250, 0.06)',
+        }}
+      >
+        <div
+          style={{
+            alignItems: 'center',
+            display: 'flex',
+            gap: '10px',
+            justifyContent: 'space-between',
+            marginBottom: '8px',
+          }}
+        >
+          <strong>Dossiê interno do caso</strong>
+
+          <button
+            type="button"
+            onClick={() => onLoadDossier(caso)}
+            className="case-card__action case-card__action--summary"
+            style={{ padding: '6px 10px' }}
+          >
+            {isLoadingDossier ? 'Montando...' : 'Atualizar dossiê'}
+          </button>
+        </div>
+
+        {dossier ? (
+          <>
+            <p style={{ margin: '0 0 8px 0' }}>
+              <strong>{dossier.caseNumber}</strong> — {dossier.readinessScore}% / {dossier.readinessStatus}
+            </p>
+
+            <div className="case-card__meta" style={{ marginBottom: '8px' }}>
+              <span className="case-card__meta-pill">Contatos: {dossier.contactLogCount}</span>
+              <span className="case-card__meta-pill">Pessoas: {dossier.witnessCount}</span>
+              <span className="case-card__meta-pill">Checklist: {dossier.checklistValidated}/{dossier.checklistTotal}</span>
+              <span className="case-card__meta-pill">Anexos: {dossier.attachmentCount}</span>
+            </div>
+
+            <p style={{ margin: '0 0 6px 0', opacity: 0.86 }}>
+              <strong>Cliente:</strong> {dossier.clientName} • {dossier.clientWhatsapp}
+            </p>
+
+            {dossier.lastContactSummary ? (
+              <p style={{ margin: '0 0 8px 0', opacity: 0.86 }}>
+                <strong>Último contato:</strong> {dossier.lastContactSummary}
+              </p>
+            ) : null}
+
+            {dossier.keyPeople.length > 0 ? (
+              <p style={{ margin: '0 0 8px 0', opacity: 0.86 }}>
+                <strong>Pessoas-chave:</strong> {dossier.keyPeople.join('; ')}
+              </p>
+            ) : null}
+
+            {dossier.evidenceSummary.length > 0 ? (
+              <p style={{ margin: '0 0 8px 0', opacity: 0.86 }}>
+                <strong>Provas/anexos:</strong> {dossier.evidenceSummary.join('; ')}
+              </p>
+            ) : null}
+
+            {dossier.openChecklistItems.length > 0 ? (
+              <p style={{ margin: '0 0 8px 0', opacity: 0.86 }}>
+                <strong>Pendências abertas:</strong> {dossier.openChecklistItems.join('; ')}
+              </p>
+            ) : null}
+
+            <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '8px' }}>
+              <strong style={{ display: 'block', marginBottom: '4px' }}>Próximos passos operacionais</strong>
+              <ul style={{ margin: '0 0 0 18px', opacity: 0.86 }}>
+                {dossier.nextSteps.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+
+            <p style={{ margin: '8px 0 0 0', fontSize: '0.86rem', opacity: 0.78 }}>
+              Dossiê interno é apoio operacional supervisionado, não peça processual e não protocolo automático.
+            </p>
+          </>
+        ) : (
+          <p style={{ margin: 0, opacity: 0.82 }}>
+            Clique em Atualizar dossiê para consolidar cliente, contatos, provas, pendências, pessoas e prontidão.
           </p>
         )}
       </div>

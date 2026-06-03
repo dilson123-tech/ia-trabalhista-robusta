@@ -4,7 +4,7 @@ import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { ApiError, cleanupDemoCases, createPlanChangeCheckout, createCase, createCaseContactLog, createCasePartyState, addCaseParty, getCasePartyState, getCases, listCaseAttachments, listCaseContactLogs, listCaseEvidenceChecklist, listCasePartyStates, getCaseAnalysis, getLegalModules, getExecutiveSummary, getExecutiveReport, getExecutivePdf, getUsageSummaryV2, login, updateCaseStatus, type CaseAttachmentItem, type CaseContactLogItem, type CaseEvidenceChecklistItem, type CaseItem, type CasePartyStateDetailItem, type CaseAnalysisResponse, type ExecutiveSummaryResponse, type ExecutiveReportResponse, type LegalModule, type UsageSummaryV2Response } from './services/api'
 import { ExpansionWorkspace } from './components/expansion/ExpansionWorkspace'
 import { CaseFiltersBar } from './components/CaseFiltersBar'
-import { CaseCard, type CaseReadinessSnapshot } from './components/CaseCard'
+import { CaseCard, type CaseInternalDossierSnapshot, type CaseReadinessSnapshot } from './components/CaseCard'
 import { DashboardTopPanel } from './components/DashboardTopPanel'
 import { LoginPanel } from './components/LoginPanel'
 import { CaseFocusPanel } from './components/CaseFocusPanel'
@@ -94,6 +94,8 @@ function App() {
   const [witnessGridLoadingId, setWitnessGridLoadingId] = useState<number | null>(null)
   const [readinessByCaseId, setReadinessByCaseId] = useState<Record<number, CaseReadinessSnapshot | null>>({})
   const [readinessLoadingId, setReadinessLoadingId] = useState<number | null>(null)
+  const [caseDossiersByCaseId, setCaseDossiersByCaseId] = useState<Record<number, CaseInternalDossierSnapshot | null>>({})
+  const [dossierLoadingId, setDossierLoadingId] = useState<number | null>(null)
   const [cleanupDemoLoading, setCleanupDemoLoading] = useState(false)
   const [usageSummary, setUsageSummary] = useState<UsageSummaryV2Response | null>(null)
   const [usageLoading, setUsageLoading] = useState(false)
@@ -752,6 +754,67 @@ function App() {
   }
 
 
+
+  function buildCaseInternalDossierSnapshot(
+    caso: CaseItem,
+    contactLogs: CaseContactLogItem[],
+    partyState: CasePartyStateDetailItem | null,
+    attachments: CaseAttachmentItem[],
+    checklistItems: CaseEvidenceChecklistItem[],
+    readiness: CaseReadinessSnapshot,
+  ): CaseInternalDossierSnapshot {
+    const witnessParties = (partyState?.parties ?? []).filter((party) => {
+      const role = party.role.toLowerCase()
+      return (
+        role.includes('testemunha') ||
+        role.includes('depoente') ||
+        role.includes('preposto') ||
+        role.includes('representante') ||
+        role.includes('perito') ||
+        role.includes('fiscal') ||
+        role.includes('cuidador') ||
+        role.includes('vizinho')
+      )
+    })
+
+    const openChecklistItems = checklistItems.filter((item) =>
+      ['pending', 'requested', 'needs_review'].includes(item.status),
+    )
+
+    const nextSteps = [
+      ...readiness.missingItems,
+      ...(openChecklistItems.length > 0
+        ? openChecklistItems.slice(0, 4).map((item) => `Resolver pendência: ${item.title}`)
+        : []),
+    ]
+
+    if (nextSteps.length === 0) {
+      nextSteps.push('Revisar o caso com o advogado antes de qualquer protocolo.')
+    }
+
+    return {
+      caseId: caso.id,
+      caseTitle: caso.title,
+      caseNumber: caso.case_number,
+      clientName: caso.client_name || 'Cliente não informado',
+      clientWhatsapp: caso.client_whatsapp || 'WhatsApp não informado',
+      readinessScore: readiness.score,
+      readinessStatus: readiness.statusLabel,
+      contactLogCount: contactLogs.length,
+      witnessCount: witnessParties.length,
+      attachmentCount: attachments.length,
+      checklistTotal: checklistItems.length,
+      checklistOpen: readiness.checklistOpen,
+      checklistValidated: readiness.checklistValidated,
+      lastContactSummary: contactLogs[0]?.summary || null,
+      keyPeople: witnessParties.slice(0, 5).map((party) => `${party.name} — ${party.role}`),
+      evidenceSummary: attachments.slice(0, 5).map((attachment) => `${attachment.original_filename} — ${attachment.category}`),
+      openChecklistItems: openChecklistItems.slice(0, 5).map((item) => `${item.title} — ${item.status}`),
+      nextSteps: nextSteps.slice(0, 6),
+      loadedAt: new Date().toISOString(),
+    }
+  }
+
   async function handleLoadCaseReadiness(caso: CaseItem) {
     setReadinessLoadingId(caso.id)
     setCaseActionError('')
@@ -792,6 +855,65 @@ function App() {
       }
     } finally {
       setReadinessLoadingId(null)
+    }
+  }
+
+
+  async function handleLoadCaseDossier(caso: CaseItem) {
+    setDossierLoadingId(caso.id)
+    setCaseActionError('')
+    setCaseActionSuccess('')
+    setSelectedCaseId(caso.id)
+
+    try {
+      const [contactLogs, states, attachments, checklistItems] = await Promise.all([
+        listCaseContactLogs(token, caso.id),
+        listCasePartyStates(token, caso.id),
+        listCaseAttachments(token, caso.id),
+        listCaseEvidenceChecklist(token, caso.id),
+      ])
+
+      const partyState =
+        states.length > 0 ? await getCasePartyState(token, states[0].id) : null
+
+      const readiness = buildCaseReadinessSnapshot(caso, contactLogs, partyState, attachments, checklistItems)
+      const dossier = buildCaseInternalDossierSnapshot(
+        caso,
+        contactLogs,
+        partyState,
+        attachments,
+        checklistItems,
+        readiness,
+      )
+
+      setContactLogsByCaseId((prev) => ({
+        ...prev,
+        [caso.id]: contactLogs,
+      }))
+
+      setPartyStatesByCaseId((prev) => ({
+        ...prev,
+        [caso.id]: partyState,
+      }))
+
+      setReadinessByCaseId((prev) => ({
+        ...prev,
+        [caso.id]: readiness,
+      }))
+
+      setCaseDossiersByCaseId((prev) => ({
+        ...prev,
+        [caso.id]: dossier,
+      }))
+
+      setCaseActionSuccess('Dossiê interno do caso atualizado.')
+    } catch (err) {
+      const fallback = handleApiFailure(err, 'Não foi possível montar o dossiê interno do caso.')
+      if (fallback) {
+        setCaseActionError(fallback)
+      }
+    } finally {
+      setDossierLoadingId(null)
     }
   }
 
@@ -1747,6 +1869,7 @@ function App() {
                   const isLoadingContactLogs = contactLogsLoadingId === caso.id
 
                     const isLoadingReadiness = readinessLoadingId === caso.id
+                    const isLoadingDossier = dossierLoadingId === caso.id
                     const isLoadingWitnessGrid = witnessGridLoadingId === caso.id
                   return (
                     <CaseCard
@@ -1761,10 +1884,12 @@ function App() {
                       isLoadingPdf={isLoadingPdf}
                       isLoadingContactLogs={isLoadingContactLogs}
                       isLoadingReadiness={isLoadingReadiness}
+                        isLoadingDossier={isLoadingDossier}
                       isLoadingWitnessGrid={isLoadingWitnessGrid}
                         contactLogs={contactLogsByCaseId[caso.id] ?? []}
                         partyState={partyStatesByCaseId[caso.id] ?? null}
                           readiness={readinessByCaseId[caso.id] ?? null}
+                          dossier={caseDossiersByCaseId[caso.id] ?? null}
                       analysisLoading={analysisLoading}
                       executiveSummaryLoading={executiveSummaryLoading}
                       executiveReportLoading={executiveReportLoading}
@@ -1787,6 +1912,9 @@ function App() {
                         }}
                           onLoadReadiness={(targetCase) => {
                             void handleLoadCaseReadiness(targetCase)
+                          }}
+                          onLoadDossier={(targetCase) => {
+                            void handleLoadCaseDossier(targetCase)
                           }}
                         onOpenWhatsAppTemplate={(caseId, whatsapp, templateKey) => {
                         void handleOpenWhatsAppTemplate(caseId, whatsapp, templateKey)
