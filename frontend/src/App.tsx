@@ -681,23 +681,26 @@ function App() {
     }
   }
 
-  async function handleAddWitnessToCase(caso: CaseItem) {
+  async function handleAddWitnessToCase(
+    caso: CaseItem,
+    witnessInput: { name: string; role: string; whatKnows: string },
+  ) {
     setCaseActionError('')
     setCaseActionSuccess('')
 
-    const name = window.prompt('Nome da testemunha/depoente:')
-    if (!name?.trim()) {
+    const name = witnessInput.name.trim()
+    if (!name) {
       setCaseActionError('Informe o nome da testemunha/depoente antes de salvar.')
       return
     }
 
-    const role = window.prompt('Papel na audiência/prova oral:', 'testemunha')?.trim()
+    const role = witnessInput.role.trim()
     if (!role) {
       setCaseActionError('Informe o papel da pessoa antes de salvar.')
       return
     }
 
-    const whatKnows = window.prompt('O que essa pessoa sabe ou confirma? Campo obrigatório:', '')?.trim()
+    const whatKnows = witnessInput.whatKnows.trim()
     if (!whatKnows) {
       setCaseActionError('Informe o que a testemunha/depoente sabe ou confirma antes de salvar.')
       return
@@ -715,7 +718,7 @@ function App() {
 
       const partyPayload = {
         key: `witness_${Date.now()}`,
-        name: name.trim(),
+        name,
         role,
         party_type: 'person',
         status: 'active',
@@ -758,7 +761,6 @@ function App() {
       setWitnessGridLoadingId(null)
     }
   }
-
 
 
   function buildCaseInternalDossierSnapshot(
@@ -2159,8 +2161,8 @@ function App() {
                       onLoadWitnessGrid={(caseId) => {
                           void handleLoadWitnessGrid(caseId)
                         }}
-                        onAddWitness={(targetCase) => {
-                          void handleAddWitnessToCase(targetCase)
+                        onAddWitness={(targetCase, witnessInput) => {
+                          void handleAddWitnessToCase(targetCase, witnessInput)
                         }}
                           onClearWitnesses={(targetCase) => {
                             void handleClearWitnessesFromCase(targetCase)

@@ -1,6 +1,13 @@
+import { useState } from 'react'
 import type { CaseContactLogItem, CaseItem, CasePartyItem, CasePartyStateDetailItem } from '../services/api'
 
 type WhatsAppTemplateKey = 'documents' | 'evidence' | 'hearing' | 'status_update' | 'confirm_data'
+
+type WitnessFormInput = {
+  name: string
+  role: string
+  whatKnows: string
+}
 
 export type CaseReadinessSnapshot = {
   score: number
@@ -66,8 +73,8 @@ type CaseCardProps = {
   onOpenExecutivePdf: (caseId: number) => void
   onLoadCaseContactLogs: (caseId: number) => void
   onLoadWitnessGrid: (caseId: number) => void
-  onAddWitness: (caso: CaseItem) => void
-    onClearWitnesses: (caso: CaseItem) => void
+  onAddWitness: (caso: CaseItem, witnessInput: WitnessFormInput) => void
+  onClearWitnesses: (caso: CaseItem) => void
   onLoadReadiness: (caso: CaseItem) => void
   onLoadDossier: (caso: CaseItem) => void
   onOpenWhatsAppTemplate: (caseId: number, whatsapp: string, templateKey: WhatsAppTemplateKey) => void
@@ -113,6 +120,39 @@ export function CaseCard({
 }: CaseCardProps) {
   const isSelected = selectedCaseId === caso.id
   const isArchived = caso.status === 'archived'
+  const [isWitnessFormOpen, setIsWitnessFormOpen] = useState(false)
+  const [witnessName, setWitnessName] = useState('')
+  const [witnessRole, setWitnessRole] = useState('testemunha')
+  const [witnessWhatKnows, setWitnessWhatKnows] = useState('')
+  const [witnessFormError, setWitnessFormError] = useState('')
+
+  function resetWitnessForm() {
+    setWitnessName('')
+    setWitnessRole('testemunha')
+    setWitnessWhatKnows('')
+    setWitnessFormError('')
+  }
+
+  function handleOpenWitnessForm() {
+    setIsWitnessFormOpen(true)
+    setWitnessFormError('')
+  }
+
+  async function handleSubmitWitnessForm() {
+    const name = witnessName.trim()
+    const role = witnessRole.trim()
+    const whatKnows = witnessWhatKnows.trim()
+
+    if (!name || !role || !whatKnows) {
+      setWitnessFormError('Preencha nome, papel e o que a pessoa sabe/confirma antes de salvar.')
+      return
+    }
+
+    await onAddWitness(caso, { name, role, whatKnows })
+    resetWitnessForm()
+    setIsWitnessFormOpen(false)
+  }
+
 
   function formatContactLogDate(value: string) {
     const date = new Date(value)
@@ -548,7 +588,7 @@ export function CaseCard({
 
             <button
               type="button"
-              onClick={() => onAddWitness(caso)}
+              onClick={handleOpenWitnessForm}
               className="case-card__action case-card__action--analysis"
               style={{ padding: '6px 10px' }}
             >
@@ -567,6 +607,78 @@ export function CaseCard({
               ) : null}
           </div>
         </div>
+
+          {isWitnessFormOpen ? (
+            <div
+              style={{
+                border: '1px solid rgba(255,255,255,0.12)',
+                borderRadius: '10px',
+                display: 'grid',
+                gap: '8px',
+                marginBottom: '10px',
+                padding: '10px',
+              }}
+            >
+              <strong>Adicionar testemunha/depoente</strong>
+
+              <label style={{ display: 'grid', gap: '4px' }}>
+                <span>Nome</span>
+                <input
+                  value={witnessName}
+                  onChange={(event) => setWitnessName(event.target.value)}
+                  placeholder="Ex.: Edson Estevão"
+                />
+              </label>
+
+              <label style={{ display: 'grid', gap: '4px' }}>
+                <span>Papel</span>
+                <input
+                  value={witnessRole}
+                  onChange={(event) => setWitnessRole(event.target.value)}
+                  placeholder="Ex.: testemunha / condutor"
+                />
+              </label>
+
+              <label style={{ display: 'grid', gap: '4px' }}>
+                <span>O que sabe ou confirma</span>
+                <textarea
+                  value={witnessWhatKnows}
+                  onChange={(event) => setWitnessWhatKnows(event.target.value)}
+                  placeholder="Descreva o que essa pessoa pode esclarecer no caso."
+                  rows={4}
+                />
+              </label>
+
+              {witnessFormError ? (
+                <p style={{ margin: 0, color: '#fca5a5' }}>{witnessFormError}</p>
+              ) : null}
+
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void handleSubmitWitnessForm()
+                  }}
+                  className="case-card__action case-card__action--analysis"
+                  style={{ padding: '6px 10px' }}
+                >
+                  Salvar testemunha
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    resetWitnessForm()
+                    setIsWitnessFormOpen(false)
+                  }}
+                  className="case-card__action case-card__action--summary"
+                  style={{ padding: '6px 10px' }}
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          ) : null}
 
         {partyState ? (
           witnessParties.length > 0 ? (
