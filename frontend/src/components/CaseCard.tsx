@@ -122,13 +122,23 @@ export function CaseCard({
   const isArchived = caso.status === 'archived'
   const [isWitnessFormOpen, setIsWitnessFormOpen] = useState(false)
   const [witnessName, setWitnessName] = useState('')
-  const [witnessRole, setWitnessRole] = useState('testemunha')
+  const [witnessRole, setWitnessRole] = useState('')
   const [witnessWhatKnows, setWitnessWhatKnows] = useState('')
   const [witnessFormError, setWitnessFormError] = useState('')
+  const [witnessFormSubmitting, setWitnessFormSubmitting] = useState(false)
+
+  function normalizeWitnessDuplicateKey(value: string) {
+    return value
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/\s+/g, ' ')
+      .trim()
+  }
 
   function resetWitnessForm() {
     setWitnessName('')
-    setWitnessRole('testemunha')
+    setWitnessRole('')
     setWitnessWhatKnows('')
     setWitnessFormError('')
   }
@@ -139,6 +149,8 @@ export function CaseCard({
   }
 
   async function handleSubmitWitnessForm() {
+    if (witnessFormSubmitting || isLoadingWitnessGrid) return
+
     const name = witnessName.trim()
     const role = witnessRole.trim()
     const whatKnows = witnessWhatKnows.trim()
@@ -148,9 +160,30 @@ export function CaseCard({
       return
     }
 
-    await onAddWitness(caso, { name, role, whatKnows })
-    resetWitnessForm()
-    setIsWitnessFormOpen(false)
+    const normalizedName = normalizeWitnessDuplicateKey(name)
+    const normalizedRole = normalizeWitnessDuplicateKey(role)
+    const duplicateWitness = witnessParties.some((party) => {
+      return (
+        normalizeWitnessDuplicateKey(party.name) === normalizedName &&
+        normalizeWitnessDuplicateKey(party.role) === normalizedRole
+      )
+    })
+
+    if (duplicateWitness) {
+      setWitnessFormError('Essa testemunha/depoente já está cadastrada com o mesmo papel neste caso.')
+      return
+    }
+
+    setWitnessFormSubmitting(true)
+    setWitnessFormError('')
+
+    try {
+      await onAddWitness(caso, { name, role, whatKnows })
+      resetWitnessForm()
+      setIsWitnessFormOpen(false)
+    } finally {
+      setWitnessFormSubmitting(false)
+    }
   }
 
 
@@ -656,13 +689,14 @@ export function CaseCard({
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                 <button
                   type="button"
+                  disabled={witnessFormSubmitting || isLoadingWitnessGrid}
                   onClick={() => {
                     void handleSubmitWitnessForm()
                   }}
                   className="case-card__action case-card__action--analysis"
                   style={{ padding: '6px 10px' }}
                 >
-                  Salvar testemunha
+                  {witnessFormSubmitting || isLoadingWitnessGrid ? 'Salvando...' : 'Salvar testemunha'}
                 </button>
 
                 <button

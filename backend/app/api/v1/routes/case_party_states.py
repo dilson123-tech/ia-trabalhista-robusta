@@ -415,6 +415,35 @@ def add_case_party(
 
     metadata = dict(payload.metadata or {})
 
+    if metadata.get("grid_source") == "case_witness_grid_v1":
+        def _normalize_duplicate_key(value: str | None) -> str:
+            return " ".join((value or "").casefold().split())
+
+        incoming_name = _normalize_duplicate_key(payload.name)
+        incoming_role = _normalize_duplicate_key(payload.role)
+
+        existing_witness_parties = (
+            db.query(CasePartyModel)
+            .filter(
+                CasePartyModel.tenant_id == current_user["tenant_id"],
+                CasePartyModel.party_state_id == state.id,
+            )
+            .all()
+        )
+
+        for existing_witness in existing_witness_parties:
+            existing_metadata = existing_witness.party_metadata or {}
+            if existing_metadata.get("grid_source") != "case_witness_grid_v1":
+                continue
+
+            same_name = _normalize_duplicate_key(existing_witness.name) == incoming_name
+            same_role = _normalize_duplicate_key(existing_witness.role) == incoming_role
+            if same_name and same_role:
+                raise HTTPException(
+                    status_code=409,
+                    detail="Witness/deponent already exists in this case party state",
+                )
+
     db.add(
         CasePartyModel(
             tenant_id=current_user["tenant_id"],
