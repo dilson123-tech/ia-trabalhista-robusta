@@ -833,7 +833,6 @@ export function CaseCard({
         )}
       </div>
 
-      {(contactLogs.length > 0 || caso.client_whatsapp) ? (
         <div
           style={{
             marginTop: '12px',
@@ -851,7 +850,7 @@ export function CaseCard({
               marginBottom: '8px',
             }}
           >
-            <strong>Histórico de contatos</strong>
+            <strong>Histórico de contatos / WhatsApp</strong>
 
             <button
               type="button"
@@ -860,6 +859,38 @@ export function CaseCard({
               style={{ padding: '6px 10px' }}
             >
               {isLoadingContactLogs ? 'Carregando...' : 'Atualizar'}
+            </button>
+          </div>
+
+          <div
+            style={{
+              borderTop: '1px solid rgba(255,255,255,0.08)',
+              display: 'grid',
+              gap: '8px',
+              marginBottom: '10px',
+              paddingTop: '8px',
+            }}
+          >
+            <p style={{ margin: 0, opacity: 0.9 }}>
+              <strong>WhatsApp principal:</strong>{' '}
+              {caso.client_whatsapp ? caso.client_whatsapp : 'não informado'}
+            </p>
+
+            <p style={{ margin: 0, opacity: 0.78 }}>
+              {caso.client_whatsapp
+                ? caso.client_whatsapp_consent
+                  ? 'Cliente autorizou contato por WhatsApp.'
+                  : 'WhatsApp informado, mas autorização de contato ainda não confirmada.'
+                : 'Informe o WhatsApp do cliente/contato principal no cadastro do caso para liberar o fluxo completo de mensagens.'}
+            </p>
+
+            <button
+              type="button"
+              onClick={() => onRegisterWhatsAppContact(caso.id)}
+              className="case-card__action case-card__action--summary"
+              style={{ padding: '6px 10px', width: 'fit-content' }}
+            >
+              Registrar contato
             </button>
           </div>
 
@@ -889,7 +920,6 @@ export function CaseCard({
             </p>
           )}
         </div>
-      ) : null}
     </article>
   )
 }
