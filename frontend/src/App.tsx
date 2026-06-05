@@ -1,8 +1,8 @@
 import './App.css'
 import { useEffect, useState, type KeyboardEvent } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
-import { ApiError, cleanupDemoCases, createPlanChangeCheckout, createCase, createCaseContactLog, createCasePartyState, addCaseParty,
-  deleteCaseParty, getCasePartyState, getCases, listCaseAttachments, listCaseContactLogs, listCaseEvidenceChecklist, listCasePartyStates, getCaseAnalysis, getLegalModules, getExecutiveSummary, getExecutiveReport, getExecutivePdf, getUsageSummaryV2, login, updateCaseStatus, type CaseAttachmentItem, type CaseContactLogItem, type CaseEvidenceChecklistItem, type CaseItem, type CasePartyStateDetailItem, type CaseAnalysisResponse, type ExecutiveSummaryResponse, type ExecutiveReportResponse, type LegalModule, type UsageSummaryV2Response } from './services/api'
+import { ApiError, cleanupDemoCases, createPlanChangeCheckout, createCase, createCaseContactLog, createCasePartyState, addCaseParty, updateCasePartyData,
+  deleteCaseParty, getCasePartyState, getCases, listCaseAttachments, listCaseContactLogs, listCaseEvidenceChecklist, listCasePartyStates, getCaseAnalysis, getLegalModules, getExecutiveSummary, getExecutiveReport, getExecutivePdf, getUsageSummaryV2, login, updateCaseStatus, type CaseAttachmentItem, type CaseContactLogItem, type CaseEvidenceChecklistItem, type CaseItem, type CasePartyItem, type CasePartyStateDetailItem, type CaseAnalysisResponse, type ExecutiveSummaryResponse, type ExecutiveReportResponse, type LegalModule, type UsageSummaryV2Response } from './services/api'
 import { ExpansionWorkspace } from './components/expansion/ExpansionWorkspace'
 import { CaseCard, type CaseInternalDossierSnapshot, type CaseReadinessSnapshot } from './components/CaseCard'
 import { DashboardTopPanel } from './components/DashboardTopPanel'
@@ -820,6 +820,77 @@ function App() {
       openChecklistItems: openChecklistItems.slice(0, 5).map((item) => `${item.title} — ${item.status}`),
       nextSteps: nextSteps.slice(0, 6),
       loadedAt: new Date().toISOString(),
+    }
+  }
+
+  async function handleUpdateWitnessInCase(
+    caso: CaseItem,
+    party: CasePartyItem,
+    witnessInput: { name: string; role: string; whatKnows: string },
+  ) {
+    setCaseActionError('')
+    setCaseActionSuccess('')
+
+    const name = witnessInput.name.trim()
+    if (!name) {
+      setCaseActionError('Informe o nome da testemunha/depoente antes de salvar.')
+      return
+    }
+
+    const role = witnessInput.role.trim()
+    if (!role) {
+      setCaseActionError('Informe o papel da pessoa antes de salvar.')
+      return
+    }
+
+    const whatKnows = witnessInput.whatKnows.trim()
+    if (!whatKnows) {
+      setCaseActionError('Informe o que a testemunha/depoente sabe ou confirma antes de salvar.')
+      return
+    }
+
+    const stateId = partyStatesByCaseId[caso.id]?.id ?? party.party_state_id
+    if (!stateId || !party.party_key) {
+      setCaseActionError('Não foi possível localizar a grade da testemunha/depoente para edição.')
+      return
+    }
+
+    setWitnessGridLoadingId(caso.id)
+    setCaseActionError('')
+    setCaseActionSuccess('')
+    setSelectedCaseId(caso.id)
+
+    try {
+      const nextState = await updateCasePartyData(token, stateId, {
+        party_key: party.party_key,
+        name,
+        role,
+        party_type: party.party_type || 'person',
+        metadata: {
+          grid_source: 'case_witness_grid_v1',
+          preparation_status: party.party_metadata?.preparation_status ?? 'pendente',
+          what_knows: whatKnows,
+          confirms_facts: '',
+          risk_level: party.party_metadata?.risk_level ?? 'a revisar',
+          sensitive_points: party.party_metadata?.sensitive_points ?? 'A revisar pelo advogado antes da audiência.',
+          recommended_questions: party.party_metadata?.recommended_questions ?? 'A gerar/refinar na Audiência Estratégica.',
+          dangerous_questions: party.party_metadata?.dangerous_questions ?? 'Evitar perguntas que induzam resposta ou sugiram versão pronta.',
+        },
+        description: 'Testemunha/depoente atualizada pela grade do caso.',
+      })
+
+      setPartyStatesByCaseId((prev) => ({
+        ...prev,
+        [caso.id]: nextState,
+      }))
+      setCaseActionSuccess('Testemunha/depoente atualizada na grade do caso.')
+    } catch (err) {
+      const fallback = handleApiFailure(err, 'Não foi possível atualizar testemunha/depoente no caso.')
+      if (fallback) {
+        setCaseActionError(fallback)
+      }
+    } finally {
+      setWitnessGridLoadingId(null)
     }
   }
 
@@ -2163,6 +2234,9 @@ function App() {
                         }}
                         onAddWitness={(targetCase, witnessInput) => {
                           void handleAddWitnessToCase(targetCase, witnessInput)
+                        }}
+                        onUpdateWitness={(targetCase, party, witnessInput) => {
+                          void handleUpdateWitnessInCase(targetCase, party, witnessInput)
                         }}
                           onClearWitnesses={(targetCase) => {
                             void handleClearWitnessesFromCase(targetCase)

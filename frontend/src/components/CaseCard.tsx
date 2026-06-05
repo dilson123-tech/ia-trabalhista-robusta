@@ -74,6 +74,7 @@ type CaseCardProps = {
   onLoadCaseContactLogs: (caseId: number) => void
   onLoadWitnessGrid: (caseId: number) => void
   onAddWitness: (caso: CaseItem, witnessInput: WitnessFormInput) => void
+  onUpdateWitness: (caso: CaseItem, party: CasePartyItem, witnessInput: WitnessFormInput) => void
   onClearWitnesses: (caso: CaseItem) => void
   onLoadReadiness: (caso: CaseItem) => void
   onLoadDossier: (caso: CaseItem) => void
@@ -111,6 +112,7 @@ export function CaseCard({
   onLoadCaseContactLogs,
   onLoadWitnessGrid,
   onAddWitness,
+  onUpdateWitness,
     onClearWitnesses,
   onLoadReadiness,
   onLoadDossier,
@@ -124,6 +126,7 @@ export function CaseCard({
   const [witnessName, setWitnessName] = useState('')
   const [witnessRole, setWitnessRole] = useState('')
   const [witnessWhatKnows, setWitnessWhatKnows] = useState('')
+  const [editingWitnessPartyKey, setEditingWitnessPartyKey] = useState<string | null>(null)
   const [witnessFormError, setWitnessFormError] = useState('')
   const [witnessFormSubmitting, setWitnessFormSubmitting] = useState(false)
 
@@ -140,12 +143,25 @@ export function CaseCard({
     setWitnessName('')
     setWitnessRole('')
     setWitnessWhatKnows('')
+    setEditingWitnessPartyKey(null)
     setWitnessFormError('')
   }
 
   function handleOpenWitnessForm() {
+    resetWitnessForm()
     setIsWitnessFormOpen(true)
     setWitnessFormError('')
+  }
+
+  function handleOpenWitnessEditForm(party: CasePartyItem) {
+    setEditingWitnessPartyKey(party.party_key)
+    setWitnessName(party.name)
+    setWitnessRole(party.role)
+    setWitnessWhatKnows(
+      getPartyMetadataText(party, 'what_knows') || getPartyMetadataText(party, 'confirms_facts'),
+    )
+    setWitnessFormError('')
+    setIsWitnessFormOpen(true)
   }
 
   async function handleSubmitWitnessForm() {
@@ -163,6 +179,10 @@ export function CaseCard({
     const normalizedName = normalizeWitnessDuplicateKey(name)
     const normalizedRole = normalizeWitnessDuplicateKey(role)
     const duplicateWitness = witnessParties.some((party) => {
+      if (editingWitnessPartyKey && party.party_key === editingWitnessPartyKey) {
+        return false
+      }
+
       return (
         normalizeWitnessDuplicateKey(party.name) === normalizedName &&
         normalizeWitnessDuplicateKey(party.role) === normalizedRole
@@ -178,7 +198,21 @@ export function CaseCard({
     setWitnessFormError('')
 
     try {
-      await onAddWitness(caso, { name, role, whatKnows })
+      const editingWitness = editingWitnessPartyKey
+        ? witnessParties.find((party) => party.party_key === editingWitnessPartyKey)
+        : null
+
+      if (editingWitnessPartyKey && !editingWitness) {
+        setWitnessFormError('Não foi possível localizar a testemunha/depoente para edição.')
+        return
+      }
+
+      if (editingWitness) {
+        await onUpdateWitness(caso, editingWitness, { name, role, whatKnows })
+      } else {
+        await onAddWitness(caso, { name, role, whatKnows })
+      }
+
       resetWitnessForm()
       setIsWitnessFormOpen(false)
     } finally {
@@ -696,7 +730,7 @@ export function CaseCard({
                   className="case-card__action case-card__action--analysis"
                   style={{ padding: '6px 10px' }}
                 >
-                  {witnessFormSubmitting || isLoadingWitnessGrid ? 'Salvando...' : 'Salvar testemunha'}
+                  {witnessFormSubmitting || isLoadingWitnessGrid ? 'Salvando...' : editingWitnessPartyKey ? 'Salvar edição' : 'Salvar testemunha'}
                 </button>
 
                 <button
@@ -736,9 +770,29 @@ export function CaseCard({
                       paddingTop: '8px',
                     }}
                   >
-                    <p style={{ margin: '0 0 4px 0' }}>
-                      <strong>{party.name}</strong> — {party.role} / {preparationStatus}
-                    </p>
+                    <div
+                      style={{
+                        alignItems: 'center',
+                        display: 'flex',
+                        gap: '8px',
+                        justifyContent: 'space-between',
+                        marginBottom: '4px',
+                      }}
+                    >
+                      <p style={{ margin: 0 }}>
+                        <strong>{party.name}</strong> — {party.role} / {preparationStatus}
+                      </p>
+
+                      <button
+                        type="button"
+                        disabled={witnessFormSubmitting || isLoadingWitnessGrid}
+                        onClick={() => handleOpenWitnessEditForm(party)}
+                        className="case-card__action case-card__action--summary"
+                        style={{ padding: '4px 8px' }}
+                      >
+                        Editar
+                      </button>
+                    </div>
 
                     {whatKnows ? (
                       <p style={{ margin: '0 0 4px 0', opacity: 0.88 }}>
