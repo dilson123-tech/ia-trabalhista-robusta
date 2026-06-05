@@ -36,6 +36,14 @@ class CaseStatusUpdate(BaseModel):
     status: Literal["draft", "active", "review", "archived"]
 
 
+class CaseContactUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    client_name: str | None = None
+    client_whatsapp: str | None = None
+    client_whatsapp_consent: bool = False
+
+
 class DemoCleanupOut(BaseModel):
     deleted_cases: int
     deleted_analyses: int

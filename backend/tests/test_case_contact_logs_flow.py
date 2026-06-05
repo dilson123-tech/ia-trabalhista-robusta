@@ -103,6 +103,19 @@ def test_case_contact_logs_create_and_list(monkeypatch):
     assert items[0]["id"] == created["id"]
     assert items[0]["summary"] == "Solicitados documentos pelo WhatsApp"
 
+    r_delete = client.delete(
+        f"/api/v1/cases/{case_id}/contact-logs/{created['id']}",
+        headers=headers,
+    )
+    assert r_delete.status_code == 204
+
+    r_list_after_delete = client.get(
+        f"/api/v1/cases/{case_id}/contact-logs",
+        headers=headers,
+    )
+    assert r_list_after_delete.status_code == 200
+    assert r_list_after_delete.json() == []
+
 
 def test_case_contact_logs_reject_missing_case(monkeypatch):
     headers = _auth_headers(monkeypatch, prefix="missing_case")
@@ -124,5 +137,11 @@ def test_case_contact_logs_reject_missing_case(monkeypatch):
         headers=headers,
     )
     assert r_list.status_code == 404
+
+    r_delete = client.delete(
+        f"/api/v1/cases/{missing_id}/contact-logs/1",
+        headers=headers,
+    )
+    assert r_delete.status_code == 404
 
 

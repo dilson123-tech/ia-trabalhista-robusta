@@ -9,6 +9,12 @@ type WitnessFormInput = {
   whatKnows: string
 }
 
+type CaseContactUpdateInput = {
+  client_name?: string
+  client_whatsapp?: string
+  client_whatsapp_consent?: boolean
+}
+
 export type CaseReadinessSnapshot = {
   score: number
   statusLabel: string
@@ -80,6 +86,8 @@ type CaseCardProps = {
   onLoadDossier: (caso: CaseItem) => void
   onOpenWhatsAppTemplate: (caseId: number, whatsapp: string, templateKey: WhatsAppTemplateKey) => void
   onRegisterWhatsAppContact: (caseId: number) => void
+  onDeleteCaseContactLog: (caseId: number, logId: number) => void
+  onUpdateCaseContact: (caso: CaseItem, payload: CaseContactUpdateInput) => void
   onSelectCase: (caseId: number) => void
 }
 
@@ -118,6 +126,8 @@ export function CaseCard({
   onLoadDossier,
   onOpenWhatsAppTemplate,
   onRegisterWhatsAppContact,
+  onDeleteCaseContactLog,
+  onUpdateCaseContact,
   onSelectCase,
 }: CaseCardProps) {
   const isSelected = selectedCaseId === caso.id
@@ -128,6 +138,11 @@ export function CaseCard({
   const [witnessWhatKnows, setWitnessWhatKnows] = useState('')
   const [editingWitnessPartyKey, setEditingWitnessPartyKey] = useState<string | null>(null)
   const [witnessFormError, setWitnessFormError] = useState('')
+  const [isContactFormOpen, setIsContactFormOpen] = useState(false)
+  const [contactName, setContactName] = useState(caso.client_name || '')
+  const [contactWhatsapp, setContactWhatsapp] = useState(caso.client_whatsapp || '')
+  const [contactConsent, setContactConsent] = useState(Boolean(caso.client_whatsapp_consent))
+  const [contactFormError, setContactFormError] = useState('')
   const [witnessFormSubmitting, setWitnessFormSubmitting] = useState(false)
 
   function normalizeWitnessDuplicateKey(value: string) {
@@ -884,14 +899,163 @@ export function CaseCard({
                 : 'Informe o WhatsApp do cliente/contato principal no cadastro do caso para liberar o fluxo completo de mensagens.'}
             </p>
 
-            <button
-              type="button"
-              onClick={() => onRegisterWhatsAppContact(caso.id)}
-              className="case-card__action case-card__action--summary"
-              style={{ padding: '6px 10px', width: 'fit-content' }}
-            >
-              Registrar contato
-            </button>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setContactName(caso.client_name || '')
+                  setContactWhatsapp(caso.client_whatsapp || '')
+                  setContactConsent(Boolean(caso.client_whatsapp_consent))
+                  setContactFormError('')
+                  setIsContactFormOpen((current) => !current)
+                }}
+                className="case-card__action case-card__action--summary"
+                style={{ padding: '6px 10px', width: 'fit-content' }}
+              >
+                {isContactFormOpen ? 'Fechar edição' : 'Editar WhatsApp'}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => onRegisterWhatsAppContact(caso.id)}
+                className="case-card__action case-card__action--summary"
+                style={{ padding: '6px 10px', width: 'fit-content' }}
+              >
+                Registrar contato
+              </button>
+            </div>
+
+            {isContactFormOpen ? (
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault()
+                  const whatsappDigits = contactWhatsapp.replace(/\D/g, '')
+
+                  if (contactConsent && !whatsappDigits) {
+                    setContactFormError('Informe um WhatsApp antes de marcar a autorização.')
+                    return
+                  }
+
+                  setContactFormError('')
+                  onUpdateCaseContact(caso, {
+                    client_name: contactName,
+                    client_whatsapp: contactWhatsapp,
+                    client_whatsapp_consent: contactConsent,
+                  })
+                  setIsContactFormOpen(false)
+                }}
+                style={{
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  borderRadius: '10px',
+                  display: 'grid',
+                  gap: '8px',
+                  padding: '10px',
+                }}
+              >
+                <label style={{ display: 'grid', gap: '4px' }}>
+                  <span>Cliente/contato principal</span>
+                  <input
+                    value={contactName}
+                    onChange={(event) => setContactName(event.target.value)}
+                    placeholder="Nome do cliente ou contato principal"
+                  />
+                </label>
+
+                <label style={{ display: 'grid', gap: '4px' }}>
+                  <span>WhatsApp principal</span>
+                  <input
+                    value={contactWhatsapp}
+                    onChange={(event) => setContactWhatsapp(event.target.value)}
+                    placeholder="Ex.: 5547999999999"
+                  />
+                </label>
+
+                <label style={{ alignItems: 'center', display: 'flex', gap: '8px' }}>
+                  <input
+                    type="checkbox"
+                    checked={contactConsent}
+                    onChange={(event) => setContactConsent(event.target.checked)}
+                  />
+                  <span>Cliente autorizou contato por WhatsApp</span>
+                </label>
+
+                {contactFormError ? (
+                  <p style={{ color: '#fca5a5', margin: 0 }}>{contactFormError}</p>
+                ) : null}
+
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                  <button
+                    type="submit"
+                    className="case-card__action case-card__action--primary"
+                    style={{ padding: '6px 10px', width: 'fit-content' }}
+                  >
+                    Salvar WhatsApp
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsContactFormOpen(false)
+                      setContactFormError('')
+                    }}
+                    className="case-card__action case-card__action--summary"
+                    style={{ padding: '6px 10px', width: 'fit-content' }}
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </form>
+            ) : null}
+
+            {caso.client_whatsapp ? (
+              <div
+                style={{
+                  borderTop: '1px solid rgba(255,255,255,0.08)',
+                  display: 'grid',
+                  gap: '8px',
+                  paddingTop: '8px',
+                }}
+              >
+                <strong>Mensagens prontas</strong>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                  <button
+                    type="button"
+                    onClick={() => onOpenWhatsAppTemplate(caso.id, caso.client_whatsapp || '', 'documents')}
+                    className="case-card__action case-card__action--summary"
+                    style={{ padding: '6px 10px' }}
+                  >
+                    Solicitar documentos
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => onOpenWhatsAppTemplate(caso.id, caso.client_whatsapp || '', 'evidence')}
+                    className="case-card__action case-card__action--summary"
+                    style={{ padding: '6px 10px' }}
+                  >
+                    Pedir provas
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => onOpenWhatsAppTemplate(caso.id, caso.client_whatsapp || '', 'status_update')}
+                    className="case-card__action case-card__action--summary"
+                    style={{ padding: '6px 10px' }}
+                  >
+                    Avisar andamento
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => onOpenWhatsAppTemplate(caso.id, caso.client_whatsapp || '', 'confirm_data')}
+                    className="case-card__action case-card__action--summary"
+                    style={{ padding: '6px 10px' }}
+                  >
+                    Confirmar dados
+                  </button>
+                </div>
+              </div>
+            ) : null}
           </div>
 
           {contactLogs.length > 0 ? (
@@ -911,6 +1075,19 @@ export function CaseCard({
                   {log.note ? (
                     <p style={{ margin: 0, opacity: 0.82 }}>{log.note}</p>
                   ) : null}
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (window.confirm('Excluir este contato do histórico?')) {
+                        onDeleteCaseContactLog(caso.id, log.id)
+                      }
+                    }}
+                    className="case-card__action case-card__action--summary"
+                    style={{ marginTop: '6px', padding: '5px 9px', width: 'fit-content' }}
+                  >
+                    Excluir
+                  </button>
                 </div>
               ))}
             </div>

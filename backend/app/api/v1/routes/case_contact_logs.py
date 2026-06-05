@@ -89,3 +89,35 @@ def create_case_contact_log(
     db.refresh(record)
 
     return record
+
+
+
+@router.delete(
+    "/{log_id}",
+    status_code=204,
+    dependencies=[Depends(require_role("admin", "advogado"))],
+)
+def delete_case_contact_log(
+    case_id: int,
+    log_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_auth),
+):
+    _get_case_or_404(db, current_user, case_id)
+
+    record = (
+        db.query(CaseContactLog)
+        .filter(
+            CaseContactLog.tenant_id == current_user["tenant_id"],
+            CaseContactLog.case_id == case_id,
+            CaseContactLog.id == log_id,
+        )
+        .first()
+    )
+
+    if not record:
+        raise HTTPException(status_code=404, detail="Contact log not found")
+
+    db.delete(record)
+    db.commit()
+    return None
