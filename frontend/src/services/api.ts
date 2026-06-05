@@ -894,6 +894,16 @@ export type CasePartyCreatePayload = {
   metadata?: Record<string, unknown>
 }
 
+export type CasePartyUpdatePayload = {
+  party_key: string
+  name?: string
+  role?: string
+  party_type?: string
+  document_id?: string | null
+  metadata?: Record<string, unknown>
+  description?: string
+}
+
 export type CasePartyStateCreatePayload = {
   case_id: number
   area: string
@@ -971,6 +981,27 @@ export async function addCaseParty(
 
   if (!response.ok) {
     await parseError(response, "Erro ao adicionar testemunha/depoente")
+  }
+
+  return response.json()
+}
+
+export async function updateCasePartyData(
+  token: string,
+  stateId: number,
+  payload: CasePartyUpdatePayload,
+): Promise<CasePartyStateDetailItem> {
+  const response = await fetch(`${API_URL}/case-party-states/${stateId}/party-data`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  })
+
+  if (!response.ok) {
+    await parseError(response, "Erro ao atualizar testemunha/depoente")
   }
 
   return response.json()
