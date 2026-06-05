@@ -25,6 +25,357 @@ router = APIRouter(
 )
 
 
+
+def _case_context_text(value) -> str:
+    if value is None:
+        return ""
+    return str(value).strip()
+
+
+def _case_context_unique(items):
+    result = []
+    seen = set()
+    for item in items or []:
+        text = _case_context_text(item)
+        if not text:
+            continue
+        key = text.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        result.append(text)
+    return result
+
+
+def _case_context_attr(obj, *names, default=None):
+    for name in names:
+        if hasattr(obj, name):
+            value = getattr(obj, name)
+            if value is not None and value != "":
+                return value
+    return default
+
+
+def _case_context_filter(query, model, attr_name, value):
+    column = getattr(model, attr_name, None)
+    if column is not None:
+        return query.filter(column == value)
+    return query
+
+
+def _case_context_order(query, model):
+    order_col = getattr(model, "created_at", None)
+    if order_col is None:
+        order_col = getattr(model, "updated_at", None)
+    if order_col is not None:
+        return query.order_by(order_col.desc())
+    return query
+
+
+def _case_context_rows(query, limit=30):
+    try:
+        return query.limit(limit).all()
+    except Exception:
+        return []
+
+
+def _build_case_operational_context(db: Session, case: Case, current_user):
+    """
+    Monta contexto operacional estruturado do caso usando apenas dados já cadastrados.
+    Não lê PDF inteiro, não faz OCR, não cria migration e não promete resultado judicial.
+    """
+    tenant_id = current_user["tenant_id"]
+
+    try:
+        from app.models.case_attachment import CaseAttachment
+    except Exception:
+        CaseAttachment = None
+
+    try:
+        from app.models.case_evidence_checklist import CaseEvidenceChecklistItem
+    except Exception:
+        CaseEvidenceChecklistItem = None
+
+    try:
+        from app.models.case_party_state import CasePartyModel, CasePartyStateModel
+    except Exception:
+        CasePartyModel = None
+        CasePartyStateModel = None
+
+    title = _case_context_text(getattr(case, "title", ""))
+    description = _case_context_text(getattr(case, "description", ""))
+    legal_area = _case_context_text(getattr(case, "legal_area", ""))
+    action_type = _case_context_text(getattr(case, "action_type", ""))
+
+    haystack = f"{title} {description} {legal_area} {action_type}".lower()
+
+    def has(*markers):
+        return any(marker in haystack for marker in markers)
+
+    facts = []
+    if has("semi-reboque", "semirreboque", "carreta", "implemento rodoviário", "implemento rodoviario"):
+        facts.append("Discussão sobre locação, uso, guarda ou devolução de semi-reboque/carreta.")
+    if has("contrato de locação", "locação de semi", "locacao de semi", "locação", "locacao"):
+        facts.append("Necessidade de conferir contrato de locação e obrigações assumidas pelas partes.")
+    if has("primeira parcela", "1ª parcela", "1a parcela"):
+        facts.append("Narrativa indica pagamento apenas da primeira parcela.")
+    if has("demais parcelas", "inadimplência", "inadimplencia", "ausência de pagamento", "ausencia de pagamento"):
+        facts.append("Narrativa indica discussão sobre inadimplência das parcelas posteriores.")
+    if has("não devolução", "nao devolucao", "não devolvido", "nao devolvido", "não devolveu", "nao devolveu"):
+        facts.append("Narrativa envolve alegação de não devolução do bem.")
+    if has("indenização", "indenizacao", "perdas e danos", "valor do equipamento", "valor do bem"):
+        facts.append("Pedido indenizatório depende de prova do dano, valor do bem e nexo causal.")
+    if has("lucros cessantes"):
+        facts.append("Lucros cessantes exigem prova específica, não apenas presunção genérica.")
+    if has("verbas acessórias", "verbas acessorias", "multa", "juros", "correção", "correcao"):
+        facts.append("Verbas acessórias dependem de base contratual, cálculo e atualização.")
+
+    if not facts and (legal_area or action_type):
+        facts.append(
+            f"Contexto jurídico informado: área {legal_area or 'não informada'}"
+            f" / tipo {action_type or 'não informado'}."
+        )
+
+    attachments = []
+    if CaseAttachment is not None:
+        q = db.query(CaseAttachment)
+        q = _case_context_filter(q, CaseAttachment, "tenant_id", tenant_id)
+        q = _case_context_filter(q, CaseAttachment, "case_id", case.id)
+        q = _case_context_order(q, CaseAttachment)
+        for row in _case_context_rows(q, limit=20):
+            filename = _case_context_text(
+                _case_context_attr(
+                    row,
+                    "filename",
+                    "original_filename",
+                    "stored_filename",
+                    "file_name",
+                    "name",
+                    default="Arquivo sem nome",
+                )
+            )
+            attachments.append(
+                {
+                    "filename": filename,
+                    "category": _case_context_text(
+                        _case_context_attr(row, "category", "file_category", "document_type", "mime_type", default="")
+                    ),
+                    "description": _case_context_text(
+                        _case_context_attr(row, "description", "notes", "summary", default="")
+                    ),
+                }
+            )
+
+    checklist_items = []
+    validated_count = 0
+    pending_count = 0
+    if CaseEvidenceChecklistItem is not None:
+        q = db.query(CaseEvidenceChecklistItem)
+        q = _case_context_filter(q, CaseEvidenceChecklistItem, "tenant_id", tenant_id)
+        q = _case_context_filter(q, CaseEvidenceChecklistItem, "case_id", case.id)
+        q = _case_context_order(q, CaseEvidenceChecklistItem)
+        for row in _case_context_rows(q, limit=50):
+            label = _case_context_text(
+                _case_context_attr(row, "title", "description", "item", "name", default="Item de checklist")
+            )
+            status_raw = _case_context_attr(row, "status", "state", default="")
+            status = _case_context_text(status_raw) or "sem status"
+            is_validated = bool(
+                _case_context_attr(row, "validated", "is_validated", "done", "is_done", default=False)
+            )
+            status_lower = status.lower()
+            if is_validated or status_lower in {"validado", "validated", "done", "concluído", "concluido"}:
+                validated_count += 1
+            elif status_lower in {"pendente", "pending", "open", "aberto"}:
+                pending_count += 1
+            checklist_items.append({"title": label, "status": status})
+
+    witnesses = []
+    if CasePartyStateModel is not None and CasePartyModel is not None:
+        state_query = db.query(CasePartyStateModel)
+        state_query = _case_context_filter(state_query, CasePartyStateModel, "tenant_id", tenant_id)
+        state_query = _case_context_filter(state_query, CasePartyStateModel, "case_id", case.id)
+        state_query = _case_context_order(state_query, CasePartyStateModel)
+        states = _case_context_rows(state_query, limit=10)
+
+        for state in states:
+            party_query = db.query(CasePartyModel)
+            party_query = _case_context_filter(party_query, CasePartyModel, "state_id", getattr(state, "id", None))
+            party_query = _case_context_order(party_query, CasePartyModel)
+            for party in _case_context_rows(party_query, limit=50):
+                role = _case_context_text(_case_context_attr(party, "role", "type", "party_type", default=""))
+                name = _case_context_text(_case_context_attr(party, "name", "full_name", default=""))
+                knowledge = _case_context_text(
+                    _case_context_attr(
+                        party,
+                        "what_knows",
+                        "knowledge",
+                        "description",
+                        "notes",
+                        "statement",
+                        "summary",
+                        default="",
+                    )
+                )
+
+                role_lower = role.lower()
+                knowledge_lower = knowledge.lower()
+                if not any(
+                    marker in f"{role_lower} {knowledge_lower}"
+                    for marker in ("testemunha", "depoente", "condutor", "motorista", "witness")
+                ):
+                    continue
+
+                witnesses.append(
+                    {
+                        "name": name or "Pessoa sem nome informado",
+                        "role": role or "testemunha/depoente",
+                        "knowledge": knowledge,
+                    }
+                )
+
+    attachments = attachments[:10]
+    checklist_items = checklist_items[:15]
+    witnesses = witnesses[:10]
+
+    summary_parts = []
+    summary_parts.extend(facts[:6])
+
+    if attachments:
+        filenames = ", ".join(item["filename"] for item in attachments[:4] if item.get("filename"))
+        if filenames:
+            summary_parts.append(f"Anexo(s) cadastrado(s): {filenames}.")
+    if checklist_items:
+        total = len(checklist_items)
+        summary_parts.append(f"Checklist de provas: {validated_count}/{total} item(ns) validados.")
+    if witnesses:
+        witness_names = ", ".join(
+            f'{item["name"]} ({item["role"]})' for item in witnesses[:4] if item.get("name")
+        )
+        if witness_names:
+            summary_parts.append(f"Testemunha(s)/depoente(s): {witness_names}.")
+
+    summary = " ".join(_case_context_unique(summary_parts)).strip()
+
+    return {
+        "facts": _case_context_unique(facts),
+        "attachments": attachments,
+        "checklist": {
+            "total": len(checklist_items),
+            "validated": validated_count,
+            "pending": pending_count,
+            "items": checklist_items,
+        },
+        "witnesses": witnesses,
+        "summary": summary,
+    }
+
+
+def _enrich_analysis_with_case_context(analysis, case_context):
+    enriched = dict(analysis or {})
+    if not isinstance(case_context, dict):
+        return enriched
+
+    facts = case_context.get("facts") or []
+    summary = _case_context_text(case_context.get("summary"))
+    attachments = case_context.get("attachments") or []
+    checklist = case_context.get("checklist") or {}
+    witnesses = case_context.get("witnesses") or []
+
+    if not (facts or attachments or checklist.get("total") or witnesses or summary):
+        return enriched
+
+    enriched["case_context"] = case_context
+    enriched["case_context_facts"] = facts
+    enriched["case_context_summary"] = summary
+
+    base_summary = _case_context_text(enriched.get("summary"))
+    if summary and "Contexto específico considerado:" not in base_summary:
+        enriched["summary"] = (
+            f"{base_summary} Contexto específico considerado: {summary}".strip()
+            if base_summary
+            else f"Contexto específico considerado: {summary}"
+        )
+
+    issues = list(enriched.get("issues") or [])
+    next_steps = list(enriched.get("next_steps") or [])
+
+    facts_joined = " ".join(facts).lower()
+
+    if "locação" in facts_joined or "locacao" in facts_joined:
+        issues.append("Verificar contrato de locação, obrigações assumidas, vigência, multas, entrega e devolução do bem.")
+    if "não devolução" in facts_joined or "nao devolucao" in facts_joined:
+        issues.append("Confrontar alegação de não devolução do bem com documentos, termos, comunicações e depoimentos disponíveis.")
+    if "indenizatório" in facts_joined or "indenizatorio" in facts_joined or "valor do bem" in facts_joined:
+        issues.append("Validar prova do valor indenizatório do equipamento e separar dano efetivo de verbas acessórias.")
+    if "lucros cessantes" in facts_joined:
+        issues.append("Exigir demonstração específica dos lucros cessantes, com base documental e cálculo verificável.")
+    if attachments:
+        issues.append("Usar os anexos cadastrados como base de conferência documental antes de qualquer peça.")
+    if checklist.get("total"):
+        issues.append("Cruzar análise jurídica com o checklist de provas e pendências já cadastrado.")
+    if witnesses:
+        issues.append("Explorar depoimento das testemunhas/depoentes sobre uso, guarda, entrega/devolução e responsabilidade operacional.")
+
+    if attachments:
+        filenames = ", ".join(item.get("filename", "") for item in attachments[:3] if item.get("filename"))
+        next_steps.append(f"Revisar anexo(s) cadastrado(s) no caso: {filenames}.")
+    if checklist.get("total"):
+        next_steps.append(
+            f"Conferir checklist probatório: {checklist.get('validated', 0)}/{checklist.get('total', 0)} item(ns) validados."
+        )
+    if witnesses:
+        names = ", ".join(item.get("name", "") for item in witnesses[:3] if item.get("name"))
+        next_steps.append(f"Preparar perguntas objetivas para testemunha(s)/depoente(s): {names}.")
+    if facts:
+        next_steps.append("Transformar os fatos-chave estruturados em linha do tempo antes de gerar peça pronta.")
+
+    enriched["issues"] = _case_context_unique(issues)
+    enriched["next_steps"] = _case_context_unique(next_steps)
+
+    return enriched
+
+
+def _enrich_case_analysis_record_with_case_context(db: Session, record: CaseAnalysis, case: Case, current_user):
+    if not record:
+        return record
+
+    case_context = _build_case_operational_context(db=db, case=case, current_user=current_user)
+    full_analysis = dict(record.analysis or {})
+    technical = full_analysis.get("technical", {})
+    if not isinstance(technical, dict):
+        technical = {}
+
+    enriched_technical = _enrich_analysis_with_case_context(technical, case_context)
+    full_analysis["technical"] = enriched_technical
+
+    executive_data = dict(record.executive_data or {})
+    viability = executive_data.get("viability") or full_analysis.get("viability") or {}
+    strategic = executive_data.get("strategic") or full_analysis.get("strategic") or {}
+    decision_seed = executive_data.get("decision") or full_analysis.get("decision") or {}
+
+    if isinstance(viability, dict) and isinstance(decision_seed, dict):
+        decision = generate_executive_summary(enriched_technical, viability, decision_seed)
+        full_analysis["decision"] = decision
+        executive_data["decision"] = decision
+
+    full_analysis["strategic"] = strategic
+    full_analysis["viability"] = viability
+    executive_data["viability"] = viability
+    executive_data["strategic"] = strategic
+
+    record.risk_level = enriched_technical.get("risk_level", "medium")
+    record.summary = enriched_technical.get("summary", "")
+    record.issues = enriched_technical.get("issues", [])
+    record.next_steps = enriched_technical.get("next_steps", [])
+    record.analysis = full_analysis
+    record.executive_data = executive_data
+
+    db.add(record)
+    db.commit()
+    db.refresh(record)
+    return record
+
 def _get_or_create_case_analysis_record(
     db: Session,
     case: Case,
@@ -319,6 +670,12 @@ def analyze_case_endpoint(
     )
 
     if existing_analysis and not force:
+        existing_analysis = _enrich_case_analysis_record_with_case_context(
+            db=db,
+            record=existing_analysis,
+            case=case,
+            current_user=current_user,
+        )
         return {
             "case_id": case.id,
             "analysis_id": existing_analysis.id,
@@ -428,6 +785,12 @@ def generate_case_report(
         case=case,
         current_user=current_user,
     )
+    analysis_record = _enrich_case_analysis_record_with_case_context(
+        db=db,
+        record=analysis_record,
+        case=case,
+        current_user=current_user,
+    )
 
     full_analysis = analysis_record.analysis or {}
     executive_data = analysis_record.executive_data or {}
@@ -467,6 +830,12 @@ def get_executive_summary(
 
     analysis_record = _get_or_create_case_analysis_record(
         db=db,
+        case=case,
+        current_user=current_user,
+    )
+    analysis_record = _enrich_case_analysis_record_with_case_context(
+        db=db,
+        record=analysis_record,
         case=case,
         current_user=current_user,
     )
@@ -523,6 +892,12 @@ def get_executive_report(
 
     analysis_record = _get_or_create_case_analysis_record(
         db=db,
+        case=case,
+        current_user=current_user,
+    )
+    analysis_record = _enrich_case_analysis_record_with_case_context(
+        db=db,
+        record=analysis_record,
         case=case,
         current_user=current_user,
     )
@@ -610,6 +985,13 @@ def generate_executive_pdf_route(
                 legal_area=getattr(case, "legal_area", None),
                 action_type=getattr(case, "action_type", None),
             )
+
+        case_context = _build_case_operational_context(
+            db=db,
+            case=case,
+            current_user=current_user,
+        )
+        analysis_data = _enrich_analysis_with_case_context(analysis_data, case_context)
 
         existing_exec = analysis.executive_data if analysis and isinstance(analysis.executive_data, dict) else {}
         existing_viability = existing_exec.get("viability", {}) if isinstance(existing_exec, dict) else {}
