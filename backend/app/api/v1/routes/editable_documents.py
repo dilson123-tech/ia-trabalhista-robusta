@@ -1862,6 +1862,55 @@ def _select_primary_party(parties: list[dict], keywords: list[str]) -> dict | No
     return None
 
 
+def _is_non_process_party_for_assisted_draft(party: dict) -> bool:
+    role = _normalize_role_token(party.get("role"))
+    metadata = party.get("party_metadata") or {}
+
+    if metadata.get("grid_source") == "case_witness_grid_v1":
+        return True
+
+    non_process_markers = (
+        "testemunha",
+        "depoente",
+        "condutor",
+        "motorista",
+        "perito",
+        "fiscal",
+        "cuidador",
+        "vizinho",
+    )
+    return any(marker in role for marker in non_process_markers)
+
+
+def _filter_litigation_parties_for_assisted_draft(parties: list[dict]) -> list[dict]:
+    return [
+        party
+        for party in parties
+        if not _is_non_process_party_for_assisted_draft(party)
+    ]
+
+
+def _select_assisted_draft_litigation_parties(parties: list[dict]) -> tuple[dict | None, dict | None]:
+    litigation_parties = _filter_litigation_parties_for_assisted_draft(parties)
+
+    author_party = _select_primary_party(
+        litigation_parties,
+        ["autor", "autora", "parte autora", "requerente", "demandante", "reclamante", "impetrante"],
+    )
+    defendant_party = _select_primary_party(
+        litigation_parties,
+        ["reu", "ré", "réu", "parte re", "parte ré", "requerido", "demandado", "reclamada", "impetrado"],
+    )
+
+    if author_party is None and litigation_parties:
+        author_party = litigation_parties[0]
+
+    if defendant_party is None or defendant_party is author_party:
+        defendant_party = next((party for party in litigation_parties if party is not author_party), None)
+
+    return author_party, defendant_party
+
+
 def _format_party_inline_qualification(
     party: dict | None,
     fallback_name: str,
@@ -2322,20 +2371,7 @@ def _build_assisted_sections(
     if not active_parties:
         active_parties = _extract_labor_parties_from_case_description(case_description)
 
-    author_party = _select_primary_party(
-        active_parties,
-        ["autor", "autora", "parte autora", "requerente", "demandante", "reclamante", "impetrante"],
-    )
-    defendant_party = _select_primary_party(
-        active_parties,
-        ["reu", "ré", "réu", "parte re", "parte ré", "requerido", "demandado", "reclamada", "impetrado"],
-    )
-
-    if author_party is None and active_parties:
-        author_party = active_parties[0]
-
-    if defendant_party is None or defendant_party is author_party:
-        defendant_party = next((party for party in active_parties if party is not author_party), None)
+    author_party, defendant_party = _select_assisted_draft_litigation_parties(active_parties)
 
     author_inline_qualification = _format_party_inline_qualification(
         author_party,
@@ -2427,9 +2463,13 @@ def _build_assisted_sections(
                 "I. Do cabimento da pretensão. À luz do quadro fático descrito, a demanda deve ser estruturada como ação de cobrança contratual, voltada à condenação da parte ré ao pagamento do saldo inadimplido, com os encargos contratuais e legais cabíveis."
                 if is_civel_cobranca
                 else (
-                    "I. Do cabimento da pretensão. À luz do quadro fático descrito, a demanda deve ser estruturada para cessar a lesão narrada, recompor o status jurídico violado e prevenir a reiteração dos impactos ao direito material discutido."
-                    if normalized_area in {"civel", "civil_ambiental"}
-                    else "I. Do cabimento da pretensão. À luz do quadro fático narrado, a demanda deve ser estruturada para tutelar o direito material afirmado e enfrentar a controvérsia central com base na prova já disponível."
+                    "I. Do cabimento da pretensão. À luz do quadro fático descrito, a demanda deve ser estruturada como pretensão cível indenizatória/contratual, voltada à responsabilização da parte ré, à comprovação do dano e do nexo causal, e à definição dos valores devidos."
+                    if normalized_area == "civel"
+                    else (
+                        "I. Do cabimento da pretensão. À luz do quadro fático descrito, a demanda deve ser estruturada para cessar a lesão narrada, recompor o status jurídico violado e prevenir a reiteração dos impactos ao direito material discutido."
+                        if normalized_area == "civil_ambiental"
+                        else "I. Do cabimento da pretensão. À luz do quadro fático narrado, a demanda deve ser estruturada para tutelar o direito material afirmado e enfrentar a controvérsia central com base na prova já disponível."
+                    )
                 )
             ),
             (
@@ -2452,15 +2492,20 @@ def _build_assisted_sections(
         ]
     )
 
+
     pedidos = _paragraphs(
         [
             (
                 "I. Requer-se a citação da parte ré para, querendo, apresentar contestação, sob pena de revelia e confissão quanto à matéria de fato."
                 if is_civel_cobranca
                 else (
-                    "I. Requer-se, em tutela provisória de urgência, quando presentes os requisitos legais, a imediata cessação, redução ou mitigação dos impactos narrados, inclusive por obrigação de fazer e/ou não fazer."
-                    if normalized_area in {"civel", "civil_ambiental"}
-                    else "I. Requer-se, quando presentes os requisitos legais, a concessão da tutela provisória cabível para resguardar desde logo a utilidade do provimento final."
+                    "I. Requer-se a citação da parte ré para, querendo, apresentar contestação, com posterior julgamento de procedência dos pedidos indenizatórios/contratuais compatíveis com a prova produzida."
+                    if normalized_area == "civel"
+                    else (
+                        "I. Requer-se, em tutela provisória de urgência, quando presentes os requisitos legais, a imediata cessação, redução ou mitigação dos impactos narrados, inclusive por obrigação de fazer e/ou não fazer."
+                        if normalized_area == "civil_ambiental"
+                        else "I. Requer-se, quando presentes os requisitos legais, a concessão da tutela provisória cabível para resguardar desde logo a utilidade do provimento final."
+                    )
                 )
             ),
             (
@@ -2472,9 +2517,13 @@ def _build_assisted_sections(
                 "III. Requer-se que os encargos de mora sejam calculados a partir do vencimento de cada parcela inadimplida, observando-se a cláusula contratual aplicável e a planilha de cálculo a ser juntada na versão final."
                 if is_civel_cobranca
                 else (
-                    "III. Requer-se, ao final, a procedência dos pedidos principais, com imposição das obrigações materiais compatíveis com a narrativa, a prova produzida e a extensão do dano demonstrado."
-                    if normalized_area in {"civel", "civil_ambiental"}
-                    else "III. Requer-se, ao final, a procedência dos pedidos compatíveis com os fatos narrados, a tese sustentada e a prova disponível."
+                    "III. Requer-se, ao final, a procedência dos pedidos principais indenizatórios/contratuais compatíveis com a narrativa, a prova produzida e a extensão do dano demonstrado."
+                    if normalized_area == "civel"
+                    else (
+                        "III. Requer-se, ao final, a procedência dos pedidos principais, com imposição das obrigações materiais compatíveis com a narrativa, a prova produzida e a extensão do dano demonstrado."
+                        if normalized_area == "civil_ambiental"
+                        else "III. Requer-se, ao final, a procedência dos pedidos compatíveis com os fatos narrados, a tese sustentada e a prova disponível."
+                    )
                 )
             ),
             (
@@ -2494,10 +2543,11 @@ def _build_assisted_sections(
             (
                 "VI. Antes do protocolo definitivo, o advogado deverá revisar valor da causa, memória de cálculo, índice de correção monetária, competência territorial e documentos comprobatórios do inadimplemento."
                 if is_civel_cobranca
-                else "VI. Antes do protocolo definitivo, o advogado deverá revisar a aderência entre pedidos, causa de pedir, prova disponível, tutela de urgência e liquidez dos danos postulados."
+                else "VI. Antes do protocolo definitivo, o advogado deverá revisar a aderência entre pedidos, causa de pedir, prova disponível e liquidez dos danos postulados."
             ),
         ]
     )
+
 
     enderecamento = _paragraphs(
         [
@@ -2525,9 +2575,13 @@ def _build_assisted_sections(
                 "Na versão final, devem ser especificados e anexados os documentos de cobrança: contrato assinado, comprovante de pagamento parcial, relatório de execução dos serviços, fotografias, mensagens de reconhecimento da dívida, notificação extrajudicial, e-mails e planilha de cálculo atualizada."
                 if is_civel_cobranca
                 else (
-                    "Na versão final, devem ser especificados os documentos já existentes, a necessidade de prova técnica ambiental/acústica, eventual inspeção judicial e o fundamento da tutela de urgência."
-                    if normalized_area in {"civel", "civil_ambiental"}
-                    else "Na versão final, devem ser especificados os documentos já existentes, a prova técnica pertinente e os requerimentos probatórios adequados ao caso."
+                    "Na versão final, devem ser especificados os documentos já existentes, contratos, comprovantes, comunicações, avaliação do bem, prova testemunhal e eventual perícia contábil ou técnica pertinente ao dano alegado."
+                    if normalized_area == "civel"
+                    else (
+                        "Na versão final, devem ser especificados os documentos já existentes, a necessidade de prova técnica ambiental/acústica, eventual inspeção judicial e o fundamento da tutela de urgência."
+                        if normalized_area == "civil_ambiental"
+                        else "Na versão final, devem ser especificados os documentos já existentes, a prova técnica pertinente e os requerimentos probatórios adequados ao caso."
+                    )
                 )
             ),
             (
@@ -2537,6 +2591,7 @@ def _build_assisted_sections(
             ),
         ]
     )
+
 
     fechamento = _paragraphs(
         [
