@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     AUTH_PROTECT_DOCS: bool = False
     JWT_SECRET: str = Field(..., min_length=32)
     JWT_ALG: str = "HS256"
-    JWT_EXPIRES_MIN: int = 60
+    JWT_EXPIRES_MIN: int = 43200
     ADMIN_SEED_TOKEN: str = "CHANGE_ME_SEED_TOKEN"
     ALLOW_SEED_ADMIN: bool = False
     CORS_ALLOW_ORIGINS: str = "http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174,http://localhost:4173,http://127.0.0.1:4173"
