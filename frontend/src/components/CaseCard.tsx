@@ -721,6 +721,10 @@ export function CaseCard({
                 const preparationStatus = getPartyMetadataText(party, 'preparation_status') || party.status
                 const whatKnows = getPartyMetadataText(party, 'what_knows')
                 const confirmsFacts = getPartyMetadataText(party, 'confirms_facts')
+                const normalizedWhatKnows = whatKnows.trim().toLowerCase()
+                const normalizedConfirmsFacts = confirmsFacts.trim().toLowerCase()
+                const hasDuplicatedKnowledge =
+                  normalizedWhatKnows.length > 0 && normalizedWhatKnows === normalizedConfirmsFacts
                 const riskLevel = getPartyMetadataText(party, 'risk_level')
                 const sensitivePoints = getPartyMetadataText(party, 'sensitive_points')
 
@@ -738,11 +742,11 @@ export function CaseCard({
 
                     {whatKnows ? (
                       <p style={{ margin: '0 0 4px 0', opacity: 0.88 }}>
-                        <strong>O que sabe:</strong> {whatKnows}
+                        <strong>{hasDuplicatedKnowledge ? 'O que sabe/confirma:' : 'O que sabe:'}</strong> {whatKnows}
                       </p>
                     ) : null}
 
-                    {confirmsFacts ? (
+                    {confirmsFacts && !hasDuplicatedKnowledge ? (
                       <p style={{ margin: '0 0 4px 0', opacity: 0.88 }}>
                         <strong>Confirma:</strong> {confirmsFacts}
                       </p>

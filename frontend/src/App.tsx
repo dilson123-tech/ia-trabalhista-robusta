@@ -727,7 +727,7 @@ function App() {
           grid_source: 'case_witness_grid_v1',
           preparation_status: 'pendente',
           what_knows: whatKnows,
-          confirms_facts: whatKnows,
+          confirms_facts: '',
           risk_level: 'a revisar',
           sensitive_points: 'A revisar pelo advogado antes da audiência.',
           recommended_questions: 'A gerar/refinar na Audiência Estratégica.',
