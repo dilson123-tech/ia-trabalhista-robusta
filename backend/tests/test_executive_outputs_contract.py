@@ -7,7 +7,10 @@ from sqlalchemy import create_engine, text
 
 from app.main import app
 from app.core.settings import settings
+from app.api.v1.routes import cases as cases_routes
 from app.services import pdf_executive as pdf_executive_service
+from app.services.executive_summary_engine import generate_executive_summary
+from app.services.report_engine import generate_report_html
 
 client = TestClient(app)
 
@@ -15,6 +18,7 @@ client = TestClient(app)
 def _auth_headers(monkeypatch):
     monkeypatch.setattr(settings, "ALLOW_SEED_ADMIN", True)
     monkeypatch.setattr(settings, "ADMIN_SEED_TOKEN", "test-seed-token")
+    monkeypatch.setattr(cases_routes, "enforce_plan_limits", lambda *args, **kwargs: None)
 
     seed_payload = {
         "username": f"admin_exec_{uuid.uuid4().hex[:8]}@example.com",
@@ -277,3 +281,87 @@ def test_public_executive_outputs_do_not_expose_numeric_prediction_fields(monkey
         response = client.get(path, headers=headers)
         assert response.status_code == 200
         assert_no_public_prediction_fields(response.json())
+
+
+
+def test_executive_context_is_rendered_in_summary_and_report():
+    analysis = {
+        "summary": "Caso com viabilidade moderada.",
+        "risk_level": "medium",
+        "issues": ["Ponto crítico original."],
+        "next_steps": ["Próximo passo original."],
+        "case_context_summary": (
+            "Discussão sobre contrato de locação de semi-reboque. "
+            "Anexo(s) cadastrado(s): CASO_DILSON.pdf. "
+            "Testemunha(s)/depoente(s): Edson Estevão (testemunha / condutor)."
+        ),
+        "case_context_facts": [
+            "Discussão sobre locação, uso, guarda ou devolução de semi-reboque/carreta.",
+            "Narrativa indica pagamento apenas da primeira parcela.",
+            "Lucros cessantes exigem prova específica, não apenas presunção genérica.",
+        ],
+        "case_context": {
+            "facts": [
+                "Discussão sobre locação, uso, guarda ou devolução de semi-reboque/carreta.",
+                "Narrativa indica pagamento apenas da primeira parcela.",
+            ],
+            "attachments": [
+                {
+                    "filename": "CASO_DILSON.pdf",
+                    "category": "PDF",
+                    "description": "Processo judicial completo.",
+                }
+            ],
+            "checklist": {
+                "total": 4,
+                "validated": 4,
+                "pending": 0,
+                "items": [
+                    {"title": "Contrato de locação", "status": "validado"},
+                    {"title": "Comprovantes de pagamento", "status": "validado"},
+                ],
+            },
+            "witnesses": [
+                {
+                    "name": "Edson Estevão",
+                    "role": "testemunha / condutor",
+                    "knowledge": "Sabe o que realmente aconteceu.",
+                }
+            ],
+            "summary": "Contexto operacional específico do Caso 001.",
+        },
+    }
+    viability = {
+        "score": 60,
+        "probability": 0.60,
+        "label": "Moderada",
+        "complexity": "Média",
+        "recommendation": "Revisar prova documental antes de qualquer peça.",
+    }
+    decision = {
+        "final_status": "MODERADA",
+        "confidence_level": 60,
+    }
+
+    executive = generate_executive_summary(analysis, viability, decision)
+
+    assert "Contexto específico considerado" in executive["executive_summary"]
+    assert "CASO_DILSON.pdf" in executive["executive_summary"]
+    assert "Edson Estevão" in executive["executive_summary"]
+
+    html = generate_report_html(
+        case={
+            "case_number": "001",
+            "title": "Caso 001 real supervisionado",
+            "description": "Processo de locação de semi-reboque.",
+        },
+        analysis=analysis,
+        viability=viability,
+        executive_decision=executive,
+    )
+
+    assert "Contexto específico do caso" in html
+    assert "CASO_DILSON.pdf" in html
+    assert "Edson Estevão" in html
+    assert "Contrato de locação" in html
+    assert "4/4 item(ns) validados" in html

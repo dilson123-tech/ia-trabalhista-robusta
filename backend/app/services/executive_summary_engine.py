@@ -39,6 +39,14 @@ def _status_phrase(final_status: str) -> str:
     return mapping.get(normalized, "caso em avaliação estratégica")
 
 
+def _context_phrase(analysis: Dict) -> str:
+    context_summary = str((analysis or {}).get("case_context_summary") or "").strip()
+    if not context_summary:
+        return ""
+    context_summary = context_summary.rstrip(".")
+    return f" Contexto específico considerado: {context_summary}."
+
+
 def _is_insufficient_data(analysis: Dict, viability: Dict, decision: Dict) -> bool:
     viability_dimensions = viability.get("dimensions") or {}
     viability_label = str(viability.get("label", "") or "").strip().lower()
@@ -111,6 +119,7 @@ def generate_executive_summary(
     final_status = decision.get("final_status", "INDEFINIDO")
     confidence = decision.get("confidence_level")
     recommendation = viability.get("recommendation", "Sem recomendação estratégica definida.")
+    context_phrase = _context_phrase(analysis)
 
     if _is_insufficient_data(analysis, viability, decision):
         complexity = _complexity_label(viability.get("complexity", "Indefinida por insuficiência de dados"))
@@ -119,8 +128,9 @@ def generate_executive_summary(
             "Caso com dados insuficientes para prognóstico confiável. "
             f"Nível de risco: {risk_level}. "
             f"Complexidade: {complexity}. "
-            f"Perspectiva de tramitação: Depende da complexidade, da fase processual, da prova disponível e do juízo competente.. "
+            "Perspectiva de tramitação: depende da complexidade, da fase processual, da prova disponível e do juízo competente. "
             f"Direcionamento: {recommendation}."
+            f"{context_phrase}"
         )
         return {
             "executive_summary": executive_text,
@@ -143,9 +153,10 @@ def generate_executive_summary(
         f"{status_phrase.capitalize()}. "
         f"Nível de risco: {risk_level}. "
         f"Complexidade: {complexity}. "
-        f"Perspectiva de tramitação: Depende da complexidade, da fase processual, da prova disponível e do juízo competente. "
+        "Perspectiva de tramitação: depende da complexidade, da fase processual, da prova disponível e do juízo competente. "
         f"Direcionamento: {recommendation}. "
         "Avaliação estratégica qualitativa, condicionada à prova documental, cálculo atualizado e revisão profissional antes do protocolo."
+        f"{context_phrase}"
     )
 
     return {

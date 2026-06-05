@@ -1,11 +1,100 @@
+import html
 from typing import Dict, Optional
 from datetime import datetime
+
+
+def _escape(value) -> str:
+    return html.escape(str(value or ""), quote=True)
+
+
+def _items_html(items, empty_text: str) -> str:
+    safe_items = [_escape(item) for item in (items or []) if str(item or "").strip()]
+    return "".join(f"<li>{item}</li>" for item in safe_items) or f"<li>{_escape(empty_text)}</li>"
+
+
+def _context_section_html(analysis: Dict) -> str:
+    context = analysis.get("case_context") or {}
+    facts = analysis.get("case_context_facts") or context.get("facts") or []
+    summary = analysis.get("case_context_summary") or context.get("summary") or ""
+    attachments = context.get("attachments") or []
+    checklist = context.get("checklist") or {}
+    witnesses = context.get("witnesses") or []
+
+    if not (facts or summary or attachments or checklist.get("total") or witnesses):
+        return ""
+
+    facts_html = _items_html(facts, "Nenhum fato-chave estruturado informado.")
+
+    attachment_items = []
+    for item in attachments:
+        filename = item.get("filename") or "Arquivo sem nome"
+        category = item.get("category")
+        description = item.get("description")
+        label = filename
+        if category:
+            label += f" — {category}"
+        if description:
+            label += f" — {description}"
+        attachment_items.append(label)
+    attachments_html = _items_html(attachment_items, "Nenhum anexo cadastrado.")
+
+    checklist_items = []
+    for item in checklist.get("items") or []:
+        title = item.get("title") or "Item de checklist"
+        status = item.get("status") or "sem status"
+        checklist_items.append(f"{title} — {status}")
+    checklist_intro = (
+        f"{checklist.get('validated', 0)}/{checklist.get('total', 0)} item(ns) validados; "
+        f"{checklist.get('pending', 0)} pendente(s)."
+        if checklist.get("total")
+        else "Sem checklist cadastrado."
+    )
+    checklist_html = _items_html(checklist_items, "Nenhum item de checklist cadastrado.")
+
+    witness_items = []
+    for item in witnesses:
+        name = item.get("name") or "Pessoa sem nome informado"
+        role = item.get("role") or "testemunha/depoente"
+        knowledge = item.get("knowledge")
+        label = f"{name} — {role}"
+        if knowledge:
+            label += f" — {knowledge}"
+        witness_items.append(label)
+    witnesses_html = _items_html(witness_items, "Nenhuma testemunha/depoente cadastrada.")
+
+    summary_html = f"<p>{_escape(summary)}</p>" if summary else ""
+
+    return f"""
+            <div class=\"section\">
+                <h2>Contexto específico do caso</h2>
+                {summary_html}
+                <div class=\"grid\">
+                    <div class=\"card\">
+                        <span class=\"label\">Fatos-chave estruturados</span>
+                        <ul>{facts_html}</ul>
+                    </div>
+                    <div class=\"card\">
+                        <span class=\"label\">Anexos cadastrados</span>
+                        <ul>{attachments_html}</ul>
+                    </div>
+                    <div class=\"card\">
+                        <span class=\"label\">Checklist de provas</span>
+                        <div>{_escape(checklist_intro)}</div>
+                        <ul>{checklist_html}</ul>
+                    </div>
+                    <div class=\"card\">
+                        <span class=\"label\">Testemunhas/depoentes</span>
+                        <ul>{witnesses_html}</ul>
+                    </div>
+                </div>
+            </div>
+    """
 
 
 def generate_report_html(case: Dict, analysis: Dict, viability: Dict, executive_decision: Optional[Dict] = None) -> str:
     generated_at = datetime.utcnow().strftime("%d/%m/%Y %H:%M UTC")
 
-    risk_level_raw = (analysis.get("risk_level") or "indefinido")
+    risk_level_raw = analysis.get("risk_level") or "indefinido"
     risk_level_map = {
         "low": "Baixo",
         "medium": "Médio",
@@ -19,13 +108,22 @@ def generate_report_html(case: Dict, analysis: Dict, viability: Dict, executive_
     next_steps = analysis.get("next_steps") or []
 
     assessment_note = "Avaliação qualitativa, sem previsão percentual de resultado judicial"
-
     time_perspective = "Depende da complexidade, da fase processual, da prova disponível e do juízo competente."
 
-    issues_html = "".join(f"<li>{item}</li>" for item in issues) or "<li>Nenhum ponto crítico identificado.</li>"
-    next_steps_html = "".join(f"<li>{item}</li>" for item in next_steps) or "<li>Sem próximos passos sugeridos.</li>"
+    case_number = _escape(case.get("case_number") or "Não informado")
+    case_title = _escape(case.get("title") or "Não informado")
+    case_description = _escape(case.get("description") or "Sem descrição informada.")
+    summary_html = _escape(summary)
+    viability_label = _escape(viability.get("label") or "Indefinida")
+    risk_level_html = _escape(risk_level)
+    complexity_html = _escape(viability.get("complexity") or "Indefinida")
+    recommendation_html = _escape(viability.get("recommendation") or "Sem recomendação")
+    context_section_html = _context_section_html(analysis)
 
-    html = f"""
+    issues_html = _items_html(issues, "Nenhum ponto crítico identificado.")
+    next_steps_html = _items_html(next_steps, "Sem próximos passos sugeridos.")
+
+    html_doc = f"""
     <html>
     <head>
         <meta charset=\"utf-8\" />
@@ -123,58 +221,60 @@ def generate_report_html(case: Dict, analysis: Dict, viability: Dict, executive_
         <div class=\"container\">
             <div class=\"eyebrow\">Plataforma Jurídica Multiárea</div>
             <h1>Relatório Executivo do Caso</h1>
-            <p class=\"muted\">Gerado em: {generated_at}</p>
+            <p class=\"muted\">Gerado em: {_escape(generated_at)}</p>
 
             <div class=\"section\">
                 <h2>Dados do Caso</h2>
                 <div class=\"grid\">
                     <div class=\"card\">
                         <span class=\"label\">Número do processo</span>
-                        <span class=\"value\">{case.get("case_number") or "Não informado"}</span>
+                        <span class=\"value\">{case_number}</span>
                     </div>
                     <div class=\"card\">
                         <span class=\"label\">Título</span>
-                        <span class=\"value\">{case.get("title") or "Não informado"}</span>
+                        <span class=\"value\">{case_title}</span>
                     </div>
                 </div>
                 <div class=\"card\" style=\"margin-top:14px;\">
                     <span class=\"label\">Descrição</span>
-                    <div>{case.get("description") or "Sem descrição informada."}</div>
+                    <div>{case_description}</div>
                 </div>
             </div>
 
             <div class=\"section\">
                 <h2>Resumo Executivo</h2>
-                <p><span class=\"highlight\">Classificação: {viability.get("label") or "Indefinida"}</span></p>
-                <p>{summary}</p>
+                <p><span class=\"highlight\">Classificação: {viability_label}</span></p>
+                <p>{summary_html}</p>
             </div>
+
+            {context_section_html}
 
             <div class=\"section\">
                 <h2>Indicadores Estratégicos</h2>
                 <div class=\"grid\">
                     <div class=\"card\">
                         <span class=\"label\">Classificação estratégica</span>
-                        <span class=\"value\">{viability.get("label") or "Indefinida"}</span>
+                        <span class=\"value\">{viability_label}</span>
                     </div>
                     <div class=\"card\">
                         <span class=\"label\">Confiança da análise</span>
-                        <span class=\"value\">{assessment_note}</span>
+                        <span class=\"value\">{_escape(assessment_note)}</span>
                     </div>
                     <div class=\"card\">
                         <span class=\"label\">Nível de risco</span>
-                        <span class=\"value\">{risk_level}</span>
+                        <span class=\"value\">{risk_level_html}</span>
                     </div>
                     <div class=\"card\">
                         <span class=\"label\">Complexidade</span>
-                        <span class=\"value\">{viability.get("complexity") or "Indefinida"}</span>
+                        <span class=\"value\">{complexity_html}</span>
                     </div>
                     <div class=\"card\">
                         <span class=\"label\">Perspectiva de tramitação</span>
-                        <span class=\"value\">{time_perspective}</span>
+                        <span class=\"value\">{_escape(time_perspective)}</span>
                     </div>
                     <div class=\"card\">
                         <span class=\"label\">Recomendação</span>
-                        <span class=\"value\">{viability.get("recommendation") or "Sem recomendação"}</span>
+                        <span class=\"value\">{recommendation_html}</span>
                     </div>
                 </div>
             </div>
@@ -202,4 +302,4 @@ def generate_report_html(case: Dict, analysis: Dict, viability: Dict, executive_
     </html>
     """
 
-    return html
+    return html_doc
