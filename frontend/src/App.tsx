@@ -1,8 +1,8 @@
 import './App.css'
 import { useEffect, useState, type KeyboardEvent } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
-import { ApiError, cleanupDemoCases, createPlanChangeCheckout, createCase, createCaseContactLog, createCasePartyState, addCaseParty, updateCasePartyData,
-  deleteCaseParty, getCasePartyState, getCases, listCaseAttachments, listCaseContactLogs, listCaseEvidenceChecklist, listCasePartyStates, getCaseAnalysis, getLegalModules, getExecutiveSummary, getExecutiveReport, getExecutivePdf, getUsageSummaryV2, login, updateCaseStatus, type CaseAttachmentItem, type CaseContactLogItem, type CaseEvidenceChecklistItem, type CaseItem, type CasePartyItem, type CasePartyStateDetailItem, type CaseAnalysisResponse, type ExecutiveSummaryResponse, type ExecutiveReportResponse, type LegalModule, type UsageSummaryV2Response } from './services/api'
+import { ApiError, cleanupDemoCases, createPlanChangeCheckout, createCase, createCaseContactLog, deleteCaseContactLog, createCasePartyState, addCaseParty, updateCasePartyData,
+  deleteCaseParty, getCasePartyState, getCases, listCaseAttachments, listCaseContactLogs, listCaseEvidenceChecklist, listCasePartyStates, getCaseAnalysis, getLegalModules, getExecutiveSummary, getExecutiveReport, getExecutivePdf, getUsageSummaryV2, login, updateCaseContact, updateCaseStatus, type CaseAttachmentItem, type CaseContactLogItem, type CaseEvidenceChecklistItem, type CaseItem, type CasePartyItem, type CasePartyStateDetailItem, type CaseAnalysisResponse, type ExecutiveSummaryResponse, type ExecutiveReportResponse, type LegalModule, type UsageSummaryV2Response } from './services/api'
 import { ExpansionWorkspace } from './components/expansion/ExpansionWorkspace'
 import { CaseCard, type CaseInternalDossierSnapshot, type CaseReadinessSnapshot } from './components/CaseCard'
 import { DashboardTopPanel } from './components/DashboardTopPanel'
@@ -1050,6 +1050,29 @@ function App() {
     }
   }
 
+  async function handleUpdateCaseContact(
+    caso: CaseItem,
+    payload: { client_name?: string; client_whatsapp?: string; client_whatsapp_consent?: boolean },
+  ) {
+    if (!token) return
+
+    setCaseActionLoadingId(caso.id)
+    setCaseActionError('')
+    setCaseActionSuccess('')
+
+    try {
+      const updatedCase = await updateCaseContact(token, caso.id, payload)
+      setCases((prev) => sortCasesForDisplay(prev.map((item) => (item.id === caso.id ? updatedCase : item))))
+      setCaseActionSuccess('WhatsApp do caso atualizado com sucesso.')
+    } catch (err) {
+      const fallback = handleApiFailure(err, 'Não foi possível atualizar o WhatsApp do caso.')
+      setCaseActionError(fallback || 'Não foi possível atualizar o WhatsApp do caso.')
+    } finally {
+      setCaseActionLoadingId(null)
+    }
+  }
+
+
   async function handleOpenWhatsAppTemplate(
     caseId: number,
     whatsapp: string,
@@ -1090,6 +1113,29 @@ function App() {
     }
   }
 
+  async function handleDeleteCaseContactLog(caseId: number, logId: number) {
+    if (!token) return
+
+    setCaseActionLoadingId(caseId)
+    setCaseActionError('')
+    setCaseActionSuccess('')
+    setSelectedCaseId(caseId)
+
+    try {
+      await deleteCaseContactLog(token, caseId, logId)
+      await handleLoadCaseContactLogs(caseId)
+      setCaseActionSuccess('Contato excluído do histórico com sucesso.')
+    } catch (err) {
+      const fallback = handleApiFailure(err, 'Não foi possível excluir o contato.')
+      if (fallback) {
+        setCaseActionError(fallback)
+      }
+    } finally {
+      setCaseActionLoadingId(null)
+    }
+  }
+
+
   async function handleRegisterWhatsAppContact(caseId: number) {
     setCaseActionLoadingId(caseId)
     setCaseActionError('')
@@ -1097,10 +1143,19 @@ function App() {
     setSelectedCaseId(caseId)
 
     try {
+      const targetCase = cases.find((item) => item.id === caseId)
+      const contactName = targetCase?.client_name?.trim()
+      const whatsapp = targetCase?.client_whatsapp?.trim()
+
       await createCaseContactLog(token, caseId, {
         contact_type: 'whatsapp',
         direction: 'outgoing',
-        summary: 'Contato realizado via WhatsApp',
+        summary: contactName
+          ? `Contato manual via WhatsApp com ${contactName}`
+          : 'Contato manual via WhatsApp com cliente/contato principal',
+        note: whatsapp
+          ? `WhatsApp principal registrado no caso: ${whatsapp}`
+          : 'WhatsApp principal ainda não informado no caso.',
       })
       await handleLoadCaseContactLogs(caseId)
 
@@ -2252,6 +2307,12 @@ function App() {
                       }}
                       onRegisterWhatsAppContact={(caseId) => {
                         void handleRegisterWhatsAppContact(caseId)
+                      }}
+                      onDeleteCaseContactLog={(caseId, logId) => {
+                        void handleDeleteCaseContactLog(caseId, logId)
+                      }}
+                      onUpdateCaseContact={(targetCase, payload) => {
+                        void handleUpdateCaseContact(targetCase, payload)
                       }}
                       onSelectCase={(caseId) => {
                         setSelectedCaseId(caseId)

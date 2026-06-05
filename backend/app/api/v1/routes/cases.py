@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.models import Case, CaseAnalysis
-from app.schemas.case import CaseCreate, CaseOut, CaseStatusUpdate, DemoCleanupOut
+from app.schemas.case import CaseCreate, CaseOut, CaseContactUpdate, CaseStatusUpdate, DemoCleanupOut
 from app.core.security import require_role, require_auth
 from app.core.tenant import scoped_query
 from app.services.report_engine import generate_report_html
@@ -575,6 +575,43 @@ def create_case(
     }
 
     return response_data
+
+
+@router.patch(
+    "/{case_id}/contact",
+    response_model=CaseOut,
+    dependencies=[Depends(require_role("admin", "advogado"))],
+)
+def update_case_contact(
+    case_id: int,
+    payload: CaseContactUpdate,
+    db: Session = Depends(get_db),
+    current_user = Depends(require_auth),
+):
+    case = scoped_query(db, Case, current_user).filter(Case.id == case_id).first()
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
+
+    previous_whatsapp = getattr(case, "client_whatsapp", None)
+    client_name = (payload.client_name or "").strip() or None
+    whatsapp_digits = "".join(ch for ch in (payload.client_whatsapp or "") if ch.isdigit())
+    has_whatsapp = bool(whatsapp_digits)
+    has_consent = bool(payload.client_whatsapp_consent and has_whatsapp)
+
+    case.client_name = client_name
+    case.client_whatsapp = whatsapp_digits or None
+    case.client_whatsapp_consent = has_consent
+
+    if has_consent:
+        if previous_whatsapp != whatsapp_digits or not getattr(case, "client_whatsapp_consent_at", None):
+            case.client_whatsapp_consent_at = dt.datetime.now(dt.UTC)
+    else:
+        case.client_whatsapp_consent_at = None
+
+    db.add(case)
+    db.commit()
+    db.refresh(case)
+    return case
 
 
 @router.patch(

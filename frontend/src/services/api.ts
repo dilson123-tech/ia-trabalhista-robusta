@@ -62,6 +62,12 @@ export type CaseCreatePayload = {
   status?: string
 }
 
+export type CaseContactUpdatePayload = {
+  client_name?: string
+  client_whatsapp?: string
+  client_whatsapp_consent?: boolean
+}
+
 export type LoginPayload = {
   username: string
   password: string
@@ -789,6 +795,28 @@ export async function deleteCaseAttachment(
 }
 
 
+export async function updateCaseContact(
+  token: string,
+  caseId: number,
+  payload: CaseContactUpdatePayload,
+): Promise<CaseItem> {
+  const response = await fetch(`${API_URL}/cases/${caseId}/contact`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  })
+
+  if (!response.ok) {
+    await parseError(response, "Erro ao atualizar WhatsApp do caso")
+  }
+
+  return response.json()
+}
+
+
 export type CaseContactLogItem = {
   id: number
   tenant_id: number
@@ -829,6 +857,24 @@ export async function createCaseContactLog(
 
   if (!response.ok) {
     await parseError(response, "Erro ao registrar contato")
+  }
+}
+
+
+export async function deleteCaseContactLog(
+  token: string,
+  caseId: number,
+  logId: number,
+): Promise<void> {
+  const response = await fetch(`${API_URL}/cases/${caseId}/contact-logs/${logId}`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+
+  if (!response.ok) {
+    await parseError(response, "Erro ao excluir contato")
   }
 }
 
