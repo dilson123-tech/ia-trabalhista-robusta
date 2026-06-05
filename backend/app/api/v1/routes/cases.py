@@ -271,6 +271,25 @@ def _build_case_operational_context(db: Session, case: Case, current_user):
     }
 
 
+def _strip_existing_case_context_from_summary(value: str) -> str:
+    text = _case_context_text(value)
+    marker = "Contexto específico considerado:"
+    if marker not in text:
+        return text
+    return text.split(marker, 1)[0].strip()
+
+
+def _is_generated_case_context_step(value: str) -> bool:
+    text = _case_context_text(value).lower()
+    generated_prefixes = (
+        "revisar anexo(s) cadastrado(s) no caso:",
+        "conferir checklist probatório:",
+        "preparar perguntas objetivas para testemunha(s)/depoente(s):",
+        "transformar os fatos-chave estruturados em linha do tempo antes de gerar peça pronta.",
+    )
+    return any(text.startswith(prefix) for prefix in generated_prefixes)
+
+
 def _enrich_analysis_with_case_context(analysis, case_context):
     enriched = dict(analysis or {})
     if not isinstance(case_context, dict):
@@ -289,16 +308,22 @@ def _enrich_analysis_with_case_context(analysis, case_context):
     enriched["case_context_facts"] = facts
     enriched["case_context_summary"] = summary
 
-    base_summary = _case_context_text(enriched.get("summary"))
-    if summary and "Contexto específico considerado:" not in base_summary:
+    base_summary = _strip_existing_case_context_from_summary(enriched.get("summary"))
+    if summary:
         enriched["summary"] = (
             f"{base_summary} Contexto específico considerado: {summary}".strip()
             if base_summary
             else f"Contexto específico considerado: {summary}"
         )
+    else:
+        enriched["summary"] = base_summary
 
     issues = list(enriched.get("issues") or [])
-    next_steps = list(enriched.get("next_steps") or [])
+    next_steps = [
+        step
+        for step in list(enriched.get("next_steps") or [])
+        if not _is_generated_case_context_step(step)
+    ]
 
     facts_joined = " ".join(facts).lower()
 

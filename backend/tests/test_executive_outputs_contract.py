@@ -11,6 +11,7 @@ from app.api.v1.routes import cases as cases_routes
 from app.services import pdf_executive as pdf_executive_service
 from app.services.executive_summary_engine import generate_executive_summary
 from app.services.report_engine import generate_report_html
+from app.api.v1.routes.cases import _enrich_analysis_with_case_context
 
 client = TestClient(app)
 
@@ -365,3 +366,60 @@ def test_executive_context_is_rendered_in_summary_and_report():
     assert "Edson Estevão" in html
     assert "Contrato de locação" in html
     assert "4/4 item(ns) validados" in html
+
+
+
+def test_executive_context_refresh_replaces_stale_context_and_generated_steps():
+    stale_analysis = {
+        "summary": (
+            "Resumo base. Contexto específico considerado: "
+            "Testemunha(s)/depoente(s): Edson estevao (testemunha /motorisa)."
+        ),
+        "risk_level": "medium",
+        "issues": ["Ponto manual preservado."],
+        "next_steps": [
+            "Organizar linha do tempo dos fatos e das provas disponíveis",
+            "Preparar perguntas objetivas para testemunha(s)/depoente(s): Edson estevao.",
+            "Transformar os fatos-chave estruturados em linha do tempo antes de gerar peça pronta.",
+        ],
+    }
+    fresh_context = {
+        "facts": [
+            "Discussão sobre locação, uso, guarda ou devolução de semi-reboque/carreta.",
+        ],
+        "attachments": [
+            {"filename": "CASO_DILSON.pdf", "category": "pdf", "description": "Processo judicial completo."},
+        ],
+        "checklist": {
+            "total": 4,
+            "validated": 4,
+            "pending": 0,
+            "items": [],
+        },
+        "witnesses": [
+            {
+                "name": "Edson Estevão",
+                "role": "testemunha / condutor",
+                "knowledge": "Responsável/condutor relacionado ao contrato.",
+            }
+        ],
+        "summary": (
+            "Discussão sobre locação, uso, guarda ou devolução de semi-reboque/carreta. "
+            "Anexo(s) cadastrado(s): CASO_DILSON.pdf. "
+            "Checklist de provas: 4/4 item(ns) validados. "
+            "Testemunha(s)/depoente(s): Edson Estevão (testemunha / condutor)."
+        ),
+    }
+
+    enriched = _enrich_analysis_with_case_context(stale_analysis, fresh_context)
+
+    assert "Edson Estevão" in enriched["summary"]
+    assert "Edson estevao" not in enriched["summary"]
+    assert "motorisa" not in enriched["summary"]
+
+    joined_steps = "\n".join(enriched["next_steps"])
+    assert "Edson Estevão" in joined_steps
+    assert "Edson estevao" not in joined_steps
+    assert joined_steps.count("Preparar perguntas objetivas") == 1
+    assert joined_steps.count("Transformar os fatos-chave estruturados") == 1
+    assert "Organizar linha do tempo dos fatos e das provas disponíveis" in joined_steps
