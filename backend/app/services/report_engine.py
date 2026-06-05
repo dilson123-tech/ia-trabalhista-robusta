@@ -12,6 +12,32 @@ def _items_html(items, empty_text: str) -> str:
     return "".join(f"<li>{item}</li>" for item in safe_items) or f"<li>{_escape(empty_text)}</li>"
 
 
+def _status_label(value) -> str:
+    raw = str(value or "").strip()
+    normalized = raw.lower()
+
+    mapping = {
+        "validated": "Validado",
+        "validado": "Validado",
+        "done": "Validado",
+        "concluído": "Concluído",
+        "concluido": "Concluído",
+        "pending": "Pendente",
+        "pendente": "Pendente",
+        "requested": "Solicitado",
+        "received": "Recebido",
+        "needs_review": "Precisa revisão",
+        "open": "Pendente",
+        "aberto": "Pendente",
+        "waived": "Dispensado",
+        "dispensado": "Dispensado",
+        "active": "Ativo",
+        "ativo": "Ativo",
+    }
+
+    return mapping.get(normalized, raw or "Sem status")
+
+
 def _context_section_html(analysis: Dict) -> str:
     context = analysis.get("case_context") or {}
     facts = analysis.get("case_context_facts") or context.get("facts") or []
@@ -41,7 +67,7 @@ def _context_section_html(analysis: Dict) -> str:
     checklist_items = []
     for item in checklist.get("items") or []:
         title = item.get("title") or "Item de checklist"
-        status = item.get("status") or "sem status"
+        status = _status_label(item.get("status"))
         checklist_items.append(f"{title} — {status}")
     checklist_intro = (
         f"{checklist.get('validated', 0)}/{checklist.get('total', 0)} item(ns) validados; "

@@ -36,7 +36,7 @@ const panelTitles: Record<FocusTab, string> = {
 }
 
 const panelDescriptions: Record<FocusTab, string> = {
-  analysis: 'Diagnóstico rápido para apoiar decisão operacional sem tirar a usuária do fluxo da carteira.',
+  analysis: 'Diagnóstico rápido para apoiar decisão operacional sem tirar a equipe do fluxo do caso.',
   summary: 'Visão consolidada para alinhamento interno, priorização e comunicação com gestão.',
   report: 'Documento analítico completo para leitura aprofundada e apresentação estruturada.',
 }
