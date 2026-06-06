@@ -1050,6 +1050,151 @@ function App() {
     }
   }
 
+  async function handleSaveWitnessContact(
+    caso: CaseItem,
+    party: CasePartyItem,
+    input: { whatsapp: string; consent: boolean; note?: string },
+  ) {
+    if (!token) return
+
+    const stateId = partyStatesByCaseId[caso.id]?.id ?? party.party_state_id
+    const whatsappDigits = input.whatsapp.replace(/\D/g, '')
+    const hasConsent = Boolean(input.consent && whatsappDigits)
+
+    if (!stateId || !party.party_key) {
+      setCaseActionError('Não foi possível localizar a testemunha/depoente para salvar o contato.')
+      return
+    }
+
+    if (input.consent && !whatsappDigits) {
+      setCaseActionError('Informe o WhatsApp antes de marcar autorização para esta testemunha/depoente.')
+      return
+    }
+
+    setWitnessGridLoadingId(caso.id)
+    setCaseActionError('')
+    setCaseActionSuccess('')
+    setSelectedCaseId(caso.id)
+
+    try {
+      const nextState = await updateCasePartyData(token, stateId, {
+        party_key: party.party_key,
+        metadata: {
+          witness_contact_whatsapp: whatsappDigits,
+          witness_contact_consent: hasConsent,
+          witness_contact_note: (input.note || '').trim(),
+          witness_contact_updated_at: new Date().toISOString(),
+        },
+        description: `Contato da testemunha/depoente atualizado: ${party.name}.`,
+      })
+
+      setPartyStatesByCaseId((prev) => ({
+        ...prev,
+        [caso.id]: nextState,
+      }))
+      setCaseActionSuccess(`Contato de ${party.name} atualizado.`)
+    } catch (err) {
+      const fallback = handleApiFailure(err, 'Não foi possível salvar o contato da testemunha/depoente.')
+      if (fallback) {
+        setCaseActionError(fallback)
+      }
+    } finally {
+      setWitnessGridLoadingId(null)
+    }
+  }
+
+  async function handleRegisterWitnessContactAction(
+    caso: CaseItem,
+    party: CasePartyItem,
+    actionKey: 'open_whatsapp' | 'evidence' | 'confirm_data' | 'reminder',
+  ) {
+    if (!token) return
+
+    const stateId = partyStatesByCaseId[caso.id]?.id ?? party.party_state_id
+    const whatsapp = String(party.party_metadata?.witness_contact_whatsapp || '')
+    const digits = whatsapp.replace(/\D/g, '')
+    const historyRaw = party.party_metadata?.witness_contact_history
+    const history = Array.isArray(historyRaw) ? historyRaw : []
+    const createdAt = new Date().toISOString()
+
+    if (!stateId || !party.party_key) {
+      setCaseActionError('Não foi possível localizar a testemunha/depoente para registrar contato.')
+      return
+    }
+
+    if (actionKey !== 'reminder' && !digits) {
+      setCaseActionError('WhatsApp da testemunha/depoente não informado.')
+      return
+    }
+
+    const messages = {
+      open_whatsapp: {
+        summary: `WhatsApp aberto para ${party.name}`,
+        message: `Olá ${party.name}, estamos entrando em contato sobre o caso ${caso.case_number}.`,
+      },
+      evidence: {
+        summary: `Pedido de provas/informações para ${party.name}`,
+        message: `Olá ${party.name}, estamos entrando em contato sobre o caso ${caso.case_number}. Por favor, envie ou confirme as informações/provas que tiver sobre os fatos.`,
+      },
+      confirm_data: {
+        summary: `Confirmação de dados com ${party.name}`,
+        message: `Olá ${party.name}, estamos conferindo os dados relacionados ao caso ${caso.case_number}. Por favor, confirme se suas informações de contato estão corretas.`,
+      },
+      reminder: {
+        summary: `Lembrete registrado para ${party.name}`,
+        message: '',
+      },
+    }
+
+    const selected = messages[actionKey]
+
+    setWitnessGridLoadingId(caso.id)
+    setCaseActionError('')
+    setCaseActionSuccess('')
+    setSelectedCaseId(caso.id)
+
+    try {
+      const nextHistory = [
+        {
+          type: actionKey,
+          summary: selected.summary,
+          created_at: createdAt,
+        },
+        ...history,
+      ].slice(0, 12)
+
+      const nextState = await updateCasePartyData(token, stateId, {
+        party_key: party.party_key,
+        metadata: {
+          witness_contact_history: nextHistory,
+          witness_contact_last_action: selected.summary,
+          witness_contact_last_action_at: createdAt,
+        },
+        description: selected.summary,
+      })
+
+      setPartyStatesByCaseId((prev) => ({
+        ...prev,
+        [caso.id]: nextState,
+      }))
+
+      if (actionKey !== 'reminder') {
+        const url = `https://wa.me/${digits}?text=${encodeURIComponent(selected.message)}`
+        window.open(url, '_blank', 'noopener,noreferrer')
+      }
+
+      setCaseActionSuccess(selected.summary)
+    } catch (err) {
+      const fallback = handleApiFailure(err, 'Não foi possível registrar contato da testemunha/depoente.')
+      if (fallback) {
+        setCaseActionError(fallback)
+      }
+    } finally {
+      setWitnessGridLoadingId(null)
+    }
+  }
+
+
   async function handleUpdateCaseContact(
     caso: CaseItem,
     payload: { client_name?: string; client_whatsapp?: string; client_whatsapp_consent?: boolean },
@@ -2292,6 +2437,12 @@ function App() {
                         }}
                         onUpdateWitness={(targetCase, party, witnessInput) => {
                           void handleUpdateWitnessInCase(targetCase, party, witnessInput)
+                        }}
+                        onSaveWitnessContact={(targetCase, party, input) => {
+                          void handleSaveWitnessContact(targetCase, party, input)
+                        }}
+                        onRegisterWitnessContactAction={(targetCase, party, actionKey) => {
+                          void handleRegisterWitnessContactAction(targetCase, party, actionKey)
                         }}
                           onClearWitnesses={(targetCase) => {
                             void handleClearWitnessesFromCase(targetCase)

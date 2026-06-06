@@ -9,6 +9,14 @@ type WitnessFormInput = {
   whatKnows: string
 }
 
+type WitnessContactInput = {
+  whatsapp: string
+  consent: boolean
+  note?: string
+}
+
+type WitnessContactActionKey = 'open_whatsapp' | 'evidence' | 'confirm_data' | 'reminder'
+
 type CaseContactUpdateInput = {
   client_name?: string
   client_whatsapp?: string
@@ -81,6 +89,8 @@ type CaseCardProps = {
   onLoadWitnessGrid: (caseId: number) => void
   onAddWitness: (caso: CaseItem, witnessInput: WitnessFormInput) => void
   onUpdateWitness: (caso: CaseItem, party: CasePartyItem, witnessInput: WitnessFormInput) => void
+  onSaveWitnessContact: (caso: CaseItem, party: CasePartyItem, input: WitnessContactInput) => void
+  onRegisterWitnessContactAction: (caso: CaseItem, party: CasePartyItem, actionKey: WitnessContactActionKey) => void
   onClearWitnesses: (caso: CaseItem) => void
   onLoadReadiness: (caso: CaseItem) => void
   onLoadDossier: (caso: CaseItem) => void
@@ -100,7 +110,6 @@ export function CaseCard({
   isLoadingSummary,
   isLoadingReport,
   isLoadingPdf,
-  isLoadingContactLogs,
   isLoadingReadiness,
   isLoadingDossier,
   isLoadingWitnessGrid,
@@ -117,17 +126,16 @@ export function CaseCard({
   onLoadExecutiveSummary,
   onLoadExecutiveReport,
   onOpenExecutivePdf,
-  onLoadCaseContactLogs,
   onLoadWitnessGrid,
   onAddWitness,
   onUpdateWitness,
+  onSaveWitnessContact,
+  onRegisterWitnessContactAction,
     onClearWitnesses,
   onLoadReadiness,
   onLoadDossier,
   onOpenWhatsAppTemplate,
   onRegisterWhatsAppContact,
-  onDeleteCaseContactLog,
-  onUpdateCaseContact,
   onSelectCase,
 }: CaseCardProps) {
   const isSelected = selectedCaseId === caso.id
@@ -138,11 +146,11 @@ export function CaseCard({
   const [witnessWhatKnows, setWitnessWhatKnows] = useState('')
   const [editingWitnessPartyKey, setEditingWitnessPartyKey] = useState<string | null>(null)
   const [witnessFormError, setWitnessFormError] = useState('')
-  const [isContactFormOpen, setIsContactFormOpen] = useState(false)
-  const [contactName, setContactName] = useState(caso.client_name || '')
-  const [contactWhatsapp, setContactWhatsapp] = useState(caso.client_whatsapp || '')
-  const [contactConsent, setContactConsent] = useState(Boolean(caso.client_whatsapp_consent))
-  const [contactFormError, setContactFormError] = useState('')
+  const [openWitnessContactPartyKey, setOpenWitnessContactPartyKey] = useState<string | null>(null)
+  const [witnessContactWhatsapp, setWitnessContactWhatsapp] = useState('')
+  const [witnessContactConsent, setWitnessContactConsent] = useState(false)
+  const [witnessContactNote, setWitnessContactNote] = useState('')
+  const [witnessContactError, setWitnessContactError] = useState('')
   const [witnessFormSubmitting, setWitnessFormSubmitting] = useState(false)
 
   function normalizeWitnessDuplicateKey(value: string) {
@@ -177,6 +185,43 @@ export function CaseCard({
     )
     setWitnessFormError('')
     setIsWitnessFormOpen(true)
+  }
+
+  function handleOpenWitnessContactPanel(party: CasePartyItem) {
+    const isOpening = openWitnessContactPartyKey !== party.party_key
+
+    if (isOpening) {
+      setWitnessContactWhatsapp(getPartyMetadataText(party, 'witness_contact_whatsapp'))
+      setWitnessContactConsent(Boolean(party.party_metadata?.witness_contact_consent))
+      setWitnessContactNote(getPartyMetadataText(party, 'witness_contact_note'))
+      setWitnessContactError('')
+      setOpenWitnessContactPartyKey(party.party_key)
+      return
+    }
+
+    setOpenWitnessContactPartyKey(null)
+    setWitnessContactError('')
+  }
+
+  async function handleSubmitWitnessContact(party: CasePartyItem) {
+    const whatsappDigits = witnessContactWhatsapp.replace(/\D/g, '')
+
+    if (witnessContactConsent && !whatsappDigits) {
+      setWitnessContactError('Informe o WhatsApp antes de marcar autorização para esta testemunha/depoente.')
+      return
+    }
+
+    setWitnessContactError('')
+    await onSaveWitnessContact(caso, party, {
+      whatsapp: witnessContactWhatsapp,
+      consent: witnessContactConsent,
+      note: witnessContactNote,
+    })
+  }
+
+  async function handleWitnessContactAction(party: CasePartyItem, actionKey: WitnessContactActionKey) {
+    setWitnessContactError('')
+    await onRegisterWitnessContactAction(caso, party, actionKey)
   }
 
   async function handleSubmitWitnessForm() {
@@ -645,6 +690,8 @@ export function CaseCard({
           padding: '12px',
           border: '1px solid rgba(255,255,255,0.08)',
           borderRadius: '10px',
+          maxHeight: '620px',
+          overflowY: 'auto',
         }}
       >
         <div
@@ -776,6 +823,12 @@ export function CaseCard({
                   normalizedWhatKnows.length > 0 && normalizedWhatKnows === normalizedConfirmsFacts
                 const riskLevel = getPartyMetadataText(party, 'risk_level')
                 const sensitivePoints = getPartyMetadataText(party, 'sensitive_points')
+                const savedWitnessContactWhatsapp = getPartyMetadataText(party, 'witness_contact_whatsapp')
+                const savedWitnessContactConsent = Boolean(party.party_metadata?.witness_contact_consent)
+                const witnessContactHistory = Array.isArray(party.party_metadata?.witness_contact_history)
+                  ? (party.party_metadata.witness_contact_history as Array<Record<string, unknown>>)
+                  : []
+                const isWitnessContactPanelOpen = openWitnessContactPartyKey === party.party_key
 
                 return (
                   <div
@@ -798,15 +851,27 @@ export function CaseCard({
                         <strong>{party.name}</strong> — {party.role} / {preparationStatus}
                       </p>
 
-                      <button
-                        type="button"
-                        disabled={witnessFormSubmitting || isLoadingWitnessGrid}
-                        onClick={() => handleOpenWitnessEditForm(party)}
-                        className="case-card__action case-card__action--summary"
-                        style={{ padding: '4px 8px' }}
-                      >
-                        Editar
-                      </button>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', justifyContent: 'flex-end' }}>
+                        <button
+                          type="button"
+                          disabled={witnessFormSubmitting|| isLoadingWitnessGrid}
+                          onClick={() => handleOpenWitnessEditForm(party)}
+                          className="case-card__action case-card__action--summary"
+                          style={{ padding: '4px 8px' }}
+                        >
+                          Editar
+                        </button>
+
+                        <button
+                          type="button"
+                          disabled={witnessFormSubmitting || isLoadingWitnessGrid}
+                          onClick={() => handleOpenWitnessContactPanel(party)}
+                          className="case-card__action case-card__action--summary"
+                          style={{ padding: '4px 8px' }}
+                        >
+                          {isWitnessContactPanelOpen ? 'Fechar contato' : 'Contato'}
+                        </button>
+                      </div>
                     </div>
 
                     {whatKnows ? (
@@ -832,6 +897,97 @@ export function CaseCard({
                         <strong>Pontos sensíveis:</strong> {sensitivePoints}
                       </p>
                     ) : null}
+
+                    {savedWitnessContactWhatsapp ? (
+                      <p style={{ margin: '6px 0 0 0', opacity: 0.82 }}>
+                        <strong>Contato da testemunha:</strong> {savedWitnessContactWhatsapp}
+                        {savedWitnessContactConsent ? ' — autorizado' : ' — autorização não confirmada'}
+                      </p>
+                    ) : null}
+
+                    {isWitnessContactPanelOpen ? (
+                      <div
+                        style={{
+                          border: '1px solid rgba(255,255,255,0.12)',
+                          borderRadius: '10px',
+                          display: 'grid',
+                          gap: '8px',
+                          marginTop: '8px',
+                          padding: '10px',
+                        }}
+                      >
+                        <strong>Janela de contato — {party.name}</strong>
+
+                        <label style={{ display: 'grid', gap: '4px' }}>
+                          <span>WhatsApp desta testemunha/depoente</span>
+                          <input
+                            value={witnessContactWhatsapp}
+                            onChange={(event) => setWitnessContactWhatsapp(event.target.value)}
+                            placeholder="Ex.: 5547999999999"
+                          />
+                        </label>
+
+                        <label style={{ alignItems: 'center', display: 'flex', gap: '8px' }}>
+                          <input
+                            type="checkbox"
+                            checked={witnessContactConsent}
+                            onChange={(event) => setWitnessContactConsent(event.target.checked)}
+                          />
+                          <span>Autorizou contato por WhatsApp</span>
+                        </label>
+
+                        <label style={{ display: 'grid', gap: '4px' }}>
+                          <span>Observação/lembrete desta pessoa</span>
+                          <textarea
+                            value={witnessContactNote}
+                            onChange={(event) => setWitnessContactNote(event.target.value)}
+                            placeholder="Ex.: ligar à tarde, pedir documento, confirmar endereço..."
+                            rows={2}
+                          />
+                        </label>
+
+                        {witnessContactError ? (
+                          <p style={{ margin: 0, color: '#fca5a5' }}>{witnessContactError}</p>
+                        ) : null}
+
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                          <button type="button" onClick={() => { void handleSubmitWitnessContact(party) }} className="case-card__action case-card__action--analysis" style={{ padding: '5px 9px' }}>
+                            Salvar contato
+                          </button>
+
+                          <button type="button" onClick={() => { void handleWitnessContactAction(party, 'open_whatsapp') }} className="case-card__action case-card__action--summary" style={{ padding: '5px 9px' }}>
+                            Abrir WhatsApp
+                          </button>
+
+                          <button type="button" onClick={() => { void handleWitnessContactAction(party, 'evidence') }} className="case-card__action case-card__action--summary" style={{ padding: '5px 9px' }}>
+                            Pedir provas
+                          </button>
+
+                          <button type="button" onClick={() => { void handleWitnessContactAction(party, 'confirm_data') }} className="case-card__action case-card__action--summary" style={{ padding: '5px 9px' }}>
+                            Confirmar dados
+                          </button>
+
+                          <button type="button" onClick={() => { void handleWitnessContactAction(party, 'reminder') }} className="case-card__action case-card__action--summary" style={{ padding: '5px 9px' }}>
+                            Registrar lembrete
+                          </button>
+                        </div>
+
+                        {witnessContactHistory.length > 0 ? (
+                          <div style={{ display: 'grid', gap: '6px' }}>
+                            <strong>Registros desta testemunha</strong>
+                            {witnessContactHistory.slice(0, 4).map((item, index) => (
+                              <p key={`${party.id}-witness-contact-${index}`} style={{ margin: 0, opacity: 0.78 }}>
+                                {String(item.created_at || '')} — {String(item.summary || 'Contato registrado')}
+                              </p>
+                            ))}
+                          </div>
+                        ) : (
+                          <p style={{ margin: 0, opacity: 0.68 }}>
+                            Nenhum registro próprio desta testemunha/depoente ainda.
+                          </p>
+                        )}
+                      </div>
+                    ) : null}
                   </div>
                 )
               })}
@@ -854,6 +1010,8 @@ export function CaseCard({
             padding: '12px',
             border: '1px solid rgba(255,255,255,0.08)',
             borderRadius: '10px',
+            maxHeight: '420px',
+            overflowY: 'auto',
           }}
         >
           <div
@@ -867,14 +1025,7 @@ export function CaseCard({
           >
             <strong>Histórico de contatos / WhatsApp</strong>
 
-            <button
-              type="button"
-              onClick={() => onLoadCaseContactLogs(caso.id)}
-              className="case-card__action case-card__action--summary"
-              style={{ padding: '6px 10px' }}
-            >
-              {isLoadingContactLogs ? 'Carregando...' : 'Atualizar'}
-            </button>
+
           </div>
 
           <div
@@ -892,173 +1043,12 @@ export function CaseCard({
             </p>
 
             <p style={{ margin: 0, opacity: 0.78 }}>
-              {caso.client_whatsapp
-                ? caso.client_whatsapp_consent
-                  ? 'Cliente autorizou contato por WhatsApp.'
-                  : 'WhatsApp informado, mas autorização de contato ainda não confirmada.'
-                : 'Informe o WhatsApp do cliente/contato principal no cadastro do caso para liberar o fluxo completo de mensagens.'}
+              Histórico operacional de contatos, mensagens, lembretes e registros do caso.
             </p>
 
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-              <button
-                type="button"
-                onClick={() => {
-                  setContactName(caso.client_name || '')
-                  setContactWhatsapp(caso.client_whatsapp || '')
-                  setContactConsent(Boolean(caso.client_whatsapp_consent))
-                  setContactFormError('')
-                  setIsContactFormOpen((current) => !current)
-                }}
-                className="case-card__action case-card__action--summary"
-                style={{ padding: '6px 10px', width: 'fit-content' }}
-              >
-                {isContactFormOpen ? 'Fechar edição' : 'Editar WhatsApp'}
-              </button>
+                      </div>
 
-              <button
-                type="button"
-                onClick={() => onRegisterWhatsAppContact(caso.id)}
-                className="case-card__action case-card__action--summary"
-                style={{ padding: '6px 10px', width: 'fit-content' }}
-              >
-                Registrar contato
-              </button>
-            </div>
-
-            {isContactFormOpen ? (
-              <form
-                onSubmit={(event) => {
-                  event.preventDefault()
-                  const whatsappDigits = contactWhatsapp.replace(/\D/g, '')
-
-                  if (contactConsent && !whatsappDigits) {
-                    setContactFormError('Informe um WhatsApp antes de marcar a autorização.')
-                    return
-                  }
-
-                  setContactFormError('')
-                  onUpdateCaseContact(caso, {
-                    client_name: contactName,
-                    client_whatsapp: contactWhatsapp,
-                    client_whatsapp_consent: contactConsent,
-                  })
-                  setIsContactFormOpen(false)
-                }}
-                style={{
-                  border: '1px solid rgba(255,255,255,0.08)',
-                  borderRadius: '10px',
-                  display: 'grid',
-                  gap: '8px',
-                  padding: '10px',
-                }}
-              >
-                <label style={{ display: 'grid', gap: '4px' }}>
-                  <span>Cliente/contato principal</span>
-                  <input
-                    value={contactName}
-                    onChange={(event) => setContactName(event.target.value)}
-                    placeholder="Nome do cliente ou contato principal"
-                  />
-                </label>
-
-                <label style={{ display: 'grid', gap: '4px' }}>
-                  <span>WhatsApp principal</span>
-                  <input
-                    value={contactWhatsapp}
-                    onChange={(event) => setContactWhatsapp(event.target.value)}
-                    placeholder="Ex.: 5547999999999"
-                  />
-                </label>
-
-                <label style={{ alignItems: 'center', display: 'flex', gap: '8px' }}>
-                  <input
-                    type="checkbox"
-                    checked={contactConsent}
-                    onChange={(event) => setContactConsent(event.target.checked)}
-                  />
-                  <span>Cliente autorizou contato por WhatsApp</span>
-                </label>
-
-                {contactFormError ? (
-                  <p style={{ color: '#fca5a5', margin: 0 }}>{contactFormError}</p>
-                ) : null}
-
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                  <button
-                    type="submit"
-                    className="case-card__action case-card__action--primary"
-                    style={{ padding: '6px 10px', width: 'fit-content' }}
-                  >
-                    Salvar WhatsApp
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsContactFormOpen(false)
-                      setContactFormError('')
-                    }}
-                    className="case-card__action case-card__action--summary"
-                    style={{ padding: '6px 10px', width: 'fit-content' }}
-                  >
-                    Cancelar
-                  </button>
-                </div>
-              </form>
-            ) : null}
-
-            {caso.client_whatsapp ? (
-              <div
-                style={{
-                  borderTop: '1px solid rgba(255,255,255,0.08)',
-                  display: 'grid',
-                  gap: '8px',
-                  paddingTop: '8px',
-                }}
-              >
-                <strong>Mensagens prontas</strong>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                  <button
-                    type="button"
-                    onClick={() => onOpenWhatsAppTemplate(caso.id, caso.client_whatsapp || '', 'documents')}
-                    className="case-card__action case-card__action--summary"
-                    style={{ padding: '6px 10px' }}
-                  >
-                    Solicitar documentos
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => onOpenWhatsAppTemplate(caso.id, caso.client_whatsapp || '', 'evidence')}
-                    className="case-card__action case-card__action--summary"
-                    style={{ padding: '6px 10px' }}
-                  >
-                    Pedir provas
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => onOpenWhatsAppTemplate(caso.id, caso.client_whatsapp || '', 'status_update')}
-                    className="case-card__action case-card__action--summary"
-                    style={{ padding: '6px 10px' }}
-                  >
-                    Avisar andamento
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => onOpenWhatsAppTemplate(caso.id, caso.client_whatsapp || '', 'confirm_data')}
-                    className="case-card__action case-card__action--summary"
-                    style={{ padding: '6px 10px' }}
-                  >
-                    Confirmar dados
-                  </button>
-                </div>
-              </div>
-            ) : null}
-          </div>
-
-          {contactLogs.length > 0 ? (
+            {contactLogs.length > 0 ? (
             <div style={{ display: 'grid', gap: '8px' }}>
               {contactLogs.slice(0, 5).map((log) => (
                 <div
@@ -1076,18 +1066,7 @@ export function CaseCard({
                     <p style={{ margin: 0, opacity: 0.82 }}>{log.note}</p>
                   ) : null}
 
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (window.confirm('Excluir este contato do histórico?')) {
-                        onDeleteCaseContactLog(caso.id, log.id)
-                      }
-                    }}
-                    className="case-card__action case-card__action--summary"
-                    style={{ marginTop: '6px', padding: '5px 9px', width: 'fit-content' }}
-                  >
-                    Excluir
-                  </button>
+
                 </div>
               ))}
             </div>
