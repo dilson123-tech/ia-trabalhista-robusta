@@ -564,6 +564,8 @@ export function EditorModulePanel({ token, selectedCaseId, selectedCaseArea, pie
     return [...selectedDocument.versions].sort((a, b) => b.version_number - a.version_number)[0] ?? null
   }, [selectedDocument])
 
+  const [isVersionTimelineOpen, setIsVersionTimelineOpen] = useState(false)
+
   const versionsTimeline = useMemo(() => {
     if (!selectedDocument) return []
     return [...selectedDocument.versions].sort((a, b) => b.version_number - a.version_number)
@@ -1674,21 +1676,53 @@ export function EditorModulePanel({ token, selectedCaseId, selectedCaseArea, pie
               </article>
 
               <article className="info-card">
-                <strong className="info-list-title">Linha do tempo de versões</strong>
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      gap: '12px',
+                      alignItems: 'center',
+                      flexWrap: 'wrap',
+                    }}
+                  >
+                    <strong className="info-list-title">Linha do tempo de versões</strong>
 
-                <ul className="info-list" style={{ marginTop: '12px' }}>
-                  {versionsTimeline.length > 0 ? (
-                    versionsTimeline.map((version) => (
-                      <li key={version.id}>
-                        <strong>{getVersionDisplayLabel(version)}</strong>
-                        {version.version_number === selectedDocument.current_version_number ? ' • atual' : ''}
-                      </li>
-                    ))
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                      <span className="insight-badge">
+                        {versionsTimeline.length > 0
+                          ? `${getVersionDisplayLabel(versionsTimeline[0])}${versionsTimeline[0].version_number === selectedDocument.current_version_number ? ' • atual' : ''}`
+                          : 'Sem versões'}
+                      </span>
+
+                      <button
+                        type="button"
+                        className="btn btn-ghost"
+                        onClick={() => setIsVersionTimelineOpen((current) => !current)}
+                      >
+                        {isVersionTimelineOpen ? 'Recolher versões' : 'Ver versões anteriores'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {isVersionTimelineOpen ? (
+                    <ul className="info-list" style={{ marginTop: '12px' }}>
+                      {versionsTimeline.length > 0 ? (
+                        versionsTimeline.map((version) => (
+                          <li key={version.id}>
+                            <strong>{getVersionDisplayLabel(version)}</strong>
+                            {version.version_number === selectedDocument.current_version_number ? ' • atual' : ''}
+                          </li>
+                        ))
+                      ) : (
+                        <li>Nenhuma versão registrada até aqui.</li>
+                      )}
+                    </ul>
                   ) : (
-                    <li>Nenhuma versão registrada até aqui.</li>
+                    <p className="info-text" style={{ marginTop: '12px', marginBottom: 0 }}>
+                      Lista recolhida. Use “Ver versões anteriores” somente quando precisar auditar o histórico.
+                    </p>
                   )}
-                </ul>
-              </article>
+                </article>
             </>
           ) : null}
         </div>
