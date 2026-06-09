@@ -1,3 +1,4 @@
+import unicodedata
 import datetime as dt
 
 from fastapi.responses import Response
@@ -45,6 +46,70 @@ def _case_context_unique(items):
         seen.add(key)
         result.append(text)
     return result
+
+
+
+def _case_context_normalize_key(value) -> str:
+    text = _case_context_text(value).lower()
+    text = unicodedata.normalize("NFKD", text)
+    text = "".join(char for char in text if not unicodedata.combining(char))
+    return " ".join(text.split())
+
+
+def _case_context_witness_score(item) -> int:
+    if not isinstance(item, dict):
+        return 0
+
+    name = _case_context_text(item.get("name"))
+    role = _case_context_text(item.get("role"))
+    knowledge = _case_context_text(item.get("knowledge"))
+
+    score = len(role) + min(len(knowledge), 240) + min(len(name), 80)
+
+    if any(char.isupper() for char in name[1:]):
+        score += 3
+
+    if any(ord(char) > 127 for char in name):
+        score += 3
+
+    if (item.get("source") or "") == "case_witness_grid_v1":
+        score += 25
+
+    return score
+
+
+def _case_context_deduplicate_witnesses(witnesses):
+    result_by_key = {}
+    order = []
+
+    for item in witnesses or []:
+        if not isinstance(item, dict):
+            continue
+
+        name = _case_context_text(item.get("name")) or "Pessoa sem nome informado"
+        key = _case_context_normalize_key(name)
+
+        if not key:
+            key = f"__witness_{len(order)}"
+
+        normalized_item = {
+            **item,
+            "name": name,
+            "role": _case_context_text(item.get("role")) or "testemunha/depoente",
+            "knowledge": _case_context_text(item.get("knowledge")),
+        }
+
+        if key not in result_by_key:
+            result_by_key[key] = normalized_item
+            order.append(key)
+            continue
+
+        current = result_by_key[key]
+        if _case_context_witness_score(normalized_item) > _case_context_witness_score(current):
+            result_by_key[key] = normalized_item
+
+    return [result_by_key[key] for key in order if key in result_by_key]
+
 
 
 def _case_context_attr(obj, *names, default=None):
@@ -226,17 +291,39 @@ def _build_case_operational_context(db: Session, case: Case, current_user):
                 ):
                     continue
 
+                metadata = _case_context_attr(party, "party_metadata", "metadata", default={}) or {}
+                if not isinstance(metadata, dict):
+                    metadata = {}
+
                 witnesses.append(
                     {
                         "name": name or "Pessoa sem nome informado",
                         "role": role or "testemunha/depoente",
                         "knowledge": knowledge,
+                        "source": _case_context_text(metadata.get("grid_source")),
                     }
                 )
 
     attachments = attachments[:10]
     checklist_items = checklist_items[:15]
-    witnesses = witnesses[:10]
+
+    grid_witnesses = [
+        item for item in witnesses
+        if item.get("source") == "case_witness_grid_v1"
+    ]
+
+    if grid_witnesses:
+        witnesses = grid_witnesses
+
+    witnesses = _case_context_deduplicate_witnesses(witnesses)
+    witnesses = [
+        {
+            "name": item.get("name"),
+            "role": item.get("role"),
+            "knowledge": item.get("knowledge"),
+        }
+        for item in witnesses[:10]
+    ]
 
     summary_parts = []
     summary_parts.extend(facts[:6])
