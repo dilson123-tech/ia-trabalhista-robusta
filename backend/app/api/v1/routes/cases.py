@@ -265,7 +265,7 @@ def _build_case_operational_context(db: Session, case: Case, current_user):
 
         for state in states:
             party_query = db.query(CasePartyModel)
-            party_query = _case_context_filter(party_query, CasePartyModel, "state_id", getattr(state, "id", None))
+            party_query = _case_context_filter(party_query, CasePartyModel, "party_state_id", getattr(state, "id", None))
             party_query = _case_context_order(party_query, CasePartyModel)
             for party in _case_context_rows(party_query, limit=50):
                 role = _case_context_text(_case_context_attr(party, "role", "type", "party_type", default=""))
