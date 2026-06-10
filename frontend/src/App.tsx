@@ -192,7 +192,8 @@ function App() {
   }
 
 
-  function handleAssistantDestinationClick(destination: string) {
+
+  function handleAssistantDestinationClick(destination: string, suggestedText?: string, label?: string) {
     const scrollTo = (selector: string) => {
       window.setTimeout(() => {
         const element = document.querySelector(selector)
@@ -205,14 +206,41 @@ function App() {
       }, 180)
     }
 
+    const openNewCaseForm = () => {
+      setShowNewCaseForm(true)
+      setNewCaseError('')
+      setNewCaseSuccess('Copiloto abriu a montagem inicial do caso. Preencha os dados básicos e salve o caso.')
+
+      const labelText = (label || '').toLowerCase()
+      const suggested = (suggestedText || '').trim()
+
+      if (suggested && labelText.includes('descrição inicial')) {
+        setNewCaseForm((prev) => ({
+          ...prev,
+          description: prev.description.trim() ? prev.description : suggested,
+        }))
+      }
+
+      window.setTimeout(() => {
+        window.scrollTo({
+          top: 0,
+          behavior: 'smooth',
+        })
+      }, 80)
+    }
+
     const openExpansionModule = (moduleName: 'editor' | 'evidence' | 'succession' | 'appeals') => {
       setExpansionModuleTarget(moduleName)
       setExpansionModuleRequestId((prev) => prev + 1)
       scrollTo('#workspace-expansion-anchor')
     }
 
+    if (!selectedCaseId || destination === 'novo_caso') {
+      openNewCaseForm()
+      return
+    }
+
     if (destination === 'contato_cliente') {
-      setShowNewCaseForm(true)
       scrollTo('#case-workbench-anchor')
       return
     }
@@ -234,9 +262,6 @@ function App() {
     }
 
     if (destination === 'dossie' || destination === 'linha_do_tempo' || destination === 'testemunhas') {
-      if (!selectedCaseId) {
-        setShowNewCaseForm(true)
-      }
       scrollTo('#case-workbench-anchor')
       return
     }

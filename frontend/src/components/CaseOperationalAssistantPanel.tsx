@@ -10,10 +10,11 @@ type CaseOperationalAssistantPanelProps = {
   token: string
   caseId: number | null
   caseLabel?: string | null
-  onDestinationClick?: (destination: string) => void
+  onDestinationClick?: (destination: string, suggestedText?: string, label?: string) => void
 }
 
 const destinationLabels: Record<string, string> = {
+  novo_caso: 'Novo caso',
   linha_do_tempo: 'Linha do tempo',
   checklist: 'Checklist de provas',
   anexos: 'Anexos/provas',
@@ -28,7 +29,7 @@ function getDestinationLabel(destination: string): string {
   return destinationLabels[destination] ?? destination
 }
 
-function renderSuggestion(item: CaseOperationalAssistantSuggestion, index: number, onDestinationClick?: (destination: string) => void) {
+function renderSuggestion(item: CaseOperationalAssistantSuggestion, index: number, onDestinationClick?: (destination: string, suggestedText?: string, label?: string) => void) {
   return (
     <div
       key={`${item.destination}-${item.label}-${index}`}
@@ -43,7 +44,7 @@ function renderSuggestion(item: CaseOperationalAssistantSuggestion, index: numbe
         <strong>{item.label}</strong>
         <button
           type="button"
-          onClick={() => onDestinationClick?.(item.destination)}
+          onClick={() => onDestinationClick?.(item.destination, item.suggested_text, item.label)}
           className="case-card__meta-pill"
           style={{
             cursor: onDestinationClick ? 'pointer' : 'default',
@@ -70,6 +71,111 @@ function renderSuggestion(item: CaseOperationalAssistantSuggestion, index: numbe
   )
 }
 
+
+function normalizeInitialCaseText(value: string): string {
+  return value.trim().replace(/\s+/g, ' ')
+}
+
+function inferInitialCaseArea(message: string): string {
+  const text = message.toLowerCase()
+
+  if (/(sem registro|hora extra|horas extras|patrão|patrao|empregado|empregador|demitid|rescis|salário|salario|ctps)/.test(text)) {
+    return 'trabalhista'
+  }
+
+  if (/(inss|benefício|beneficio|auxílio|auxilio|aposentadoria|bpc|loas|perícia|pericia|laudo médico|laudo medico)/.test(text)) {
+    return 'previdenciário'
+  }
+
+  if (/(pensão|pensao|guarda|divórcio|divorcio|alimentos|criança|crianca|visita|união estável|uniao estavel)/.test(text)) {
+    return 'família'
+  }
+
+  if (/(produto|defeito|loja|compra|fornecedor|consumidor|garantia|nota fiscal|cobrança indevida|cobranca indevida)/.test(text)) {
+    return 'consumidor'
+  }
+
+  if (/(pátio|patio|carreta|veículo|veiculo|contrato|indenização|indenizacao|dano|responsabilidade civil|locação|locacao)/.test(text)) {
+    return 'cível'
+  }
+
+  if (/(furto|roubo|ameaça|ameaca|agressão|agressao|delegacia|boletim de ocorrência|bo|crime)/.test(text)) {
+    return 'cível / criminal'
+  }
+
+  return 'a definir'
+}
+
+function inferInitialActionType(message: string, area: string): string {
+  const text = message.toLowerCase()
+
+  if (area === 'trabalhista') {
+    return 'Reclamação trabalhista / reconhecimento de vínculo e verbas'
+  }
+
+  if (area === 'previdenciário') {
+    return 'Revisão/ concessão de benefício previdenciário ou assistencial'
+  }
+
+  if (area === 'família') {
+    return 'Ação de família a definir conforme documentos e urgência'
+  }
+
+  if (area === 'consumidor') {
+    return 'Ação consumerista / reparação por falha na prestação ou produto'
+  }
+
+  if (/(pátio|patio|carreta|veículo|veiculo|guarda|furto|desapareceu|sumiu)/.test(text)) {
+    return 'Responsabilidade civil / indenização por guarda de bem'
+  }
+
+  return 'A definir após triagem jurídica'
+}
+
+function buildInitialCaseTitle(message: string, area: string): string {
+  const text = message.toLowerCase()
+
+  if (/(pátio|patio|carreta)/.test(text)) {
+    return 'Responsabilidade de pátio por desaparecimento/furto de carreta'
+  }
+
+  if (area === 'trabalhista') {
+    return 'Possível vínculo trabalhista, horas extras e provas digitais'
+  }
+
+  if (area === 'previdenciário') {
+    return 'Benefício negado pelo INSS com documentos médicos'
+  }
+
+  if (area === 'família') {
+    return 'Demanda familiar com pendências documentais'
+  }
+
+  if (area === 'consumidor') {
+    return 'Falha de produto/serviço com documentos e mensagens'
+  }
+
+  return 'Caso em montagem inicial'
+}
+
+function buildInitialCaseNumber(area: string): string {
+  const normalized = area
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 18)
+
+  return `${normalized || 'CASO'}-001`
+}
+
+function buildInitialCaseDescription(message: string): string {
+  const cleaned = normalizeInitialCaseText(message).replace(/[.!?]+$/, '')
+
+  return `Relato inicial do cliente: ${cleaned}. O caso ainda está em montagem inicial e depende de conferência dos dados do cliente, documentos, provas, datas, pessoas envolvidas, valores e urgências. Antes de qualquer medida, recomenda-se organizar a linha do tempo, criar checklist de provas, identificar anexos/documentos necessários, levantar testemunhas/depoentes e atualizar o dossiê interno.`
+}
+
 export function CaseOperationalAssistantPanel({ token, caseId, caseLabel, onDestinationClick }: CaseOperationalAssistantPanelProps) {
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(false)
@@ -82,52 +188,85 @@ export function CaseOperationalAssistantPanel({ token, caseId, caseLabel, onDest
     if (!cleanedMessage || loading) return
 
     if (!caseId) {
+      const initialArea = inferInitialCaseArea(cleanedMessage)
+      const initialActionType = inferInitialActionType(cleanedMessage, initialArea)
+      const initialTitle = buildInitialCaseTitle(cleanedMessage, initialArea)
+      const initialCaseNumber = buildInitialCaseNumber(initialArea)
+      const initialDescription = buildInitialCaseDescription(cleanedMessage)
+
       setResponse({
         case_id: 0,
         assistant_mode: 'initial_case_setup',
-        summary: 'Entendi. Como ainda não há caso aberto, vou orientar a montagem inicial antes do cadastro.',
+        summary: 'Entendi. Vou transformar seu relato em um roteiro de preenchimento para montar o caso dentro do sistema.',
         rewritten_input: cleanedMessage,
         suggested_actions: [
           {
-            destination: 'contato_cliente',
-            label: 'Levantar dados básicos do cliente',
-            suggested_text: 'Antes de cadastrar, confirme nome do cliente, WhatsApp, área provável, resumo dos fatos, datas principais e urgência.',
-            reason: 'Esses dados ajudam a criar o caso com base mínima confiável.',
+            destination: 'novo_caso',
+            label: '1. Preencher Novo Caso',
+            suggested_text: `Número do caso:
+${initialCaseNumber}
+
+Título:
+${initialTitle}
+
+Área provável:
+${initialArea}
+
+Tipo de ação:
+${initialActionType}
+
+Descrição inicial:
+${initialDescription}`,
+            reason: 'Este bloco já organiza o relato informal em campos prontos para copiar no formulário “+ Novo Caso”.',
             priority: 'alta',
           },
           {
-            destination: 'analise',
-            label: 'Identificar área e tipo de ação',
-            suggested_text: 'Use a narrativa para definir a área provável: trabalhista, cível, consumidor, família, previdenciário, criminal ou ambiental.',
-            reason: 'A área jurídica orienta quais documentos, provas e perguntas serão necessários.',
+            destination: 'novo_caso',
+            label: '2. Depois de criar o caso',
+            suggested_text: 'Ordem recomendada: Linha do Tempo → Checklist de provas → Anexos/provas → Testemunhas/depoentes → Dossiê interno → Análise do caso → Editor/minuta.',
+            reason: 'Essa sequência evita que o advogado se perca e garante que o caso seja montado antes da minuta.',
             priority: 'alta',
           },
           {
-            destination: 'editor_minuta',
-            label: 'Preparar descrição inicial do caso',
-            suggested_text: cleanedMessage,
-            reason: 'A informação pode virar a primeira descrição do caso, depois de revisão humana.',
+            destination: 'novo_caso',
+            label: '3. Documentos e provas para pedir',
+            suggested_text: 'Peça ao cliente todos os documentos citados no relato: contratos, comprovantes, prints, conversas, áudios, vídeos, fotos, laudos, boletins, notificações, decisões, recibos e qualquer registro de data, valor ou responsabilidade.',
+            reason: 'A prova precisa ser organizada desde o início para alimentar checklist, anexos, dossiê, análise e futura minuta.',
+            priority: 'alta',
+          },
+          {
+            destination: 'novo_caso',
+            label: '4. Pessoas e testemunhas para levantar',
+            suggested_text: 'Identifique quem participou, viu, recebeu mensagens, assinou documentos, acompanhou os fatos ou pode confirmar datas, valores, guarda, uso, dano, negativa, cobrança, prestação de serviço ou relação entre as partes.',
+            reason: 'Pessoas-chave ajudam a preencher testemunhas/depoentes e a validar a linha do tempo.',
             priority: 'normal',
           },
           {
-            destination: 'checklist',
-            label: 'Criar lista inicial de documentos e provas',
-            suggested_text: 'Liste documentos citados, prints, mensagens, contratos, laudos, comprovantes, decisões, notificações, testemunhas e pendências de confirmação.',
-            reason: 'Mesmo antes de abrir o caso, já é possível orientar quais provas pedir ao cliente.',
-            priority: 'alta',
+            destination: 'novo_caso',
+            label: '5. Alertas antes de salvar',
+            suggested_text: 'Não acuse diretamente sem prova. Use linguagem técnica, como “relata”, “informa”, “alega”, “desaparecimento”, “possível falha”, “pendente de confirmação documental” e “responsabilidade a apurar”.',
+            reason: 'A montagem inicial deve ser prudente e revisada por advogado antes de virar peça ou estratégia.',
+            priority: 'normal',
           },
         ],
         next_steps: [
-          'Revisar a narrativa enviada pelo cliente.',
-          'Clicar em “+ Novo Caso” e preencher os dados básicos.',
-          'Depois de criar o caso, voltar ao copiloto para orientar linha do tempo, checklist, anexos, testemunhas, dossiê e minuta.',
+          'Clique em “Abrir Novo caso”.',
+          'Copie os campos sugeridos para o formulário.',
+          'Salve o caso.',
+          'Depois volte ao Copiloto com o caso em foco para montar Linha do Tempo, Checklist, Anexos, Testemunhas e Dossiê.',
         ],
         warnings: [
           'Modo montagem inicial: ainda não há caso aberto, então nenhuma informação foi salva.',
-          'Toda orientação deve ser revisada pelo advogado responsável.',
+          'Os campos sugeridos são rascunho operacional e exigem revisão humana.',
         ],
         disclaimer: 'Assistente operacional de apoio. Não substitui revisão jurídica profissional.',
-        metadata: { source: 'initial_case_setup_frontend_v1' },
+        metadata: {
+          source: 'initial_case_setup_frontend_v2',
+          initial_area: initialArea,
+          initial_action_type: initialActionType,
+          initial_title: initialTitle,
+          initial_case_number: initialCaseNumber,
+        },
       })
       setError('')
       return
