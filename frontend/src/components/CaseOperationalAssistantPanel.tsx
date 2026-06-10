@@ -29,7 +29,9 @@ function getDestinationLabel(destination: string): string {
   return destinationLabels[destination] ?? destination
 }
 
-function renderSuggestion(item: CaseOperationalAssistantSuggestion, index: number, onDestinationClick?: (destination: string, suggestedText?: string, label?: string) => void) {
+function renderSuggestion(item: CaseOperationalAssistantSuggestion, index: number, onDestinationClick?: (destination: string, suggestedText?: string, label?: string) => void, hasSelectedCase = false) {
+  const destinationLabel = getDestinationLabel(item.destination)
+  const isUnavailableUntilCaseSaved = !hasSelectedCase && item.destination !== 'novo_caso'
   return (
     <div
       key={`${item.destination}-${item.label}-${index}`}
@@ -44,13 +46,19 @@ function renderSuggestion(item: CaseOperationalAssistantSuggestion, index: numbe
         <strong>{item.label}</strong>
         <button
           type="button"
-          onClick={() => onDestinationClick?.(item.destination, item.suggested_text, item.label)}
+          onClick={() => {
+              if (isUnavailableUntilCaseSaved) {
+                return
+              }
+              onDestinationClick?.(item.destination, item.suggested_text, item.label)
+            }}
+            disabled={isUnavailableUntilCaseSaved}
           className="case-card__meta-pill"
           style={{
             cursor: onDestinationClick ? 'pointer' : 'default',
             border: '1px solid rgba(148,163,184,0.24)',
           }}
-          title={`Abrir ${getDestinationLabel(item.destination)}`}
+          title={isUnavailableUntilCaseSaved ? `Salve o Novo Caso para abrir ${destinationLabel}` : `Abrir ${destinationLabel}`}
         >
           Abrir {getDestinationLabel(item.destination)} • prioridade {item.priority || 'normal'}
         </button>
@@ -402,7 +410,7 @@ ${initialDescription}`,
           {response.suggested_actions.length > 0 ? (
             <div style={{ display: 'grid', gap: '8px' }}>
               <strong>Sugestões de aplicação</strong>
-              {response.suggested_actions.map((item, index) => renderSuggestion(item, index, onDestinationClick))}
+              {response.suggested_actions.map((item, index) => renderSuggestion(item, index, onDestinationClick, Boolean(caseId)))}
             </div>
           ) : null}
 
