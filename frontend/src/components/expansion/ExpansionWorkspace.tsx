@@ -10,6 +10,7 @@ type ExpansionWorkspaceProps = {
   selectedCaseId: number | null
   selectedCaseArea?: string | null
   forcedModule?: ExpansionModule
+  forcedModuleRequestId?: number
   pieceReadyRequestId?: number
 }
 
@@ -25,6 +26,7 @@ export function ExpansionWorkspace({
   selectedCaseId,
   selectedCaseArea,
   forcedModule,
+  forcedModuleRequestId,
   pieceReadyRequestId,
 }: ExpansionWorkspaceProps) {
   const [activeModule, setActiveModule] = useState<ExpansionModule | null>(null)
@@ -32,7 +34,7 @@ export function ExpansionWorkspace({
   useEffect(() => {
     if (!forcedModule) return
     setActiveModule(forcedModule)
-  }, [forcedModule])
+  }, [forcedModule, forcedModuleRequestId])
 
   return (
     <>

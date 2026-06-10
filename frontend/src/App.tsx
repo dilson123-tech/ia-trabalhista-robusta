@@ -8,6 +8,7 @@ import { CaseCard, type CaseInternalDossierSnapshot, type CaseReadinessSnapshot 
 import { DashboardTopPanel } from './components/DashboardTopPanel'
 import { LoginPanel } from './components/LoginPanel'
 import { CaseFocusPanel } from './components/CaseFocusPanel'
+import { CaseOperationalAssistantPanel } from './components/CaseOperationalAssistantPanel'
 import { getPlanLabel as getCatalogPlanLabel, getPlanPricing, getPlanStatusLabel as getCatalogPlanStatusLabel, listPlanPricing } from './config/pricing'
 
 const AUTH_TOKEN_STORAGE_KEY = 'ia_trabalhista_auth_token'
@@ -109,7 +110,8 @@ function App() {
   const [dashboardWorkspace, setDashboardWorkspace] = useState<'production' | 'commercial'>('production')
   const [pieceReadyRequestId, setPieceReadyRequestId] = useState(0)
   const [pieceReadyNotice, setPieceReadyNotice] = useState('')
-  const [expansionModuleTarget, setExpansionModuleTarget] = useState<'editor' | 'succession' | 'appeals'>('editor')
+  const [expansionModuleTarget, setExpansionModuleTarget] = useState<'editor' | 'evidence' | 'succession' | 'appeals'>('editor')
+  const [expansionModuleRequestId, setExpansionModuleRequestId] = useState(0)
   const navigate = useNavigate()
   const location = useLocation()
   const isLoginRoute = location.pathname === '/login'
@@ -187,6 +189,59 @@ function App() {
     if (!Number.isFinite(value) || value <= 0) return '0%'
     if (value >= 100) return '100%'
     return `${Math.floor(value)}%`
+  }
+
+
+  function handleAssistantDestinationClick(destination: string) {
+    const scrollTo = (selector: string) => {
+      window.setTimeout(() => {
+        const element = document.querySelector(selector)
+        if (element) {
+          element.scrollIntoView({
+            behavior: 'smooth',
+            block: 'start',
+          })
+        }
+      }, 180)
+    }
+
+    const openExpansionModule = (moduleName: 'editor' | 'evidence' | 'succession' | 'appeals') => {
+      setExpansionModuleTarget(moduleName)
+      setExpansionModuleRequestId((prev) => prev + 1)
+      scrollTo('#workspace-expansion-anchor')
+    }
+
+    if (destination === 'contato_cliente') {
+      setShowNewCaseForm(true)
+      scrollTo('#case-workbench-anchor')
+      return
+    }
+
+    if (destination === 'checklist' || destination === 'anexos') {
+      openExpansionModule('evidence')
+      return
+    }
+
+    if (destination === 'editor_minuta') {
+      openExpansionModule('editor')
+      return
+    }
+
+    if (destination === 'analise') {
+      setActiveFocusTab('analysis')
+      scrollTo('#case-focus-anchor')
+      return
+    }
+
+    if (destination === 'dossie' || destination === 'linha_do_tempo' || destination === 'testemunhas') {
+      if (!selectedCaseId) {
+        setShowNewCaseForm(true)
+      }
+      scrollTo('#case-workbench-anchor')
+      return
+    }
+
+    scrollTo('#case-workbench-anchor')
   }
 
   function sortCasesForDisplay(list: CaseItem[]) {
@@ -1478,6 +1533,13 @@ function App() {
           casesCount={cases.length}
           loaded={loaded}
         />
+          <CaseOperationalAssistantPanel
+            token={token}
+            caseId={selectedCaseId}
+            caseLabel={selectedCase ? `${selectedCase.title} — ${selectedCase.case_number}` : null}
+            onDestinationClick={handleAssistantDestinationClick}
+          />
+
         <section
           className="insight-card"
           style={{
@@ -2130,15 +2192,18 @@ function App() {
             </section>
 
 
+          <div id="workspace-expansion-anchor">
           <ExpansionWorkspace
             token={token}
             selectedCaseId={selectedCaseId}
             selectedCaseArea={selectedCase?.legal_area ?? null}
             forcedModule={expansionModuleTarget}
+                forcedModuleRequestId={expansionModuleRequestId}
             pieceReadyRequestId={pieceReadyRequestId}
           />
+          </div>
 
-        <section className="cases-layout">
+        <section id="case-workbench-anchor" className="cases-layout">
           <div className="cases-layout__list">
             <section className="insight-card">
               <div className="insight-head">
@@ -2476,7 +2541,7 @@ function App() {
             </section>
           </div>
 
-          <div className="cases-layout__focus">
+          <div id="case-focus-anchor" className="cases-layout__focus">
             <section className="insight-card" style={{ marginBottom: '16px' }}>
               <div className="insight-head">
                 <div>

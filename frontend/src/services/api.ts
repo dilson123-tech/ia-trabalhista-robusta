@@ -1325,3 +1325,43 @@ export async function deleteCaseTimelineItem(
     await parseError(response, "Erro ao excluir item da linha do tempo")
   }
 }
+export type CaseOperationalAssistantSuggestion = {
+  destination: string
+  label: string
+  suggested_text: string
+  reason: string
+  priority: string
+}
+
+export type CaseOperationalAssistantResponse = {
+  case_id: number
+  assistant_mode: string
+  summary: string
+  rewritten_input: string
+  suggested_actions: CaseOperationalAssistantSuggestion[]
+  next_steps: string[]
+  warnings: string[]
+  disclaimer: string
+  metadata?: Record<string, unknown>
+}
+
+export async function askCaseOperationalAssistant(
+  token: string,
+  caseId: number,
+  message: string,
+): Promise<CaseOperationalAssistantResponse> {
+  const response = await fetch(`${API_URL}/cases/${caseId}/operational-assistant`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ message }),
+  })
+
+  if (!response.ok) {
+    await parseError(response, "Erro ao consultar assistente operacional do caso")
+  }
+
+  return response.json()
+}
