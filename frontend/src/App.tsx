@@ -2400,6 +2400,7 @@ function App() {
                     <CaseCard
                       key={caso.id}
                       caso={caso}
+                        token={token}
                       selectedCaseId={selectedCaseId}
                       getStatusLabel={getStatusLabel}
                       isArchiving={isArchiving}
