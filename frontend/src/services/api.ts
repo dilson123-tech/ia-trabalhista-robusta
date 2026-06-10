@@ -1218,3 +1218,110 @@ export async function deleteCaseEvidenceChecklistItem(
     await parseError(response, "Erro ao excluir item do checklist de provas")
   }
 }
+
+export type CaseTimelineItem = {
+  id: number
+  tenant_id: number
+  case_id: number
+  event_date?: string | null
+  title: string
+  description: string
+  related_evidence?: string | null
+  related_witness?: string | null
+  pending_note?: string | null
+  sort_order: number
+  timeline_metadata?: Record<string, unknown>
+  metadata?: Record<string, unknown>
+  created_at: string
+  updated_at: string
+}
+
+export type CaseTimelineCreatePayload = {
+  event_date?: string
+  title: string
+  description: string
+  related_evidence?: string
+  related_witness?: string
+  pending_note?: string
+  sort_order?: number
+  metadata?: Record<string, unknown>
+}
+
+export type CaseTimelineUpdatePayload = Partial<CaseTimelineCreatePayload>
+
+export async function listCaseTimeline(
+  token: string,
+  caseId: number,
+): Promise<CaseTimelineItem[]> {
+  const response = await fetch(`${API_URL}/cases/${caseId}/timeline`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+
+  if (!response.ok) {
+    await parseError(response, "Erro ao buscar linha do tempo do caso")
+  }
+
+  return response.json()
+}
+
+export async function createCaseTimelineItem(
+  token: string,
+  caseId: number,
+  payload: CaseTimelineCreatePayload,
+): Promise<CaseTimelineItem> {
+  const response = await fetch(`${API_URL}/cases/${caseId}/timeline`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  })
+
+  if (!response.ok) {
+    await parseError(response, "Erro ao criar item da linha do tempo")
+  }
+
+  return response.json()
+}
+
+export async function updateCaseTimelineItem(
+  token: string,
+  caseId: number,
+  itemId: number,
+  payload: CaseTimelineUpdatePayload,
+): Promise<CaseTimelineItem> {
+  const response = await fetch(`${API_URL}/cases/${caseId}/timeline/${itemId}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  })
+
+  if (!response.ok) {
+    await parseError(response, "Erro ao atualizar item da linha do tempo")
+  }
+
+  return response.json()
+}
+
+export async function deleteCaseTimelineItem(
+  token: string,
+  caseId: number,
+  itemId: number,
+): Promise<void> {
+  const response = await fetch(`${API_URL}/cases/${caseId}/timeline/${itemId}`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+
+  if (!response.ok) {
+    await parseError(response, "Erro ao excluir item da linha do tempo")
+  }
+}

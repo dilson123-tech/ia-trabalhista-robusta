@@ -12,6 +12,7 @@ from app.api.v1.routes.webhooks import router as webhooks_router
 from app.api.v1.routes.billing import router as billing_router
 from app.api.v1.routes.editable_documents import router as editable_documents_router
 from app.api.v1.routes.case_party_states import router as case_party_states_router
+from app.api.v1.routes.case_timeline import router as case_timeline_router
 from app.api.v1.routes.appeal_reaction_states import router as appeal_reaction_states_router
 from app.api.v1.routes.legal_modules import router as legal_modules_router
 
@@ -23,6 +24,7 @@ api_router.include_router(cases_router)
 api_router.include_router(case_attachments_router)
 api_router.include_router(case_contact_logs_router)
 api_router.include_router(case_evidence_checklist_router)
+api_router.include_router(case_timeline_router)
 api_router.include_router(usage_router)
 api_router.include_router(editable_documents_router)
 api_router.include_router(case_party_states_router)

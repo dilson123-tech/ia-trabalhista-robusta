@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { CaseContactLogItem, CaseItem, CasePartyItem, CasePartyStateDetailItem } from '../services/api'
+import { CaseTimelinePanel } from './CaseTimelinePanel'
 
 type WhatsAppTemplateKey = 'documents' | 'evidence' | 'hearing' | 'status_update' | 'confirm_data'
 
@@ -61,6 +62,7 @@ export type CaseInternalDossierSnapshot = {
 
 type CaseCardProps = {
   caso: CaseItem
+  token: string
   selectedCaseId: number | null
   getStatusLabel: (status: string) => string
   isArchiving: boolean
@@ -103,6 +105,7 @@ type CaseCardProps = {
 
 export function CaseCard({
   caso,
+  token,
   selectedCaseId,
   getStatusLabel,
   isArchiving,
@@ -537,6 +540,12 @@ export function CaseCard({
           </p>
         )}
       </div>
+
+      <CaseTimelinePanel token={token} caseId={caso.id} />
+
+
+
+
 
       <div className="case-card__actions">
         {!isArchived ? (
