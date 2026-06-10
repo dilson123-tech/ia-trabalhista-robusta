@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { CaseContactLogItem, CaseItem, CasePartyItem, CasePartyStateDetailItem } from '../services/api'
 import { CaseTimelinePanel } from './CaseTimelinePanel'
+import { CaseOperationalAssistantPanel } from './CaseOperationalAssistantPanel'
 
 type WhatsAppTemplateKey = 'documents' | 'evidence' | 'hearing' | 'status_update' | 'confirm_data'
 
@@ -541,12 +542,10 @@ export function CaseCard({
         )}
       </div>
 
+      <CaseOperationalAssistantPanel token={token} caseId={caso.id} />
+
+
       <CaseTimelinePanel token={token} caseId={caso.id} />
-
-
-
-
-
       <div className="case-card__actions">
         {!isArchived ? (
           <>
