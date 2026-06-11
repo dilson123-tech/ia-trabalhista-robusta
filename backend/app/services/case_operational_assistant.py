@@ -436,8 +436,96 @@ def _checklist_guide_text(case: Case, context: dict[str, Any], message: str = ""
         )
     return "\n".join(blocks)
 
-def _attachments_guide_text(case: Case, context: dict[str, Any]) -> str:
+def _attachments_guide_text(case: Case, context: dict[str, Any], message: str = "") -> str:
     case_title = _clean_text(getattr(case, "title", ""), 220) or "este caso"
+    blob = f"{_case_context_text(case, context)} {message}".lower()
+
+    if _is_vehicle_dealer_pix_context(blob):
+        has_license = any(
+            marker in blob
+            for marker in (
+                "licenciamento",
+                "licenciamentos",
+                "ipva",
+                "documento anual",
+                "taxa do veículo",
+                "taxa do veiculo",
+            )
+        )
+
+        available = [
+            (
+                "Comprovantes Pix das parcelas pagas",
+                "comprovante de pagamento",
+                "Comprovante Pix de parcela do veículo adquirido junto à revendedora. Usar para conferência de data, valor, destinatário, chave Pix, banco de origem e vínculo com a negociação.",
+                "Ajuda a demonstrar pagamento de parcelas, histórico de adimplemento informado pelo cliente e valor econômico já desembolsado.",
+                "Conferir se todos os comprovantes correspondem à negociação, se o destinatário é a revendedora/representante e se o total bate com as 34 parcelas de R$ 1.180,00.",
+            ),
+        ]
+
+        if has_license:
+            available.append(
+                (
+                    "Comprovantes de pagamento dos licenciamentos",
+                    "comprovante de despesa vinculada ao veículo",
+                    "Comprovante de pagamento de licenciamento/IPVA/taxa do veículo relacionado ao caso. Usar para demonstrar despesa assumida pelo cliente e vínculo com a posse/uso do veículo.",
+                    "Ajuda a demonstrar gastos feitos pelo cliente com o veículo, além das parcelas, e pode compor análise de prejuízos materiais.",
+                    "Confirmar ano, placa/veículo, CPF/CNPJ pagador, valor, data e se o pagamento se refere ao veículo objeto do caso.",
+                )
+            )
+
+        pending = [
+            "Contrato de compra e venda ou financiamento/parcelamento firmado com a revendedora.",
+            "Notas promissórias, recibos, carnês, demonstrativo de parcelas ou confissão de dívida.",
+            "Recibos ou documentos da entrada com Scenic 2004 e Honda CBX 300.",
+            "Prestação de contas da revendedora com valores pagos, saldo alegado e motivo da retomada/recolhimento.",
+            "Documento formal do suposto bloqueio, ordem judicial, busca e apreensão, restrição Detran ou justificativa administrativa.",
+            "Prova da retomada/recolhimento: mensagens, fotos, vídeos, guincho, local onde o veículo está ou testemunhas.",
+            "Consultas Detran e eventuais consultas processuais vinculadas ao veículo ou às partes.",
+        ]
+
+        risks = [
+            "Sem contrato, fica pendente confirmar valor total, cláusulas, vencimentos, multa, saldo e autorização contratual alegada.",
+            "Sem documento do suposto bloqueio, não se deve afirmar irregularidade definitiva; é necessário validar se houve ordem judicial, restrição administrativa ou mera alegação comercial.",
+            "Sem prestação de contas, o cálculo de saldo, devolução, restituição ou indenização fica pendente de conferência.",
+            "Sem prova da retomada/recolhimento, é importante buscar mensagens, testemunhas ou documento que confirme data, local, responsável e destino do veículo.",
+        ]
+
+        blocks = [
+            f"Para o caso: {case_title}",
+            "Em Anexos/provas, anexe apenas arquivos reais. Não trate relato digitado como prova sem documento correspondente.",
+            "",
+            "Provas disponíveis para anexar agora:",
+        ]
+
+        for index, (title, kind, description, proves, caution) in enumerate(available, start=1):
+            blocks.append(
+                f"\nAnexo disponível {index}\n"
+                f"Tipo: {kind}\n"
+                f"Nome/descrição sugerida: {title}\n"
+                f"Descrição para o anexo: {description}\n"
+                f"O que comprova: {proves}\n"
+                f"Cuidado/conferência: {caution}"
+            )
+
+        blocks.append("\nProvas/documentos ainda pendentes:")
+        for index, item in enumerate(pending, start=1):
+            blocks.append(f"{index}. {item}")
+
+        blocks.append("\nRiscos por falta de documentos:")
+        for index, item in enumerate(risks, start=1):
+            blocks.append(f"{index}. {item}")
+
+        blocks.append(
+            "\nPróximas providências:\n"
+            "1. Anexar primeiro os comprovantes Pix e, se existirem, os comprovantes de licenciamentos.\n"
+            "2. Descrever cada arquivo de forma objetiva, sem aumentar o conteúdo do documento.\n"
+            "3. Criar pendências no Checklist para contrato, prestação de contas, entrada com bens, suposto bloqueio e prova do recolhimento.\n"
+            "4. Depois de anexar as provas reais, atualizar o Dossiê interno para consolidar o que já existe e o que ainda falta."
+        )
+
+        return "\n".join(blocks)
+
     return f"""Para o caso: {case_title}
 Em Anexos/provas, só envie documentos reais. Para cada arquivo, descreva o que ele comprova.
 
@@ -454,6 +542,7 @@ Tipo: prova do dano/prejuízo
 Descrição: comprova valor, perda, dano, pagamento, orçamento, laudo ou consequência do fato.
 
 Cuidado: texto digitado não substitui prova. Quando citar BO, contrato, print, foto ou mensagem, tente anexar o arquivo correspondente."""
+
 
 
 def _witness_guide_text(case: Case, context: dict[str, Any]) -> str:
@@ -517,7 +606,7 @@ def _module_guide_suggestion(destination: str, case: Case, context: dict[str, An
         return _suggestion(
             "anexos",
             "Organizar Anexos/provas",
-            _attachments_guide_text(case, context),
+            _attachments_guide_text(case, context, message),
             "A pergunta envolve documentos/provas que devem ser anexados quando existirem arquivos reais.",
             "normal",
         )
