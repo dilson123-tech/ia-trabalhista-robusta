@@ -805,9 +805,191 @@ def _evidence_availability_response(
         },
     }
 
+
+def _is_natural_next_step_message(lowered: str) -> bool:
+    text = f" {lowered.strip()} "
+    if not text.strip():
+        return False
+
+    next_step_markers = (
+        "qual próximo passo",
+        "qual proximo passo",
+        "próximo passo",
+        "proximo passo",
+        "e agora",
+        "agora o que",
+        "o que faço agora",
+        "o que faco agora",
+        "faço o quê",
+        "faco o que",
+        "faço o que",
+        "como continuo",
+        "como continuar",
+        "posso continuar",
+        "depois disso faço",
+        "depois disso faco",
+        "depois disso o que",
+        "após isso faço",
+        "apos isso faco",
+        "após isso o que",
+        "apos isso o que",
+    )
+    if any(marker in text for marker in next_step_markers):
+        return True
+
+    completion_markers = (
+        "terminei",
+        "preenchi",
+        "preenchido",
+        "cadastrei",
+        "coloquei",
+        "lancei",
+        "salvei",
+        "já fiz",
+        "ja fiz",
+        "já preenchi",
+        "ja preenchi",
+        "já cadastrei",
+        "ja cadastrei",
+        "já terminei",
+        "ja terminei",
+    )
+    module_markers = (
+        "checklist",
+        "linha do tempo",
+        "timeline",
+        "anexo",
+        "anexos",
+        "prova",
+        "provas",
+        "testemunha",
+        "testemunhas",
+        "depoente",
+        "depoentes",
+        "dossiê",
+        "dossie",
+        "caso",
+        "processo",
+    )
+
+    return any(marker in text for marker in completion_markers) and any(
+        marker in text for marker in module_markers
+    )
+
+
+def _natural_next_step_response(
+    case: Case,
+    message: str,
+    context: dict[str, Any],
+    timeline: list[dict[str, Any]],
+) -> dict[str, Any]:
+    text = _clean_text(message, 2500)
+    lowered = text.lower()
+
+    mentions_checklist = "checklist" in lowered
+    mentions_timeline = "linha do tempo" in lowered or "timeline" in lowered
+    mentions_attachments = any(marker in lowered for marker in ("anexo", "anexos", "prova", "provas"))
+    mentions_people = any(
+        marker in lowered
+        for marker in ("testemunha", "testemunhas", "depoente", "depoentes")
+    )
+
+    if mentions_checklist:
+        summary = (
+            "Entendi que o Checklist já foi preenchido ou revisado. "
+            "O próximo passo é consolidar o caso e separar o que ainda falta, sem transformar essa pergunta em fato da Linha do Tempo."
+        )
+    elif mentions_timeline:
+        summary = (
+            "Entendi que a Linha do Tempo já foi preenchida ou revisada. "
+            "O próximo passo é conferir provas, pessoas envolvidas e atualizar o Dossiê interno."
+        )
+    elif mentions_attachments:
+        summary = (
+            "Entendi que você está avançando na parte de Anexos/provas. "
+            "O próximo passo é conferir se os arquivos reais foram anexados e depois consolidar isso no Dossiê interno."
+        )
+    elif mentions_people:
+        summary = (
+            "Entendi que você está avançando na parte de Testemunhas/depoentes. "
+            "O próximo passo é conferir se o que cada pessoa sabe está claro e depois atualizar o Dossiê interno."
+        )
+    else:
+        summary = (
+            "Entendi que você está perguntando o próximo passo operacional do caso. "
+            "Vou orientar o fluxo sem tratar essa mensagem como fato cronológico."
+        )
+
+    suggestions = [
+        _suggestion(
+            "dossie",
+            "Atualizar Dossiê interno",
+            "Consolidar o que já foi preenchido, o que ainda falta e quais pontos dependem de documento, prova ou revisão.",
+            "O Dossiê interno deve virar a visão executiva do caso antes de nova análise ou minuta.",
+            "alta",
+        ),
+        _suggestion(
+            "anexos",
+            "Anexar provas reais quando disponíveis",
+            "Quando os arquivos estiverem em mãos, anexar comprovantes, contratos, prints, documentos, fotos, áudios, vídeos ou consultas oficiais.",
+            "Texto digitado ajuda a organizar, mas não substitui o arquivo/documento real.",
+            "alta" if mentions_checklist or mentions_attachments else "normal",
+        ),
+        _suggestion(
+            "testemunhas",
+            "Conferir pessoas/testemunhas",
+            "Cadastrar ou revisar pessoas que possam confirmar fatos, pagamentos, entrega de bens, recolhimento, conversas ou outras informações relevantes.",
+            "Se não houver testemunha ou depoente por enquanto, manter como pendência operacional.",
+            "normal",
+        ),
+        _suggestion(
+            "linha_do_tempo",
+            "Conferir Linha do Tempo",
+            "Verificar se os principais acontecimentos do caso estão em ordem cronológica, com prova relacionada ou pendência indicada.",
+            "A pergunta de próximo passo não deve ser salva como fato; apenas fatos concretos do caso entram na Linha do Tempo.",
+            "normal" if mentions_timeline else "baixa",
+        ),
+    ]
+
+    return {
+        "case_id": case.id,
+        "assistant_mode": "orientation_only",
+        "summary": summary,
+        "rewritten_input": text,
+        "suggested_actions": suggestions[:6],
+        "next_steps": [
+            "Não salvar esta pergunta como fato da Linha do Tempo.",
+            "Atualizar o Dossiê interno para consolidar o que já foi feito e o que ainda falta.",
+            "Manter Anexos/provas como pendência quando depender de arquivo real ainda não levantado.",
+            "Conferir se Linha do Tempo, Checklist e Testemunhas/depoentes estão coerentes entre si.",
+            "Depois de consolidar os módulos principais, pedir nova análise do caso.",
+        ],
+        "warnings": [
+            "Esta orientação não salva dados automaticamente.",
+            "Não invente documentos, datas, valores, testemunhas ou conteúdo de anexos.",
+            "Toda informação jurídica deve ser revisada por profissional responsável antes de uso real.",
+        ],
+        "disclaimer": "Assistente operacional de apoio. Não substitui revisão técnica, prova documental, estratégia jurídica ou decisão profissional.",
+        "metadata": {
+            "source": "case_operational_assistant_natural_next_step_routing_v1",
+            "provider": "fallback",
+            "case_number": _clean_text(getattr(case, "case_number", "")),
+            "timeline_items_considered": len(timeline),
+        },
+    }
+
+
 def _fallback_response(case: Case, message: str, context: dict[str, Any], timeline: list[dict[str, Any]]) -> dict[str, Any]:
     text = _clean_text(message, 2500)
     lowered = text.lower()
+
+    if _is_natural_next_step_message(lowered):
+        return _natural_next_step_response(
+            case=case,
+            message=text,
+            context=context,
+            timeline=timeline,
+        )
 
     requested_guidance_modules = _requested_guidance_modules(lowered)
     if requested_guidance_modules:
