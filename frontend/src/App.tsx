@@ -112,6 +112,7 @@ function App() {
   const [pieceReadyNotice, setPieceReadyNotice] = useState('')
   const [expansionModuleTarget, setExpansionModuleTarget] = useState<'editor' | 'evidence' | 'succession' | 'appeals'>('editor')
   const [expansionModuleRequestId, setExpansionModuleRequestId] = useState(0)
+  const [assistantDestinationRequest, setAssistantDestinationRequest] = useState<{ destination: string; requestId: number } | null>(null)
   const navigate = useNavigate()
   const location = useLocation()
   const isLoginRoute = location.pathname === '/login'
@@ -262,7 +263,11 @@ function App() {
     }
 
     if (destination === 'dossie' || destination === 'linha_do_tempo' || destination === 'testemunhas') {
-      scrollTo('#case-workbench-anchor')
+      setAssistantDestinationRequest({
+        destination,
+        requestId: Date.now(),
+      })
+      scrollTo(`#case-card-${selectedCaseId}-${destination}`)
       return
     }
 
@@ -531,7 +536,7 @@ function App() {
     setSelectedCaseId(caseId)
 
     try {
-      const data = await getCaseAnalysis(token, caseId)
+      const data = await getCaseAnalysis(token, caseId, true)
       setAnalysisData(data)
     } catch (err) {
       const fallback = handleApiFailure(err, 'Não foi possível analisar o caso selecionado.')
@@ -2492,6 +2497,7 @@ function App() {
                       caso={caso}
                         token={token}
                       selectedCaseId={selectedCaseId}
+                      assistantDestinationRequest={assistantDestinationRequest}
                       getStatusLabel={getStatusLabel}
                       isArchiving={isArchiving}
                       isAnalyzing={isAnalyzing}

@@ -1,7 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { CaseContactLogItem, CaseItem, CasePartyItem, CasePartyStateDetailItem } from '../services/api'
 import { CaseTimelinePanel } from './CaseTimelinePanel'
-import { CaseOperationalAssistantPanel } from './CaseOperationalAssistantPanel'
 
 type WhatsAppTemplateKey = 'documents' | 'evidence' | 'hearing' | 'status_update' | 'confirm_data'
 
@@ -18,6 +17,11 @@ type WitnessContactInput = {
 }
 
 type WitnessContactActionKey = 'open_whatsapp' | 'evidence' | 'confirm_data' | 'reminder'
+
+type AssistantDestinationRequest = {
+  destination: string
+  requestId: number
+}
 
 type CaseContactUpdateInput = {
   client_name?: string
@@ -65,6 +69,7 @@ type CaseCardProps = {
   caso: CaseItem
   token: string
   selectedCaseId: number | null
+  assistantDestinationRequest?: AssistantDestinationRequest | null
   getStatusLabel: (status: string) => string
   isArchiving: boolean
   isAnalyzing: boolean
@@ -108,6 +113,7 @@ export function CaseCard({
   caso,
   token,
   selectedCaseId,
+  assistantDestinationRequest,
   getStatusLabel,
   isArchiving,
   isAnalyzing,
@@ -156,6 +162,41 @@ export function CaseCard({
   const [witnessContactNote, setWitnessContactNote] = useState('')
   const [witnessContactError, setWitnessContactError] = useState('')
   const [witnessFormSubmitting, setWitnessFormSubmitting] = useState(false)
+  const dossierSectionRef = useRef<HTMLDivElement | null>(null)
+  const timelineSectionRef = useRef<HTMLDivElement | null>(null)
+  const witnessSectionRef = useRef<HTMLDivElement | null>(null)
+  const witnessNameInputRef = useRef<HTMLInputElement | null>(null)
+
+  useEffect(() => {
+    if (!assistantDestinationRequest || !isSelected) return
+
+    const scrollToRef = (ref: { current: HTMLElement | null }) => {
+      window.setTimeout(() => {
+        ref.current?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start',
+        })
+      }, 120)
+    }
+
+    if (assistantDestinationRequest.destination === 'testemunhas') {
+      handleOpenWitnessForm()
+      scrollToRef(witnessSectionRef)
+      window.setTimeout(() => {
+        witnessNameInputRef.current?.focus()
+      }, 300)
+      return
+    }
+
+    if (assistantDestinationRequest.destination === 'linha_do_tempo') {
+      scrollToRef(timelineSectionRef)
+      return
+    }
+
+    if (assistantDestinationRequest.destination === 'dossie') {
+      scrollToRef(dossierSectionRef)
+    }
+  }, [assistantDestinationRequest?.requestId])
 
   function normalizeWitnessDuplicateKey(value: string) {
     return value
@@ -452,7 +493,10 @@ export function CaseCard({
       </div>
 
       <div
+        id={`case-card-${caso.id}-dossie`}
+        ref={dossierSectionRef}
         style={{
+          scrollMarginTop: '18px',
           marginTop: '12px',
           padding: '12px',
           border: '1px solid rgba(96, 165, 250, 0.22)',
@@ -541,11 +585,13 @@ export function CaseCard({
           </p>
         )}
       </div>
-
-      <CaseOperationalAssistantPanel token={token} caseId={caso.id} />
-
-
-      <CaseTimelinePanel token={token} caseId={caso.id} />
+      <div
+        id={`case-card-${caso.id}-linha_do_tempo`}
+        ref={timelineSectionRef}
+        style={{ scrollMarginTop: '18px' }}
+      >
+        <CaseTimelinePanel token={token} caseId={caso.id} />
+      </div>
       <div className="case-card__actions">
         {!isArchived ? (
           <>
@@ -693,7 +739,10 @@ export function CaseCard({
       </div>
 
       <div
+        id={`case-card-${caso.id}-testemunhas`}
+        ref={witnessSectionRef}
         style={{
+          scrollMarginTop: '18px',
           marginTop: '12px',
           padding: '12px',
           border: '1px solid rgba(255,255,255,0.08)',
@@ -761,6 +810,7 @@ export function CaseCard({
               <label style={{ display: 'grid', gap: '4px' }}>
                 <span>Nome</span>
                 <input
+                  ref={witnessNameInputRef}
                   value={witnessName}
                   onChange={(event) => setWitnessName(event.target.value)}
                   placeholder="Ex.: Edson Estevão"

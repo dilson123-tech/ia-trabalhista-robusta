@@ -84,6 +84,59 @@ function normalizeInitialCaseText(value: string): string {
   return value.trim().replace(/\s+/g, ' ')
 }
 
+function isVehicleDealerPixCase(message: string): boolean {
+  const text = message.toLowerCase()
+
+  const hasVehicle = /(veículo|veiculo|carro|automóvel|automovel|moto|placa|renavam|chassi)/.test(text)
+  const hasDealer = /(revendedora|garagem|automóveis|automoveis|quintino|comércio de automóveis|comercio de automoveis)/.test(text)
+  const hasPayment = /(pix|parcela|parcelamento|nota promissória|nota promissoria|entrada)/.test(text)
+  const hasTaking = /(tomou|recolheu|retomou|retirada|bloqueio|busca e apreensão|busca e apreensao)/.test(text)
+
+  return hasVehicle && hasDealer && hasPayment && hasTaking
+}
+
+
+function extractInitialCaseDescription(message: string): string {
+  const lowerMessage = message.toLowerCase()
+  const labels = ['Descrição inicial', 'Descricao inicial']
+
+  let startIndex = -1
+  let selectedLabel = ''
+
+  for (const label of labels) {
+    const index = lowerMessage.indexOf(`${label.toLowerCase()}:`)
+    if (index >= 0 && (startIndex === -1 || index < startIndex)) {
+      startIndex = index
+      selectedLabel = label
+    }
+  }
+
+  if (startIndex < 0) return ''
+
+  const valueStart = startIndex + selectedLabel.length + 1
+  const stopLabels = [
+    'Alertas',
+    'Documentos e provas',
+    'Pessoas/testemunhas',
+    'Próximos passos',
+    'Proximos passos',
+    'Objetivo',
+    'Classificação sugerida',
+    'Classificacao sugerida',
+  ]
+
+  let valueEnd = message.length
+
+  for (const stopLabel of stopLabels) {
+    const stopIndex = lowerMessage.indexOf(`${stopLabel.toLowerCase()}:`, valueStart)
+    if (stopIndex >= 0 && stopIndex < valueEnd) {
+      valueEnd = stopIndex
+    }
+  }
+
+  return normalizeInitialCaseText(message.slice(valueStart, valueEnd))
+}
+
 function inferInitialCaseArea(message: string): string {
   const text = message.toLowerCase()
 
@@ -117,6 +170,10 @@ function inferInitialCaseArea(message: string): string {
 function inferInitialActionType(message: string, area: string): string {
   const text = message.toLowerCase()
 
+  if (isVehicleDealerPixCase(message)) {
+    return 'Exibição de contrato / restituição de veículo ou valores / indenização'
+  }
+
   if (area === 'trabalhista') {
     return 'Reclamação trabalhista / reconhecimento de vínculo e verbas'
   }
@@ -143,6 +200,10 @@ function inferInitialActionType(message: string, area: string): string {
 function buildInitialCaseTitle(message: string, area: string): string {
   const text = message.toLowerCase()
 
+  if (isVehicleDealerPixCase(message)) {
+    return 'Retomada de veículo por revendedora após pagamento parcelado via Pix'
+  }
+
   if (/(pátio|patio|carreta)/.test(text)) {
     return 'Responsabilidade de pátio por desaparecimento/furto de carreta'
   }
@@ -166,7 +227,11 @@ function buildInitialCaseTitle(message: string, area: string): string {
   return 'Caso em montagem inicial'
 }
 
-function buildInitialCaseNumber(area: string): string {
+function buildInitialCaseNumber(area: string, message = ''): string {
+  if (isVehicleDealerPixCase(message)) {
+    return /quintino/i.test(message) ? 'VEICULO-QUINTINO-PIX-001' : 'VEICULO-REVENDEDORA-PIX-001'
+  }
+
   const normalized = area
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
@@ -199,8 +264,8 @@ export function CaseOperationalAssistantPanel({ token, caseId, caseLabel, onDest
       const initialArea = inferInitialCaseArea(cleanedMessage)
       const initialActionType = inferInitialActionType(cleanedMessage, initialArea)
       const initialTitle = buildInitialCaseTitle(cleanedMessage, initialArea)
-      const initialCaseNumber = buildInitialCaseNumber(initialArea)
-      const initialDescription = buildInitialCaseDescription(cleanedMessage)
+      const initialCaseNumber = buildInitialCaseNumber(initialArea, cleanedMessage)
+      const initialDescription = extractInitialCaseDescription(cleanedMessage) || buildInitialCaseDescription(cleanedMessage)
 
       setResponse({
         case_id: 0,
