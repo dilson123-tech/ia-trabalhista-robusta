@@ -668,6 +668,143 @@ def _module_guidance_response(
     }
 
 
+
+
+def _is_evidence_availability_message(lowered: str) -> bool:
+    availability_markers = (
+        "por enquanto",
+        "só possui",
+        "so possui",
+        "só tenho",
+        "so tenho",
+        "só temos",
+        "so temos",
+        "cliente só possui",
+        "cliente so possui",
+        "cliente possui",
+        "cliente tem",
+        "possui",
+        "tenho",
+        "temos",
+        "já possui",
+        "ja possui",
+        "já tenho",
+        "ja tenho",
+        "não possui",
+        "nao possui",
+        "não tenho",
+        "nao tenho",
+        "não temos",
+        "nao temos",
+        "ainda não possui",
+        "ainda nao possui",
+        "ainda não tenho",
+        "ainda nao tenho",
+        "não tem",
+        "nao tem",
+        "faltam",
+        "falta",
+        "pendente",
+        "pendentes",
+        "disponível",
+        "disponivel",
+        "disponíveis",
+        "disponiveis",
+        "provas disponíveis",
+        "provas disponiveis",
+        "documentos disponíveis",
+        "documentos disponiveis",
+    )
+    evidence_markers = (
+        "prova",
+        "provas",
+        "anexo",
+        "anexos",
+        "documento",
+        "documentos",
+        "contrato",
+        "comprovante",
+        "comprovantes",
+        "recibo",
+        "recibos",
+        "nota fiscal",
+        "print",
+        "prints",
+        "foto",
+        "fotos",
+        "imagem",
+        "áudio",
+        "audio",
+        "vídeo",
+        "video",
+        "laudo",
+        "atestado",
+        "receita",
+        "exame",
+        "holerite",
+        "contracheque",
+        "ctps",
+        "rescisão",
+        "rescisao",
+        "declaração",
+        "declaracao",
+        "bo",
+        "boletim",
+        "mensagem",
+        "mensagens",
+        "whatsapp",
+        "email",
+        "e-mail",
+        "licenciamento",
+        "licenciamentos",
+        "ipva",
+        "pix",
+        "extrato",
+        "extratos",
+    )
+    has_availability = any(marker in lowered for marker in availability_markers)
+    has_evidence = any(marker in lowered for marker in evidence_markers)
+    return has_availability and has_evidence
+
+
+def _evidence_availability_response(
+    case: Case,
+    message: str,
+    context: dict[str, Any],
+    timeline: list[dict[str, Any]],
+) -> dict[str, Any]:
+    suggestions = [
+        _module_guide_suggestion("anexos", case, context, message),
+        _module_guide_suggestion("checklist", case, context, message),
+        _module_guide_suggestion("dossie", case, context, message),
+    ]
+
+    return {
+        "case_id": case.id,
+        "assistant_mode": "orientation_only",
+        "summary": "Entendi que você está informando quais provas ou documentos existem e quais ainda faltam. Vou tratar isso como organização probatória, não como fato da Linha do Tempo.",
+        "rewritten_input": _clean_text(message, 2500),
+        "suggested_actions": suggestions[:8],
+        "next_steps": [
+            "Anexar apenas arquivos reais em Anexos/provas.",
+            "Criar ou revisar pendências no Checklist para documentos que ainda faltam.",
+            "Não salvar essa informação como fato cronológico, salvo se houver uma data/evento concreto a registrar.",
+            "Depois atualize o Dossiê interno para consolidar provas disponíveis e pendências.",
+        ],
+        "warnings": [
+            "Texto digitado não substitui prova documental.",
+            "Não invente documentos, datas, valores, testemunhas ou conteúdo de anexos.",
+            "Quando um documento ainda não existir, mantenha como pendência no Checklist.",
+        ],
+        "disclaimer": "Assistente operacional de apoio. Não substitui revisão técnica, prova documental, estratégia jurídica ou decisão profissional.",
+        "metadata": {
+            "source": "case_operational_assistant_evidence_availability_routing_v1",
+            "provider": "fallback",
+            "case_number": _clean_text(getattr(case, "case_number", "")),
+            "timeline_items_considered": len(timeline),
+        },
+    }
+
 def _fallback_response(case: Case, message: str, context: dict[str, Any], timeline: list[dict[str, Any]]) -> dict[str, Any]:
     text = _clean_text(message, 2500)
     lowered = text.lower()
@@ -680,6 +817,14 @@ def _fallback_response(case: Case, message: str, context: dict[str, Any], timeli
             context=context,
             timeline=timeline,
             modules=requested_guidance_modules,
+        )
+
+    if _is_evidence_availability_message(lowered):
+        return _evidence_availability_response(
+            case=case,
+            message=text,
+            context=context,
+            timeline=timeline,
         )
 
     suggestions: list[dict[str, str]] = []
