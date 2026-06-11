@@ -124,6 +124,19 @@ def _requested_guidance_modules(lowered: str) -> list[str]:
         "o que vai",
         "quais campos",
         "como faço",
+        "monte",
+        "monta",
+        "organize",
+        "organizar",
+        "gere",
+        "gerar",
+        "crie",
+        "criar",
+        "liste",
+        "listar",
+        "fatos prontos",
+        "fatos obrigatórios",
+        "fatos obrigatorios",
     )
 
     if not any(marker in lowered for marker in guidance_markers):
@@ -153,11 +166,135 @@ def _requested_guidance_modules(lowered: str) -> list[str]:
     return ordered
 
 
-def _timeline_guide_text(case: Case, context: dict[str, Any]) -> str:
-    case_title = _clean_text(getattr(case, "title", ""), 220) or "este caso"
-    blob = _case_context_text(case, context)
+def _is_vehicle_dealer_pix_context(blob: str) -> bool:
+    lowered = blob.lower()
+    has_vehicle = any(
+        marker in lowered
+        for marker in (
+            "veículo",
+            "veiculo",
+            "carro",
+            "automóvel",
+            "automovel",
+            "moto",
+            "placa",
+            "renavam",
+            "chassi",
+        )
+    )
+    has_dealer = any(
+        marker in lowered
+        for marker in (
+            "revendedora",
+            "garagem",
+            "automóveis",
+            "automoveis",
+            "quintino",
+            "comércio de automóveis",
+            "comercio de automoveis",
+        )
+    )
+    has_payment = any(
+        marker in lowered
+        for marker in (
+            "pix",
+            "parcela",
+            "parcelas",
+            "parcelamento",
+            "nota promissória",
+            "nota promissoria",
+            "entrada",
+            "r$",
+        )
+    )
+    has_retention = any(
+        marker in lowered
+        for marker in (
+            "bloqueio",
+            "tomou",
+            "recolheu",
+            "retomou",
+            "retomada",
+            "recolhimento",
+            "busca e apreensão",
+            "busca e apreensao",
+        )
+    )
+    return has_vehicle and has_dealer and (has_payment or has_retention)
 
-    if "pátio" in blob or "patio" in blob or "carreta" in blob:
+
+def _timeline_guide_text(case: Case, context: dict[str, Any], message: str = "") -> str:
+    case_title = _clean_text(getattr(case, "title", ""), 220) or "este caso"
+    blob = f"{_case_context_text(case, context)} {message}".lower()
+
+    if _is_vehicle_dealer_pix_context(blob):
+        facts = [
+            (
+                "A confirmar",
+                "Compra do veículo junto à revendedora",
+                "Cliente relata que adquiriu veículo junto à revendedora, mediante negociação parcelada, com entrega de bens como entrada e pagamentos posteriores via Pix.",
+                "contrato, nota promissória, mensagens com a revendedora, comprovantes de negociação e documentos do veículo adquirido",
+                "cliente comprador; pessoa que acompanhou a negociação; representante da revendedora",
+                "confirmar data da compra, dados do veículo adquirido, placa, Renavam, chassi, valor total contratado e condições da negociação",
+            ),
+            (
+                "A confirmar",
+                "Entrega do veículo Scenic 2004 como parte da entrada",
+                "Cliente informa que entregou um veículo Scenic 2004 avaliado em R$ 4.000,00 como parte da entrada na negociação.",
+                "documentos do Scenic 2004, recibo, mensagens, comprovante de transferência, avaliação ou declaração de recebimento",
+                "cliente comprador; pessoa que presenciou a entrega; representante da revendedora que recebeu o bem",
+                "confirmar se houve recibo, transferência, avaliação formal e identificação de quem recebeu o veículo",
+            ),
+            (
+                "A confirmar",
+                "Entrega da moto Honda CBX 300 como parte da entrada",
+                "Cliente informa que entregou uma moto Honda CBX 300 avaliada em R$ 11.000,00 como parte da entrada na negociação.",
+                "documentos da Honda CBX 300, recibo, mensagens, comprovante de transferência, avaliação ou declaração de recebimento",
+                "cliente comprador; pessoa que presenciou a entrega; representante da revendedora que recebeu o bem",
+                "confirmar se houve recibo, transferência, avaliação formal e identificação de quem recebeu a moto",
+            ),
+            (
+                "A confirmar",
+                "Pagamento de 34 parcelas via Pix",
+                "Cliente informa que pagou 34 parcelas de R$ 1.180,00 via Pix, totalizando R$ 40.120,00 em parcelas pagas à revendedora ou a destinatário vinculado à negociação.",
+                "comprovantes Pix, extratos bancários, identificação do destinatário dos Pix, mensagens de cobrança ou confirmação de pagamento",
+                "cliente comprador; pessoa que auxiliou nos pagamentos; responsável da revendedora que recebia ou confirmava os pagamentos",
+                "conferir datas, destinatários, chaves Pix, valores, soma total e eventual saldo alegado pela revendedora",
+            ),
+            (
+                "A confirmar",
+                "Perda da via física do contrato pelo comprador",
+                "Cliente informa que perdeu sua via física do contrato, permanecendo pendente a obtenção de cópia junto à revendedora.",
+                "relato do cliente, mensagens solicitando cópia do contrato, eventual negativa ou ausência de resposta",
+                "cliente comprador; representante da revendedora responsável pelo contrato",
+                "solicitar cópia integral do contrato, notas promissórias, recibos e prestação de contas",
+            ),
+            (
+                "A confirmar",
+                "Retomada ou recolhimento do veículo pela revendedora",
+                "Cliente relata que a revendedora tomou ou recolheu o veículo sob alegação de suposto bloqueio, sem documentação completa apresentada até o momento.",
+                "mensagens, fotos, vídeos, comprovante de guincho, localização do veículo, comunicação da revendedora ou testemunhas",
+                "cliente comprador; pessoa que presenciou o recolhimento; representante da revendedora; eventual guincheiro ou terceiro",
+                "confirmar data, local, quem realizou o recolhimento, onde está o veículo e qual justificativa formal foi apresentada",
+            ),
+            (
+                "A confirmar",
+                "Ausência de documentação clara sobre o suposto bloqueio",
+                "Até o momento, o cliente informa não ter recebido ordem judicial, busca e apreensão, contrato, prestação de contas, documento formal da dívida ou comprovação do suposto bloqueio.",
+                "mensagens de solicitação, resposta ou silêncio da revendedora, consulta Detran, consulta processual, documentos recebidos ou ausência deles",
+                "cliente comprador; advogado responsável pela conferência; representante da revendedora",
+                "validar documentalmente se existe bloqueio administrativo, ordem judicial, busca e apreensão ou apenas alegação comercial",
+            ),
+            (
+                "A confirmar",
+                "Avaliação jurídica das medidas cabíveis",
+                "Diante da compra, entradas com bens, pagamentos via Pix e retomada/recolhimento do veículo, o caso depende de avaliação do advogado sobre exibição de contrato/documentos, restituição do veículo ou valores, danos materiais/morais e eventual tutela de urgência.",
+                "conjunto documental do caso, comprovantes Pix, documentos dos bens de entrada, mensagens e consultas oficiais",
+                "cliente comprador; advogado responsável; eventuais testemunhas dos fatos principais",
+                "não afirmar crime, culpa ou ilegalidade definitiva sem prova; manter linguagem prudente e pendente de validação documental",
+            ),
+        ]
+    elif "pátio" in blob or "patio" in blob or "carreta" in blob:
         facts = [
             ("A confirmar", "Entrada ou permanência da carreta no pátio", "Registrar quando, onde, por quem e por qual motivo a carreta ficou sob guarda do pátio.", "contrato, recibo, mensagens, comprovante de entrada ou documentos do pátio", "quem entregou, recebeu, autorizou ou acompanhou a guarda", "confirmar data exata, responsável pela guarda e documento de entrada"),
             ("A confirmar", "Desaparecimento, furto ou não localização da carreta", "Registrar quando foi percebido que a carreta não estava mais disponível, quem comunicou o fato e qual foi a resposta do pátio.", "BO, mensagens, ligações, fotos, comunicações e registros do pátio", "pessoa que constatou ou comunicou o desaparecimento", "confirmar data, horário, local e versão do pátio"),
@@ -185,8 +322,7 @@ def _timeline_guide_text(case: Case, context: dict[str, Any]) -> str:
             f"Pendência/observação: {pending}\n"
             f"Ordem: {index}"
         )
-    return "\\n".join(blocks)
-
+    return "\n".join(blocks)
 
 def _checklist_guide_text(case: Case, context: dict[str, Any]) -> str:
     case_title = _clean_text(getattr(case, "title", ""), 220) or "este caso"
@@ -276,12 +412,12 @@ Antes de atualizar o dossiê, confira:
 Depois clique em Atualizar dossiê. Ele serve para visão operacional do advogado, não é peça processual e não substitui revisão jurídica."""
 
 
-def _module_guide_suggestion(destination: str, case: Case, context: dict[str, Any]) -> dict[str, str]:
+def _module_guide_suggestion(destination: str, case: Case, context: dict[str, Any], message: str = "") -> dict[str, str]:
     if destination == "linha_do_tempo":
         return _suggestion(
             "linha_do_tempo",
             "Preencher Linha do Tempo por campos",
-            _timeline_guide_text(case, context),
+            _timeline_guide_text(case, context, message),
             "A pergunta é sobre como preencher a Linha do Tempo; a resposta deve orientar campo por campo, não tratar a pergunta como fato.",
             "alta",
         )
@@ -329,10 +465,10 @@ def _module_guidance_response(
     timeline: list[dict[str, Any]],
     modules: list[str],
 ) -> dict[str, Any]:
-    suggestions = [_module_guide_suggestion(module, case, context) for module in modules]
+    suggestions = [_module_guide_suggestion(module, case, context, message) for module in modules]
 
     if "dossie" not in modules:
-        suggestions.append(_module_guide_suggestion("dossie", case, context))
+        suggestions.append(_module_guide_suggestion("dossie", case, context, message))
 
     return {
         "case_id": case.id,
