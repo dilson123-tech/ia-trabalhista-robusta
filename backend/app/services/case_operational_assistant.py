@@ -324,35 +324,117 @@ def _timeline_guide_text(case: Case, context: dict[str, Any], message: str = "")
         )
     return "\n".join(blocks)
 
-def _checklist_guide_text(case: Case, context: dict[str, Any]) -> str:
+def _checklist_guide_text(case: Case, context: dict[str, Any], message: str = "") -> str:
     case_title = _clean_text(getattr(case, "title", ""), 220) or "este caso"
-    return f"""Para o caso: {case_title}
-No Checklist de provas, crie pendências objetivas. Sugestões:
+    blob = f"{_case_context_text(case, context)} {message}".lower()
 
-Pendência 1
-Título: Localizar documento principal do caso
-Categoria: documento
-Prioridade: alta
-Solicitar de: cliente
-Prazo: a definir
-Observações: pedir contrato, recibo, BO, mensagens, protocolos ou documento que comprove a origem do caso.
+    if _is_vehicle_dealer_pix_context(blob):
+        pending_items = [
+            (
+                "Conferir e anexar comprovantes Pix das parcelas pagas",
+                "prova",
+                "alta",
+                "cliente",
+                "a definir",
+                "Cliente informa possuir comprovantes Pix de 34 parcelas de R$ 1.180,00, totalizando R$ 40.120,00. Conferir todos os comprovantes, datas, valores, destinatário, chave Pix, banco de origem e vínculo com a negociação do veículo. Depois de conferidos, anexar os arquivos em Anexos/provas e registrar se há parcela faltante ou divergente.",
+            ),
+            (
+                "Montar resumo cronológico dos pagamentos realizados",
+                "informação",
+                "alta",
+                "cliente/advogado",
+                "a definir",
+                "Organizar os pagamentos em ordem cronológica, com data, valor, destinatário, chave Pix, banco, comprovante correspondente e observação. Confirmar se o total pago em parcelas é R$ 40.120,00 e se todos os Pix foram enviados à revendedora, representante ou pessoa vinculada à negociação.",
+            ),
+            (
+                "Solicitar contrato, notas promissórias e prestação de contas da revendedora",
+                "documento",
+                "alta",
+                "revendedora/cliente/advogado",
+                "a definir",
+                "Cliente informa que perdeu sua via física do contrato. Solicitar cópia integral do contrato, notas promissórias, recibos, demonstrativo de parcelas, saldo alegado, prestação de contas e qualquer documento usado pela revendedora para justificar a retomada ou recolhimento do veículo.",
+            ),
+            (
+                "Comprovar bens entregues como entrada",
+                "prova",
+                "alta",
+                "cliente",
+                "a definir",
+                "Levantar documentos, recibos, prints, mensagens ou comprovantes da entrega do Scenic 2004 avaliado em R$ 4.000,00 e da moto Honda CBX 300 avaliada em R$ 11.000,00. Confirmar quem recebeu os bens, data da entrega, avaliação usada e se houve transferência ou recibo.",
+            ),
+            (
+                "Comprovar retomada ou recolhimento do veículo",
+                "prova",
+                "alta",
+                "cliente/testemunha",
+                "a definir",
+                "Levantar data, local, quem recolheu, onde o veículo está, mensagens, fotos, vídeos, comprovante de guincho, comunicação da revendedora ou testemunhas que confirmem a retomada/recolhimento do veículo.",
+            ),
+            (
+                "Verificar existência do suposto bloqueio",
+                "documento",
+                "alta",
+                "advogado/revendedora",
+                "a definir",
+                "Conferir se existe ordem judicial, busca e apreensão, bloqueio administrativo, restrição Detran, documento formal de dívida ou apenas alegação comercial da revendedora. Solicitar documento formal que comprove o motivo informado.",
+            ),
+            (
+                "Consultar Detran e eventuais processos relacionados ao veículo",
+                "documento",
+                "normal",
+                "advogado",
+                "a definir",
+                "Realizar consulta de restrições administrativas/judiciais do veículo, histórico de propriedade, eventuais processos, busca e apreensão ou bloqueios vinculados. Guardar comprovantes das consultas para conferência.",
+            ),
+            (
+                "Separar pontos para avaliação de restituição, danos e tutela",
+                "informação",
+                "normal",
+                "advogado",
+                "a definir",
+                "Após reunir Pix, documentos da entrada, contrato/prestação de contas e prova do recolhimento, avaliar pedidos possíveis: exibição de documentos, restituição do veículo ou valores, danos materiais/morais e tutela de urgência. Não afirmar culpa ou ilegalidade definitiva sem prova documental.",
+            ),
+        ]
+    else:
+        pending_items = [
+            (
+                "Localizar documento principal do caso",
+                "documento",
+                "alta",
+                "cliente",
+                "a definir",
+                "Pedir contrato, recibo, BO, mensagens, protocolos ou documento que comprove a origem do caso.",
+            ),
+            (
+                "Confirmar datas principais",
+                "informação",
+                "alta",
+                "cliente/testemunha",
+                "a definir",
+                "Confirmar data inicial, data do fato principal, comunicações feitas e situação atual.",
+            ),
+            (
+                "Separar provas de responsabilidade e prejuízo",
+                "prova",
+                "alta",
+                "cliente/advogado",
+                "a definir",
+                "Organizar documentos que mostram quem tinha obrigação, o que aconteceu, qual dano houve e o valor envolvido.",
+            ),
+        ]
 
-Pendência 2
-Título: Confirmar datas principais
-Categoria: informação
-Prioridade: alta
-Solicitar de: cliente/testemunha
-Prazo: a definir
-Observações: confirmar data inicial, data do fato principal, comunicações feitas e situação atual.
-
-Pendência 3
-Título: Separar provas de responsabilidade e prejuízo
-Categoria: prova
-Prioridade: alta
-Solicitar de: cliente/advogado
-Prazo: a definir
-Observações: organizar documentos que mostram quem tinha obrigação, o que aconteceu, qual dano houve e o valor envolvido."""
-
+    blocks = [f"Para o caso: {case_title}", "No Checklist de provas, crie pendências objetivas:"]
+    for index, (title, category, priority, requested_from, deadline, notes) in enumerate(pending_items, start=1):
+        blocks.append(
+            f"\nPendência {index}\n"
+            f"Título: {title}\n"
+            f"Categoria: {category}\n"
+            f"Prioridade: {priority}\n"
+            f"Solicitar de: {requested_from}\n"
+            f"Prazo: {deadline}\n"
+            f"Observações: {notes}"
+        )
+    return "\n".join(blocks)
 
 def _attachments_guide_text(case: Case, context: dict[str, Any]) -> str:
     case_title = _clean_text(getattr(case, "title", ""), 220) or "este caso"
@@ -426,7 +508,7 @@ def _module_guide_suggestion(destination: str, case: Case, context: dict[str, An
         return _suggestion(
             "checklist",
             "Preencher Checklist de provas",
-            _checklist_guide_text(case, context),
+            _checklist_guide_text(case, context, message),
             "A pergunta pede organização de pendências e documentos; isso pertence ao Checklist.",
             "alta",
         )
