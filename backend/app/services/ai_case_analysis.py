@@ -193,28 +193,54 @@ def _fallback_analysis(
 
 
     elif normalized_area == "consumidor":
-        if any(term in text for term in ["produto", "defeito", "vício", "vicio", "garantia"]):
-            issues.append("Possível vício/defeito de produto, exigindo prova da compra, falha apresentada e tentativa de solução com fornecedor")
+        is_vehicle_dealer_pix_case = (
+            any(term in text for term in ["veículo", "veiculo", "carro", "automóvel", "automovel", "moto", "placa", "renavam", "chassi"])
+            and any(term in text for term in ["revendedora", "garagem", "automóveis", "automoveis", "quintino", "comércio de automóveis", "comercio de automoveis"])
+            and any(term in text for term in ["pix", "parcela", "parcelamento", "nota promissória", "nota promissoria", "entrada"])
+            and any(term in text for term in ["tomou", "recolheu", "retomou", "retirada", "bloqueio", "busca e apreensão", "busca e apreensao"])
+        )
+
+        if is_vehicle_dealer_pix_case:
+            issues.extend(
+                [
+                    "Relação de consumo com revendedora de veículos, exigindo validação do fornecedor, contrato, negociação e documentos do veículo.",
+                    "Pagamentos relevantes por Pix e entrada com bens usados, exigindo conferência de valores, destinatário dos Pix, notas promissórias e eventual saldo discutido.",
+                    "Retomada/recolhimento do veículo sob alegação de suposto bloqueio, sem documentação clara apresentada até o momento.",
+                    "Necessário verificar se houve ordem judicial, busca e apreensão, bloqueio administrativo, restrição no Detran ou mera alegação comercial da revendedora.",
+                    "Avaliar exibição de contrato/documentos, restituição do veículo ou devolução de valores, danos materiais/morais e tutela de urgência conforme prova disponível.",
+                ]
+            )
             risk = "medium"
+            next_steps = [
+                "Anexar comprovantes Pix, documentos dos bens dados de entrada, dados do veículo adquirido, mensagens e qualquer prova da retirada/recolhimento.",
+                "Solicitar ou exigir cópia do contrato, notas promissórias, prestação de contas, documento do suposto bloqueio e justificativa formal da revendedora.",
+                "Confirmar destinatário dos Pix, valor total pago, valor da entrada, eventual saldo pendente e quem recebeu ou autorizou a retomada do veículo.",
+                "Organizar cronologia da compra, pagamentos, perda/ausência do contrato, alegação de bloqueio e recolhimento do veículo.",
+                "Submeter ao advogado a análise de tutela de urgência, restituição do veículo, devolução de valores e indenização, sem afirmar crime ou culpa sem prova.",
+            ]
+        else:
+            if any(term in text for term in ["produto", "defeito", "vício", "vicio", "garantia"]):
+                issues.append("Possível vício/defeito de produto, exigindo prova da compra, falha apresentada e tentativa de solução com fornecedor")
+                risk = "medium"
 
-        if any(term in text for term in ["serviço", "servico", "não prestado", "nao prestado", "falha na prestação", "falha na prestacao"]):
-            issues.append("Possível falha na prestação de serviço, dependente de contrato, pagamento, protocolos e prova do descumprimento")
-            risk = "medium"
+            if any(term in text for term in ["serviço", "servico", "não prestado", "nao prestado", "falha na prestação", "falha na prestacao"]):
+                issues.append("Possível falha na prestação de serviço, dependente de contrato, pagamento, protocolos e prova do descumprimento")
+                risk = "medium"
 
-        if any(term in text for term in ["cobrança indevida", "cobranca indevida", "negativação", "negativacao", "restituição", "restituicao"]):
-            issues.append("Possível cobrança indevida, negativação ou restituição, exigindo documentos, protocolos e prova do dano")
-            risk = "medium"
+            if any(term in text for term in ["cobrança indevida", "cobranca indevida", "negativação", "negativacao", "restituição", "restituicao"]):
+                issues.append("Possível cobrança indevida, negativação ou restituição, exigindo documentos, protocolos e prova do dano")
+                risk = "medium"
 
-        if len(issues) < 2:
-            issues.append("Necessária análise consumerista específica da relação de consumo, fornecedor, produto/serviço, falha e dano alegado")
-            issues.append("Necessário consolidar nota fiscal, contrato, comprovantes, protocolos e tentativas administrativas antes da conclusão")
+            if len(issues) < 2:
+                issues.append("Necessária análise consumerista específica da relação de consumo, fornecedor, produto/serviço, falha e dano alegado")
+                issues.append("Necessário consolidar nota fiscal, contrato, comprovantes, protocolos e tentativas administrativas antes da conclusão")
 
-        next_steps = [
-            "Confirmar relação de consumo, fornecedor, produto ou serviço contratado e valores envolvidos",
-            "Anexar nota fiscal, contrato, comprovante de pagamento, protocolos de atendimento e registros de reclamação",
-            "Organizar cronologia da falha, tentativas de solução e prejuízos suportados",
-            "Submeter pedidos de restituição, obrigação de fazer ou indenização à revisão do advogado",
-        ]
+            next_steps = [
+                "Confirmar relação de consumo, fornecedor, produto ou serviço contratado e valores envolvidos",
+                "Anexar nota fiscal, contrato, comprovante de pagamento, protocolos de atendimento e registros de reclamação",
+                "Organizar cronologia da falha, tentativas de solução e prejuízos suportados",
+                "Submeter pedidos de restituição, obrigação de fazer ou indenização à revisão do advogado",
+            ]
 
     elif normalized_area == "familia":
         if any(term in text for term in ["guarda", "convivência", "convivencia", "visita", "menor", "criança", "crianca"]):
@@ -388,7 +414,7 @@ def _build_prompt(
     - O conteúdo deve variar conforme os fatos do caso.
     - A área jurídica informada é mandatória e deve prevalecer sobre inferências soltas do texto.
     - Quando a área indicada NÃO for trabalhista, é proibido mencionar ou pressupor: reclamação trabalhista, Justiça do Trabalho, vínculo empregatício, empregador, FGTS, CTPS, insalubridade, contrato de trabalho, prescrição bienal trabalhista ou créditos trabalhistas.
-    - Se a área for consumidor, priorizar relação de consumo, fornecedor, produto/serviço, defeito/vício, cobrança indevida, protocolos, restituição, obrigação de fazer e dano alegado.
+    - Se a área for consumidor, priorizar relação de consumo, fornecedor, produto/serviço, defeito/vício, cobrança indevida, protocolos, restituição, obrigação de fazer e dano alegado. Quando o caso envolver veículo, revendedora, Pix/parcelamento e retomada/recolhimento por suposto bloqueio, tratar como caso consumerista específico de compra e venda de veículo, exibição de contrato/documentos, comprovação do bloqueio, restituição do veículo ou valores, danos e tutela de urgência, sem usar análise genérica de produto/serviço.
     - Se a área for familia, priorizar vínculo familiar, alimentos, guarda, convivência, divórcio, partilha simples, documentos familiares e melhor interesse da criança quando aplicável.
     - Se a área for previdenciario, priorizar BPC/LOAS, INSS, CadÚnico, renda familiar, laudos/relatórios médicos, vulnerabilidade social, requerimento/indeferimento administrativo e documentos sociais.
     - Se a área for civil_ambiental, priorizar direito de vizinhança, obrigação de fazer/não fazer, tutela de urgência, responsabilidade civil, dano moral, prova ambiental/acústica/médica e proteção à saúde/sossego/segurança.

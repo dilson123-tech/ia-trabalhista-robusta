@@ -249,8 +249,9 @@ export type CaseAnalysisResponse = {
   viability?: Record<string, unknown>
 }
 
-export async function getCaseAnalysis(token: string, caseId: number): Promise<CaseAnalysisResponse> {
-  const response = await fetch(`${API_URL}/cases/${caseId}/analysis`, {
+export async function getCaseAnalysis(token: string, caseId: number, force = false): Promise<CaseAnalysisResponse> {
+  const query = force ? '?force=true' : ''
+  const response = await fetch(`${API_URL}/cases/${caseId}/analysis${query}`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },

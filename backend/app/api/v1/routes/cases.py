@@ -413,13 +413,28 @@ def _enrich_analysis_with_case_context(analysis, case_context):
     ]
 
     facts_joined = " ".join(facts).lower()
+    existing_issues_joined = " ".join(str(issue) for issue in issues).lower()
+    context_joined = f"{facts_joined} {summary} {existing_issues_joined}".lower()
+    vehicle_dealer_case = (
+        ("veículo" in context_joined or "veiculo" in context_joined or "carro" in context_joined or "automóvel" in context_joined or "automovel" in context_joined)
+        and ("revendedora" in context_joined or "quintino" in context_joined or "automóveis" in context_joined or "automoveis" in context_joined)
+        and ("pix" in context_joined or "parcela" in context_joined or "parcelamento" in context_joined or "nota promissória" in context_joined or "nota promissoria" in context_joined)
+        and ("bloqueio" in context_joined or "recolheu" in context_joined or "tomou" in context_joined or "retomou" in context_joined or "retirada" in context_joined)
+    )
+
+    if vehicle_dealer_case:
+        issues.append("Conferir se a retomada/recolhimento do veículo teve base documental: ordem judicial, busca e apreensão, bloqueio administrativo, restrição no Detran ou autorização contratual.")
+        issues.append("Validar contrato, notas promissórias, comprovantes Pix, bens dados de entrada e eventual prestação de contas antes de definir pedidos.")
 
     if "locação" in facts_joined or "locacao" in facts_joined:
         issues.append("Verificar contrato de locação, obrigações assumidas, vigência, multas, entrega e devolução do bem.")
     if "não devolução" in facts_joined or "nao devolucao" in facts_joined:
         issues.append("Confrontar alegação de não devolução do bem com documentos, termos, comunicações e depoimentos disponíveis.")
     if "indenizatório" in facts_joined or "indenizatorio" in facts_joined or "valor do bem" in facts_joined:
-        issues.append("Validar prova do valor indenizatório do equipamento e separar dano efetivo de verbas acessórias.")
+        if vehicle_dealer_case:
+            issues.append("Validar valor econômico do veículo, bens dados de entrada, parcelas pagas por Pix e eventual restituição/devolução, separando principal, danos materiais e danos morais.")
+        else:
+            issues.append("Validar prova do valor indenizatório do equipamento e separar dano efetivo de verbas acessórias.")
     if "lucros cessantes" in facts_joined:
         issues.append("Exigir demonstração específica dos lucros cessantes, com base documental e cálculo verificável.")
     if attachments:
