@@ -979,9 +979,288 @@ def _natural_next_step_response(
     }
 
 
+
+def _is_review_validation_message(lowered: str) -> bool:
+    text = f" {lowered.strip()} "
+    if not text.strip():
+        return False
+
+    review_markers = (
+        "confere se",
+        "confira se",
+        "verifica se",
+        "verifique se",
+        "ve se",
+        "vê se",
+        "olha se",
+        "olhe se",
+        "esta bom",
+        "está bom",
+        "ficou bom",
+        "ta bom",
+        "tá bom",
+        "precisa mudar",
+        "precisa alterar",
+        "tem que mudar",
+        "tem algo errado",
+        "algo errado",
+        "esta coerente",
+        "está coerente",
+        "ficou coerente",
+        "esta correto",
+        "está correto",
+        "ficou correto",
+        "revisa",
+        "revise",
+        "validar",
+        "valida",
+        "valide",
+        "analise se",
+        "melhorar esse texto",
+        "melhorar essa análise",
+        "melhorar essa analise",
+        "falta algo",
+        "faltou algo",
+    )
+    content_markers = (
+        "análise",
+        "analise",
+        "resumo",
+        "pontos de atenção",
+        "pontos de atencao",
+        "próximos passos",
+        "proximos passos",
+        "risco",
+        "diagnóstico",
+        "diagnostico",
+        "dossiê",
+        "dossie",
+        "linha do tempo",
+        "checklist",
+        "anexos",
+        "provas",
+        "caso",
+        "processo",
+        "peça",
+        "peca",
+        "minuta",
+        "texto",
+    )
+
+    has_review_marker = any(marker in text for marker in review_markers)
+    has_content_marker = any(marker in text for marker in content_markers)
+
+    return has_review_marker and has_content_marker
+
+
+def _review_validation_response(
+    case: Case,
+    message: str,
+    context: dict[str, Any],
+    timeline: list[dict[str, Any]],
+) -> dict[str, Any]:
+    text = _clean_text(message, 2500)
+    lowered = text.lower()
+
+    mentions_analysis = any(
+        marker in lowered
+        for marker in ("análise", "analise", "diagnóstico", "diagnostico", "risco", "pontos de atenção", "pontos de atencao")
+    )
+    mentions_timeline = "linha do tempo" in lowered or "timeline" in lowered
+    mentions_evidence = any(marker in lowered for marker in ("anexo", "anexos", "prova", "provas", "documento", "documentos", "comprovante"))
+    mentions_dossier = "dossiê" in lowered or "dossie" in lowered
+    mentions_draft = any(marker in lowered for marker in ("peça", "peca", "minuta", "petição", "peticao"))
+
+    must_change: list[str] = []
+    keep_items: list[str] = []
+    optional_improvements: list[str] = []
+
+    if (
+        "analisado automaticamente em modo de contingência" in lowered
+        or "analisado automaticamente em modo de contingencia" in lowered
+    ):
+        must_change.append(
+            "Localização provável: bloco Análise > Resumo técnico, na frase de abertura. Observação: esse bloco pode ser somente leitura/gerado automaticamente. Onde está: 'analisado automaticamente em modo de contingência'. Sugestão para próxima versão revisada: 'analisado em caráter operacional preliminar'. Motivo: fica mais claro, profissional e evita parecer falha interna do sistema."
+        )
+    elif "modo de contingência" in lowered or "modo de contingencia" in lowered:
+        must_change.append(
+            "Localização provável: trecho em que aparece a expressão técnica indicada. Onde está: 'modo de contingência'. Troque por: 'análise operacional preliminar'. Motivo: linguagem mais clara para usuário comum e aplicável a qualquer caso."
+        )
+
+    if "analisado automaticamente" in lowered and not (
+        "analisado automaticamente em modo de contingência" in lowered
+        or "analisado automaticamente em modo de contingencia" in lowered
+    ):
+        optional_improvements.append(
+            "Localização provável: frase de abertura, resumo técnico ou trecho de apresentação da análise. Observação: se o bloco for somente leitura, não tente editar diretamente. Onde está: 'analisado automaticamente'. Sugestão para próxima versão revisada: 'análise operacional gerada pelo sistema'. Motivo: fica melhor para cliente ou usuário final, mantendo a necessidade de revisão profissional."
+        )
+
+    if any(marker in lowered for marker in ("suposto", "alega", "cliente informa", "pendente de validação", "pendente de validacao")):
+        keep_items.append(
+            "Manter a linguagem cautelosa como 'suposto', 'alega', 'cliente informa' e 'pendente de validação', pois isso evita conclusão sem prova."
+        )
+
+    if any(marker in lowered for marker in ("sem afirmar crime", "sem afirmar culpa", "não afirmar crime", "nao afirmar crime", "não afirmar culpa", "nao afirmar culpa")):
+        keep_items.append(
+            "Manter o alerta para não afirmar crime, culpa ou irregularidade definitiva sem prova suficiente."
+        )
+
+    if "nível de risco: médio" in lowered or "nivel de risco: medio" in lowered or "risco: médio" in lowered or "risco: medio" in lowered:
+        keep_items.append(
+            "Manter risco médio se ainda faltam documentos essenciais e não há prova validada de urgência extrema; ajustar apenas se surgir fato novo relevante."
+        )
+    elif "risco" in lowered:
+        optional_improvements.append(
+            "Conferir o nível de risco: manter se estiver compatível com urgência, prova disponível e impacto prático; ajustar se houver fato novo relevante."
+        )
+
+    if any(marker in lowered for marker in ("crime", "culpa", "ilegalidade", "fraude", "golpe")):
+        optional_improvements.append(
+            "Conferir linguagem sensível: não afirmar crime, culpa, fraude, golpe ou ilegalidade definitiva sem prova suficiente e revisão profissional."
+        )
+
+    if not must_change:
+        must_change.append(
+            "Nenhuma alteração obrigatória identificada pela revisão operacional, desde que o texto esteja fiel aos documentos e dados preenchidos."
+        )
+
+    if not keep_items:
+        keep_items.append(
+            "Manter os trechos que estejam objetivos, prudentes, coerentes com o caso e ligados a documentos, pendências ou próximos passos."
+        )
+
+    if not optional_improvements:
+        optional_improvements.append(
+            "Sem melhoria opcional específica detectada; se quiser uma redação mais bonita, peça para gerar uma versão revisada."
+        )
+
+    recommended_changes_text = (
+        "Veredito operacional:\n"
+        "- Se não houver alteração obrigatória real listada abaixo, o texto pode ser mantido/salvo.\n\n"
+        "Eu mudaria:\n"
+        + "\n".join(f"- {item}" for item in must_change)
+        + "\n\nEu manteria:\n"
+        + "\n".join(f"- {item}" for item in keep_items)
+        + "\n\nMelhorias opcionais:\n"
+        + "\n".join(f"- {item}" for item in optional_improvements)
+    )
+
+    suggestions: list[dict[str, str]] = [
+        _suggestion(
+            "dossie",
+            "Veredito e modificações recomendadas",
+            recommended_changes_text,
+            "Pedidos como 'confere se está bom' devem dizer claramente se pode manter, o que mudar e qual ação executar agora.",
+            "alta",
+        ),
+        _suggestion(
+            "dossie",
+            "Ação agora",
+            "Se o texto estiver adequado, mantenha a análise e atualize o Dossiê interno. Se houver sugestão de melhoria em bloco somente leitura, não tente editar manualmente: registre a observação no Dossiê interno ou peça/gere uma nova versão revisada da análise. Se houver lacuna documental, registre pendência no Checklist antes de avançar.",
+            "O usuário precisa sair da revisão sabendo se deve salvar, alterar, gerar nova versão ou marcar pendência.",
+            "alta",
+        ),
+        _suggestion(
+            "checklist",
+            "Marcar ajustes necessários",
+            "Quando faltar contrato, documento, data, valor, testemunha, consulta oficial ou validação, registrar como pendência no Checklist.",
+            "O sistema deve pedir alteração apenas quando houver lacuna, risco de linguagem ou informação pendente.",
+            "alta",
+        ),
+    ]
+
+    if mentions_evidence or mentions_analysis:
+        suggestions.append(
+            _suggestion(
+                "anexos",
+                "Conferir lastro documental",
+                "Verificar se cada conclusão relevante tem documento, prova real ou pendência expressa. Se não tiver, usar termos como 'cliente informa', 'alega', 'suposto' e 'pendente de validação'.",
+                "A revisão deve proteger o caso contra afirmações fortes demais sem prova anexada.",
+                "alta",
+            )
+        )
+
+    if mentions_timeline or mentions_analysis:
+        suggestions.append(
+            _suggestion(
+                "linha_do_tempo",
+                "Conferir fatos cronológicos",
+                "Verificar se os fatos principais estão em ordem cronológica e se cada item tem prova relacionada ou pendência indicada.",
+                "A análise fica melhor quando a narrativa, o checklist e os anexos conversam entre si.",
+                "normal",
+            )
+        )
+
+    if (mentions_dossier or mentions_draft) and not mentions_analysis:
+        suggestions.append(
+            _suggestion(
+                "dossie",
+                "Atualizar visão operacional",
+                "Depois de revisar os ajustes, atualizar o Dossiê interno para consolidar diagnóstico, pendências, riscos e próximos passos.",
+                "O Dossiê deve refletir a versão mais confiável do caso antes de análise jurídica ou minuta.",
+                "normal",
+            )
+        )
+
+    if mentions_analysis:
+        summary = (
+            "Entendi que você quer uma revisão crítica da análise, não apenas orientação de preenchimento. "
+            "A estrutura parece adequada quando separa resumo, nível de risco, pontos de atenção e próximos passos. "
+            "Eu só recomendaria alteração se houver linguagem conclusiva sem prova, ausência de pendência documental ou falta de próximo passo operacional claro."
+        )
+        next_steps = [
+            "Veredito: se não houver linguagem forte sem prova, lacuna documental grave ou próximo passo ausente, a análise pode ser mantida.",
+            "Ir até o trecho indicado em 'Localização provável'. Se for campo editável, aplicar o texto sugerido. Se for bloco somente leitura/gerado automaticamente, registrar a observação no Dossiê interno ou pedir/gerar nova versão revisada.",
+            "Manter a análise atual se o bloco for somente leitura e atualizar o Dossiê interno com a observação ou gerar nova versão revisada quando houver ação própria.",
+            "Marcar no Checklist tudo que depender de contrato, comprovante, consulta oficial, testemunha ou validação externa.",
+            "Se quiser melhorar o texto, pedir explicitamente para gerar uma versão revisada da análise.",
+        ]
+    else:
+        summary = (
+            "Entendi que você quer validar se o conteúdo está bom ou se precisa de ajuste. "
+            "Vou tratar como revisão operacional: manter o que estiver coerente e pedir alteração apenas quando houver lacuna, risco ou linguagem forte demais."
+        )
+        next_steps = [
+            "Veredito: manter o texto se ele estiver claro, prudente e coerente com o módulo correto.",
+            "Ir até o trecho indicado em 'Localização provável'. Se for campo editável, aplicar o texto sugerido. Se for bloco somente leitura/gerado automaticamente, registrar a observação no Dossiê interno ou pedir/gerar nova versão revisada.",
+            "Salvar/manter o conteúdo revisado ou atualizar o Dossiê interno.",
+            "Registrar pendências no Checklist quando faltarem documentos, datas, valores, pessoas ou provas.",
+            "Se quiser melhorar a redação, pedir explicitamente para gerar uma versão revisada.",
+        ]
+
+    return {
+        "case_id": case.id,
+        "assistant_mode": "orientation_only",
+        "summary": summary,
+        "rewritten_input": text,
+        "suggested_actions": suggestions[:6],
+        "next_steps": next_steps,
+        "warnings": [
+            "Não transformar pedido de revisão em fato da Linha do Tempo.",
+            "Não afirmar crime, culpa, ilegalidade definitiva, valor fechado ou responsabilidade sem prova suficiente.",
+            "Quando faltar documento ou validação, pedir ajuste ou marcar pendência em vez de inventar informação.",
+        ],
+        "disclaimer": "Assistente operacional de apoio. Não substitui revisão técnica, prova documental, estratégia jurídica ou decisão profissional.",
+        "metadata": {
+            "source": "case_operational_assistant_review_validation_routing_v1",
+            "provider": "fallback",
+            "case_number": _clean_text(getattr(case, "case_number", "")),
+            "timeline_items_considered": len(timeline),
+        },
+    }
+
+
 def _fallback_response(case: Case, message: str, context: dict[str, Any], timeline: list[dict[str, Any]]) -> dict[str, Any]:
     text = _clean_text(message, 2500)
     lowered = text.lower()
+
+    if _is_review_validation_message(lowered):
+        return _review_validation_response(
+            case=case,
+            message=text,
+            context=context,
+            timeline=timeline,
+        )
 
     if _is_natural_next_step_message(lowered):
         return _natural_next_step_response(
