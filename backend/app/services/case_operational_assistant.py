@@ -980,6 +980,241 @@ def _natural_next_step_response(
 
 
 
+
+EDITOR_BLOCK_LABELS: tuple[tuple[str, str], ...] = (
+    ("endereçamento", "Endereçamento"),
+    ("enderecamento", "Endereçamento"),
+    ("qualificação das partes", "Qualificação das Partes"),
+    ("qualificacao das partes", "Qualificação das Partes"),
+    ("resumo fático", "Resumo Fático"),
+    ("resumo fatico", "Resumo Fático"),
+    ("fundamentação", "Fundamentação"),
+    ("fundamentacao", "Fundamentação"),
+    ("pedidos e valores estimados", "Pedidos e Valores Estimados"),
+    ("provas e requerimentos", "Provas e Requerimentos"),
+    ("checklist final", "Checklist Final"),
+    ("fechamento", "Fechamento"),
+    ("pedidos", "Pedidos"),
+)
+
+
+def _detect_editor_block_label(lowered: str) -> str:
+    for marker, label in EDITOR_BLOCK_LABELS:
+        if marker in lowered:
+            return label
+    return "Bloco editável"
+
+
+def _is_editor_block_correction_message(lowered: str) -> bool:
+    text = f" {lowered.strip()} "
+    if not text.strip():
+        return False
+
+    block_markers = (
+        "— draft",
+        "- draft",
+        "(assisted_draft)",
+        "blocos da versão",
+        "blocos da versao",
+        "editar bloco",
+        "versão atual",
+        "versao atual",
+        "resumo fático",
+        "resumo fatico",
+        "endereçamento",
+        "enderecamento",
+        "fundamentação",
+        "fundamentacao",
+        "pedidos",
+        "provas e requerimentos",
+        "checklist final",
+    )
+    correction_markers = (
+        "corrige",
+        "corrigir",
+        "como está",
+        "como esta",
+        "ta bom",
+        "tá bom",
+        "t bom",
+        "precisa mexer",
+        "precisa mudar",
+        "precisa ajustar",
+        "está viável",
+        "esta viavel",
+        "tá viável",
+        "ta viavel",
+        "revisa",
+        "revise",
+    )
+
+    return any(marker in text for marker in block_markers) and any(
+        marker in text for marker in correction_markers
+    )
+
+
+def _extract_editor_block_body(message: str) -> str:
+    lines: list[str] = []
+    skip_fragments = (
+        "corrige esse",
+        "corrigir esse",
+        "como está esse",
+        "como esta esse",
+        "preciso saber",
+        "versão atual",
+        "versao atual",
+        "número:",
+        "numero:",
+        "aprovada:",
+        "notas:",
+        "blocos da versão",
+        "blocos da versao",
+        "editar bloco",
+    )
+
+    for raw_line in str(message or "").replace("\r\n", "\n").split("\n"):
+        line = raw_line.strip()
+        lowered = line.lower()
+
+        if not line:
+            lines.append("")
+            continue
+
+        if any(fragment in lowered for fragment in skip_fragments):
+            continue
+
+        if "(assisted_draft)" in lowered or "— draft" in lowered or "- draft" in lowered:
+            continue
+
+        lines.append(line)
+
+    cleaned = _clean_multiline_text("\n".join(lines), 6000)
+    while "\n\n\n" in cleaned:
+        cleaned = cleaned.replace("\n\n\n", "\n\n")
+    return cleaned.strip()
+
+
+def _build_editor_block_revision(label: str, body: str) -> tuple[str, str]:
+    lowered_body = body.lower()
+    lowered_label = label.lower()
+
+    if lowered_label == "endereçamento" or lowered_label == "enderecamento":
+        return (
+            "Ajustar o placeholder da comarca e manter a advertência de conferência profissional, sem transformar o bloco em fato do caso.",
+            (
+                "EXCELENTÍSSIMO(A) SENHOR(A) DOUTOR(A) JUIZ(A) DE DIREITO DO JUÍZO COMPETENTE DA COMARCA DE [COMARCA A CONFIRMAR PELO ADVOGADO].\n\n"
+                "O advogado responsável deverá confirmar, antes do protocolo, a competência territorial, o juízo competente, eventual prevenção, o rito aplicável e a adequação da comarca conforme os documentos e a estratégia processual do caso."
+            ),
+        )
+
+    if lowered_label == "resumo fático" or lowered_label == "resumo fatico":
+        problem = (
+            "O bloco está viável, mas deve permanecer narrativo. Estratégia, pedidos, indenização e tutela de urgência devem ficar nos blocos próprios."
+        )
+        revised = body
+
+        for marker in ("O objetivo é montar", "O objetivo e montar"):
+            idx = revised.find(marker)
+            if idx >= 0:
+                revised = revised[:idx].rstrip()
+                break
+
+        narrative_close = (
+            "A narrativa permanece sujeita à validação documental, especialmente quanto à existência e conteúdo do contrato, valores efetivamente pagos, destinatário dos Pix, eventual saldo pendente, motivo formal do suposto bloqueio e circunstâncias da retomada/recolhimento do veículo."
+        )
+
+        if narrative_close.lower() not in revised.lower():
+            revised = f"{revised.rstrip()}\n\n{narrative_close}"
+
+        return problem, revised.strip()
+
+    if lowered_label == "pedidos":
+        return (
+            "Conferir se o bloco contém pedidos jurídicos concretos, e não apenas pontos de atenção, riscos ou pendências documentais.",
+            body,
+        )
+
+    if lowered_label == "fundamentação" or lowered_label == "fundamentacao":
+        return (
+            "Conferir se a fundamentação liga fatos, prova mínima e tese jurídica, sem afirmar culpa, crime ou irregularidade definitiva sem prova.",
+            body,
+        )
+
+    if lowered_label == "provas e requerimentos":
+        return (
+            "Conferir se o bloco separa provas existentes, documentos pendentes e requerimentos de exibição/diligência.",
+            body,
+        )
+
+    return (
+        "Revisar o conteúdo como bloco editável da minuta, sem salvar como fato da Linha do Tempo.",
+        body,
+    )
+
+
+def _editor_block_correction_response(
+    case: Case,
+    message: str,
+    context: dict[str, Any],
+    timeline: list[dict[str, Any]],
+) -> dict[str, Any]:
+    raw_message = str(message or "")
+    lowered = raw_message.lower()
+    block_label = _detect_editor_block_label(lowered)
+    block_body = _extract_editor_block_body(raw_message)
+    problem, revised_text = _build_editor_block_revision(block_label, block_body)
+
+    if not revised_text:
+        revised_text = "[Cole aqui o texto revisado do bloco após validar os dados do caso.]"
+
+    suggested_text = _clean_multiline_text(
+        f"""Veredito: viável, com ajuste no bloco editável.
+
+Bloco: {block_label}.
+
+Problema principal:
+{problem}
+
+Texto sugerido para substituir:
+{revised_text}
+
+Ação agora:
+Aplicar o texto sugerido no campo editável "{block_label}" do Editor/minuta. Não salvar este conteúdo na Linha do Tempo e não abrir Anexos/provas automaticamente, salvo se houver pedido explícito sobre documentos ou prova.""",
+        6000,
+    )
+
+    return {
+        "case_id": case.id,
+        "assistant_mode": "orientation_only",
+        "summary": f"Veredito: revisar no Editor/minuta o bloco {block_label}.",
+        "rewritten_input": "",
+        "suggested_actions": [
+            _suggestion(
+                "editor_minuta",
+                f"Revisar bloco: {block_label}",
+                suggested_text,
+                "O texto enviado é um bloco editável de minuta; deve ser corrigido no Editor/minuta, não organizado como fato do caso.",
+                "alta",
+            )
+        ],
+        "next_steps": [
+            f"Aplicar a sugestão no bloco editável {block_label}.",
+            "Não salvar este conteúdo na Linha do Tempo; criar Checklist ou Anexo apenas se houver pendência/prova real específica.",
+        ],
+        "warnings": [
+            "Não transformar bloco de minuta em fato cronológico.",
+            "Não exportar para PDF antes de revisar todos os blocos editáveis.",
+        ],
+        "disclaimer": "Assistente operacional de apoio. Não substitui revisão técnica, prova documental, estratégia jurídica ou decisão profissional.",
+        "metadata": {
+            "source": "case_operational_assistant_editor_block_correction_routing_v1",
+            "provider": "fallback",
+            "case_number": _clean_text(getattr(case, "case_number", "")),
+            "timeline_items_considered": len(timeline),
+        },
+    }
+
+
 def _is_review_validation_message(lowered: str) -> bool:
     text = f" {lowered.strip()} "
     if not text.strip():
@@ -1243,6 +1478,14 @@ def _review_validation_response(
 def _fallback_response(case: Case, message: str, context: dict[str, Any], timeline: list[dict[str, Any]]) -> dict[str, Any]:
     text = _clean_text(message, 2500)
     lowered = text.lower()
+
+    if _is_editor_block_correction_message(lowered):
+        return _editor_block_correction_response(
+            case=case,
+            message=message,
+            context=context,
+            timeline=timeline,
+        )
 
     if _is_review_validation_message(lowered):
         return _review_validation_response(
