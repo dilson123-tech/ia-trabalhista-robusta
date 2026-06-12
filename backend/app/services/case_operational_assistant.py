@@ -1119,10 +1119,7 @@ def _review_validation_response(
             "Conferir linguagem sensível: não afirmar crime, culpa, fraude, golpe ou ilegalidade definitiva sem prova suficiente e revisão profissional."
         )
 
-    if not must_change:
-        must_change.append(
-            "Nenhuma alteração obrigatória identificada pela revisão operacional, desde que o texto esteja fiel aos documentos e dados preenchidos."
-        )
+    has_required_change = bool(must_change)
 
     if not keep_items:
         keep_items.append(
@@ -1134,42 +1131,42 @@ def _review_validation_response(
             "Sem melhoria opcional específica detectada; se quiser uma redação mais bonita, peça para gerar uma versão revisada."
         )
 
+    change_section = (
+        "O que mudar:\n" + "\n".join(f"- {item}" for item in must_change)
+        if has_required_change
+        else "O que mudar:\n- Nada obrigatório no conteúdo. Ajustes de redação são opcionais."
+    )
+
     recommended_changes_text = (
-        "Veredito operacional:\n"
-        "- Se não houver alteração obrigatória real listada abaixo, o texto pode ser mantido/salvo.\n\n"
-        "Eu mudaria:\n"
-        + "\n".join(f"- {item}" for item in must_change)
-        + "\n\nEu manteria:\n"
-        + "\n".join(f"- {item}" for item in keep_items)
-        + "\n\nMelhorias opcionais:\n"
-        + "\n".join(f"- {item}" for item in optional_improvements)
+        f"Veredito: {'viável, com ajuste pequeno.' if has_required_change else 'viável.'}\n"
+        f"Precisa mexer? {'Sim, apenas no ponto indicado abaixo.' if has_required_change else 'Não há alteração obrigatória de conteúdo.'}\n\n"
+        + change_section
+        + "\n\nO que manter:\n"
+        + "\n".join(f"- {item}" for item in keep_items[:3])
+        + "\n\nAção agora:\n"
+        "- Manter/salvar se o conteúdo estiver fiel aos documentos. "
+        "Se o ajuste estiver em bloco somente leitura, registrar no Dossiê interno ou gerar nova versão revisada. "
+        "Marcar no Checklist apenas as pendências reais de documento, prova, data, valor ou validação externa."
     )
 
     suggestions: list[dict[str, str]] = [
         _suggestion(
             "dossie",
-            "Veredito e modificações recomendadas",
+            "Veredito curto de viabilidade",
             recommended_changes_text,
-            "Pedidos como 'confere se está bom' devem dizer claramente se pode manter, o que mudar e qual ação executar agora.",
-            "alta",
-        ),
-        _suggestion(
-            "dossie",
-            "Ação agora",
-            "Se o texto estiver adequado, mantenha a análise e atualize o Dossiê interno. Se houver sugestão de melhoria em bloco somente leitura, não tente editar manualmente: registre a observação no Dossiê interno ou peça/gere uma nova versão revisada da análise. Se houver lacuna documental, registre pendência no Checklist antes de avançar.",
-            "O usuário precisa sair da revisão sabendo se deve salvar, alterar, gerar nova versão ou marcar pendência.",
+            "Pedidos como 'está viável?' ou 'precisa mexer?' devem responder com veredito, mudança necessária e ação agora, sem repetir o texto inteiro do usuário.",
             "alta",
         ),
         _suggestion(
             "checklist",
-            "Marcar ajustes necessários",
-            "Quando faltar contrato, documento, data, valor, testemunha, consulta oficial ou validação, registrar como pendência no Checklist.",
-            "O sistema deve pedir alteração apenas quando houver lacuna, risco de linguagem ou informação pendente.",
+            "Marcar pendências reais",
+            "Registrar no Checklist apenas o que depender de contrato, documento, data, valor, testemunha, consulta oficial ou validação externa.",
+            "A revisão deve gerar pendência operacional apenas quando houver lacuna real, risco de linguagem ou falta de prova.",
             "alta",
         ),
     ]
 
-    if mentions_evidence or mentions_analysis:
+    if mentions_evidence:
         suggestions.append(
             _suggestion(
                 "anexos",
@@ -1180,7 +1177,7 @@ def _review_validation_response(
             )
         )
 
-    if mentions_timeline or mentions_analysis:
+    if mentions_timeline:
         suggestions.append(
             _suggestion(
                 "linha_do_tempo",
@@ -1204,36 +1201,29 @@ def _review_validation_response(
 
     if mentions_analysis:
         summary = (
-            "Entendi que você quer uma revisão crítica da análise, não apenas orientação de preenchimento. "
-            "A estrutura parece adequada quando separa resumo, nível de risco, pontos de atenção e próximos passos. "
-            "Eu só recomendaria alteração se houver linguagem conclusiva sem prova, ausência de pendência documental ou falta de próximo passo operacional claro."
+            "Veredito: viável, com ajuste pequeno."
+            if has_required_change
+            else "Veredito: viável. Não há alteração obrigatória de conteúdo."
         )
-        next_steps = [
-            "Veredito: se não houver linguagem forte sem prova, lacuna documental grave ou próximo passo ausente, a análise pode ser mantida.",
-            "Ir até o trecho indicado em 'Localização provável'. Se for campo editável, aplicar o texto sugerido. Se for bloco somente leitura/gerado automaticamente, registrar a observação no Dossiê interno ou pedir/gerar nova versão revisada.",
-            "Manter a análise atual se o bloco for somente leitura e atualizar o Dossiê interno com a observação ou gerar nova versão revisada quando houver ação própria.",
-            "Marcar no Checklist tudo que depender de contrato, comprovante, consulta oficial, testemunha ou validação externa.",
-            "Se quiser melhorar o texto, pedir explicitamente para gerar uma versão revisada da análise.",
-        ]
     else:
         summary = (
-            "Entendi que você quer validar se o conteúdo está bom ou se precisa de ajuste. "
-            "Vou tratar como revisão operacional: manter o que estiver coerente e pedir alteração apenas quando houver lacuna, risco ou linguagem forte demais."
+            "Veredito: viável, com ajuste pequeno."
+            if has_required_change
+            else "Veredito: manter se estiver claro, prudente e coerente com o módulo correto."
         )
-        next_steps = [
-            "Veredito: manter o texto se ele estiver claro, prudente e coerente com o módulo correto.",
-            "Ir até o trecho indicado em 'Localização provável'. Se for campo editável, aplicar o texto sugerido. Se for bloco somente leitura/gerado automaticamente, registrar a observação no Dossiê interno ou pedir/gerar nova versão revisada.",
-            "Salvar/manter o conteúdo revisado ou atualizar o Dossiê interno.",
-            "Registrar pendências no Checklist quando faltarem documentos, datas, valores, pessoas ou provas.",
-            "Se quiser melhorar a redação, pedir explicitamente para gerar uma versão revisada.",
-        ]
+
+    next_steps = [
+        "Aplicar apenas o ajuste obrigatório indicado, se houver. Se o bloco for somente leitura, registrar a observação no Dossiê interno ou gerar nova versão revisada.",
+        "Manter o conteúdo se ele estiver fiel aos documentos, aos fatos preenchidos e às pendências registradas.",
+        "Marcar no Checklist somente pendências reais de contrato, comprovante, consulta oficial, testemunha, valor, data ou validação externa.",
+    ]
 
     return {
         "case_id": case.id,
         "assistant_mode": "orientation_only",
         "summary": summary,
-        "rewritten_input": text,
-        "suggested_actions": suggestions[:6],
+        "rewritten_input": "",
+        "suggested_actions": suggestions[:4],
         "next_steps": next_steps,
         "warnings": [
             "Não transformar pedido de revisão em fato da Linha do Tempo.",
