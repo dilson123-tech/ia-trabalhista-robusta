@@ -1689,6 +1689,274 @@ def _series_block(title: str, items: list[str], limit: int = 4) -> str:
     return "\n".join(lines)
 
 
+
+def _dedupe_content_viability_items(items: list[str]) -> list[str]:
+    result: list[str] = []
+    seen: set[str] = set()
+
+    for raw_item in items:
+        item = _safe_text(raw_item)
+        if not item:
+            continue
+
+        key = item.lower()
+        if key in seen:
+            continue
+
+        seen.add(key)
+        result.append(item)
+
+    return result
+
+
+def _join_content_viability_context(*values) -> str:
+    parts: list[str] = []
+
+    for value in values:
+        if isinstance(value, list):
+            parts.extend(_safe_text(item) for item in value)
+        else:
+            parts.append(_safe_text(value))
+
+    return " ".join(part for part in parts if part).lower()
+
+
+def _build_content_viability_assisted_claims(
+    *,
+    normalized_area: str,
+    case_search_text: str,
+    issues: list[str],
+    controverted_points: list[str],
+    proof_checklist: list[str],
+    next_steps: list[str],
+) -> list[str]:
+    """Build concrete claim/request items.
+
+    Content rule:
+    - issues/controverted points are not claims by themselves;
+    - the assisted draft must convert content into operational legal requests;
+    - stylistic polish is secondary and remains for attorney review.
+    """
+
+    context = _join_content_viability_context(
+        normalized_area,
+        case_search_text,
+        issues,
+        controverted_points,
+        proof_checklist,
+        next_steps,
+    )
+
+    def has_any(*terms: str) -> bool:
+        return any(term in context for term in terms)
+
+    claims: list[str] = []
+
+    if has_any(
+        "contrato",
+        "nota promiss",
+        "parcelamento",
+        "financiamento",
+        "recibo",
+        "prestação de contas",
+        "prestacao de contas",
+        "demonstrativo",
+    ):
+        claims.append(
+            "Requer-se a exibição do contrato, instrumentos de parcelamento ou financiamento, notas promissórias, recibos, demonstrativo de parcelas, prestação de contas e demais documentos que sustentem a relação jurídica discutida."
+        )
+
+    if has_any(
+        "pix",
+        "pagamento",
+        "pagamentos",
+        "parcela",
+        "parcelas",
+        "licenciamento",
+        "entrada",
+        "saldo",
+        "valor pago",
+        "valores pagos",
+    ):
+        claims.append(
+            "Requer-se a apuração dos valores pagos, valores eventualmente pendentes, destinatários dos pagamentos, encargos cobrados e memória de cálculo, com vinculação entre cada pagamento e a obrigação discutida."
+        )
+
+    if has_any(
+        "bloqueio",
+        "detran",
+        "restrição",
+        "restricao",
+        "busca e apreensão",
+        "busca e apreensao",
+        "retomada",
+        "recolhimento",
+        "tomou o veículo",
+        "tomou o veiculo",
+        "retido",
+        "retenção",
+        "retencao",
+    ):
+        claims.append(
+            "Requer-se a apresentação de justificativa formal para eventual bloqueio, restrição, busca e apreensão, retenção, retomada ou recolhimento do bem, com indicação do documento, autoridade, data, fundamento e responsável pela medida."
+        )
+
+    if has_any(
+        "veículo",
+        "veiculo",
+        "automóvel",
+        "automovel",
+        "motocicleta",
+        "bem",
+        "posse",
+        "restituição",
+        "restituicao",
+        "devolução",
+        "devolucao",
+    ):
+        claims.append(
+            "Requer-se, conforme prova documental e estratégia do advogado, a restituição do bem ou, subsidiariamente, a devolução total ou parcial dos valores pagos, sem prejuízo de apuração de perdas materiais demonstradas."
+        )
+
+    if has_any(
+        "consumidor",
+        "fornecedor",
+        "revendedora",
+        "loja",
+        "produto",
+        "serviço",
+        "servico",
+        "cdc",
+    ):
+        claims.append(
+            "Requer-se o enquadramento jurídico adequado da relação de consumo ou da relação contratual aplicável, com análise dos deveres de informação, transparência, boa-fé, guarda documental e prestação de contas."
+        )
+
+    if has_any(
+        "dano",
+        "danos",
+        "prejuízo",
+        "prejuizo",
+        "indenização",
+        "indenizacao",
+        "moral",
+        "materiais",
+        "material",
+    ):
+        claims.append(
+            "Requer-se a avaliação de indenização por danos materiais e/ou morais apenas quando houver prova suficiente de conduta irregular, prejuízo concreto e nexo causal."
+        )
+
+    if has_any(
+        "urgência",
+        "urgencia",
+        "tutela",
+        "risco",
+        "perigo de dano",
+        "bloqueio",
+        "retenção",
+        "retencao",
+        "recolhimento",
+    ):
+        claims.append(
+            "Requer-se a avaliação de tutela de urgência quando houver prova documental mínima, risco de dano e utilidade prática da medida antes do julgamento final."
+        )
+
+    if not claims:
+        claims.extend(
+            [
+                "Requer-se a formulação dos pedidos materiais compatíveis com a narrativa validada, a prova disponível e a estratégia definida pelo advogado responsável.",
+                "Requer-se a complementação documental e probatória necessária antes de transformar pontos de atenção em pedidos definitivos.",
+            ]
+        )
+
+    return _dedupe_content_viability_items(claims)
+
+
+def _build_content_viability_proof_items(
+    *,
+    case_search_text: str,
+    issues: list[str],
+    controverted_points: list[str],
+    proof_checklist: list[str],
+    next_steps: list[str],
+) -> list[str]:
+    context = _join_content_viability_context(
+        case_search_text,
+        issues,
+        controverted_points,
+        proof_checklist,
+        next_steps,
+    )
+
+    def has_any(*terms: str) -> bool:
+        return any(term in context for term in terms)
+
+    items: list[str] = []
+
+    if has_any("pix", "pagamento", "pagamentos", "parcela", "parcelas"):
+        items.append(
+            "Separar comprovantes de pagamento por data, valor, destinatário, chave ou conta recebedora e vínculo com a obrigação discutida."
+        )
+
+    if has_any("contrato", "nota promiss", "parcelamento", "financiamento", "recibo"):
+        items.append(
+            "Separar documentos contratuais existentes e marcar como pendentes os contratos, notas promissórias, recibos, carnês, demonstrativos ou instrumentos que ainda dependam de exibição."
+        )
+
+    if has_any("bloqueio", "detran", "restrição", "restricao", "busca e apreensão", "busca e apreensao"):
+        items.append(
+            "Conferir documento formal do suposto bloqueio, restrição administrativa, consulta oficial, ordem judicial ou busca e apreensão antes de afirmar a natureza da medida."
+        )
+
+    if has_any("retomada", "recolhimento", "retenção", "retencao", "tomou o veículo", "tomou o veiculo"):
+        items.append(
+            "Identificar quem retomou ou recolheu o bem, quando, onde, com qual justificativa e quais provas demonstram a retirada ou retenção."
+        )
+
+    if has_any("veículo", "veiculo", "automóvel", "automovel", "motocicleta", "bem"):
+        items.append(
+            "Conferir dados completos do bem, documentos de propriedade, licenciamento, posse, transferência, restrições e situação atual em consulta oficial quando cabível."
+        )
+
+    if has_any("mensagem", "whatsapp", "print", "conversa", "áudio", "audio", "foto", "vídeo", "video"):
+        items.append(
+            "Organizar mensagens, prints, conversas, áudios, fotos e vídeos com data, origem, contexto e pertinência, preservando apenas o necessário para o caso."
+        )
+
+    items.append(
+        "Separar o que já está provado, o que está apenas relatado, o que está pendente e o que deverá ser requerido por exibição, diligência ou requisição judicial."
+    )
+
+    return _dedupe_content_viability_items(items)
+
+
+def _build_content_viability_protocol_items(
+    *,
+    case_search_text: str,
+    issues: list[str],
+    controverted_points: list[str],
+    proof_checklist: list[str],
+    next_steps: list[str],
+) -> list[str]:
+    items = _build_content_viability_proof_items(
+        case_search_text=case_search_text,
+        issues=issues,
+        controverted_points=controverted_points,
+        proof_checklist=proof_checklist,
+        next_steps=next_steps,
+    )
+
+    items.extend(
+        [
+            "Confirmar que o bloco Pedidos contém requerimentos concretos e não apenas pontos de atenção copiados da análise.",
+            "Confirmar que cada pedido conversa com fato, prova mínima, fundamento e providência processual possível.",
+            "Priorizar viabilidade de conteúdo antes de ajustes de estilo; redação fina, termos finais e estratégia de protocolo ficam para o advogado responsável.",
+        ]
+    )
+
+    return _dedupe_content_viability_items(items)
+
 def _build_missing_context_items(
     case_description: str,
     technical_summary: str,
@@ -2493,6 +2761,30 @@ def _build_assisted_sections(
     )
 
 
+
+    content_viability_claims = _build_content_viability_assisted_claims(
+        normalized_area=normalized_area,
+        case_search_text=case_search_text,
+        issues=issues,
+        controverted_points=controverted_points,
+        proof_checklist=proof_checklist,
+        next_steps=next_steps,
+    )
+    content_viability_proof_items = _build_content_viability_proof_items(
+        case_search_text=case_search_text,
+        issues=issues,
+        controverted_points=controverted_points,
+        proof_checklist=proof_checklist,
+        next_steps=next_steps,
+    )
+    content_viability_protocol_items = _build_content_viability_protocol_items(
+        case_search_text=case_search_text,
+        issues=issues,
+        controverted_points=controverted_points,
+        proof_checklist=proof_checklist,
+        next_steps=next_steps,
+    )
+
     pedidos = _paragraphs(
         [
             (
@@ -2511,7 +2803,7 @@ def _build_assisted_sections(
             (
                 "II. Requer-se a condenação da parte ré ao pagamento do saldo contratual inadimplido, acrescido de multa contratual, juros de mora, correção monetária, custas processuais e honorários advocatícios."
                 if is_civel_cobranca
-                else _series_block("II. Pedidos principais sugeridos para a minuta final:", issues, limit=5)
+                else _series_block("II. Pedidos principais sugeridos para a minuta final:", content_viability_claims, limit=8)
             ),
             (
                 "III. Requer-se que os encargos de mora sejam calculados a partir do vencimento de cada parcela inadimplida, observando-se a cláusula contratual aplicável e a planilha de cálculo a ser juntada na versão final."
@@ -2592,6 +2884,24 @@ def _build_assisted_sections(
         ]
     )
 
+
+
+    if (
+        "content_viability_proof_items" in locals()
+        and content_viability_proof_items
+        and not is_civel_cobranca
+    ):
+        provas_requerimentos = _paragraphs(
+            [
+                provas_requerimentos,
+                _series_block(
+                    "Conferências probatórias de conteúdo e viabilidade:",
+                    content_viability_proof_items,
+                    limit=8,
+                ),
+                "A revisão assistida deve priorizar suficiência de conteúdo, prova mínima e coerência entre fatos, fundamentos e pedidos; ajustes de estilo ficam para a revisão final do advogado.",
+            ]
+        )
 
     fechamento = _paragraphs(
         [
@@ -3555,6 +3865,24 @@ def _build_assisted_sections(
         is_fgts_case=is_trabalhista_fgts_nao_recolhido and not is_trabalhista_verbas_rescisorias,
         is_labor_case=is_labor_case,
     )
+
+
+    if (
+        "content_viability_protocol_items" in locals()
+        and content_viability_protocol_items
+        and not is_civel_cobranca
+    ):
+        protocolo_checklist = _paragraphs(
+            [
+                protocolo_checklist,
+                _series_block(
+                    "Pendências específicas de conteúdo antes da aprovação:",
+                    content_viability_protocol_items,
+                    limit=10,
+                ),
+            ]
+        )
+
 
     return [
         {
