@@ -98,3 +98,36 @@ Cliente relata que adquiriu veículo junto à revendedora QUINTINO COMÉRCIO DE 
 
     assert "linha_do_tempo" not in destinations
     assert "anexos" not in destinations
+
+
+def test_editor_block_correction_preserves_inline_resumo_fatico_body():
+    message = (
+        "como esta esse resumo fatico, t bom ou precisa mexer "
+        "Resumo Fático — draft (assisted_draft) "
+        "Trata-se do caso VEICULO-QUINTINO-PIX-001 — Retomada de veículo por revendedora após pagamento parcelado via Pix. "
+        "Cliente relata que adquiriu veículo junto à revendedora QUINTINO COMÉRCIO DE AUTOMÓVEIS LTDA. "
+        "Informa que pagou 34 parcelas de R$ 1.180,00 via Pix. "
+        "O cliente informa que perdeu sua via física do contrato, mas possui comprovantes Pix dos pagamentos. "
+        "Após os pagamentos, relata que a revendedora tomou ou recolheu o veículo alegando que ele estaria em bloqueio. "
+        "O objetivo é montar o caso para avaliação de advogado, com possível pedido de exibição de contrato e documentos."
+    )
+
+    response = _fallback_response(
+        case=_fake_case(),
+        message=message,
+        context={},
+        timeline=[],
+    )
+
+    output = _joined_response_text(response)
+    destinations = [action["destination"] for action in response["suggested_actions"]]
+
+    assert destinations == ["editor_minuta"]
+    assert "Texto sugerido para substituir:" in output
+    assert "Trata-se do caso VEICULO-QUINTINO-PIX-001" in output
+    assert "Cliente relata que adquiriu veículo" in output
+    assert "34 parcelas de R$ 1.180,00" in output
+    assert "A narrativa permanece sujeita à validação documental" in output
+    assert "O objetivo é montar" not in output
+    assert "linha_do_tempo" not in destinations
+    assert "anexos" not in destinations

@@ -1054,8 +1054,58 @@ def _is_editor_block_correction_message(lowered: str) -> bool:
 
 
 def _extract_editor_block_body(message: str) -> str:
+    raw_text = str(message or "").replace("\r\n", "\n").strip()
+    if not raw_text:
+        return ""
+
+    lowered = raw_text.lower()
+    block_markers = (
+        "endereçamento — draft",
+        "enderecamento — draft",
+        "resumo fático — draft",
+        "resumo fatico — draft",
+        "fundamentação — draft",
+        "fundamentacao — draft",
+        "pedidos — draft",
+        "provas e requerimentos — draft",
+        "checklist final — draft",
+        "endereçamento - draft",
+        "enderecamento - draft",
+        "resumo fático - draft",
+        "resumo fatico - draft",
+        "fundamentação - draft",
+        "fundamentacao - draft",
+        "pedidos - draft",
+        "provas e requerimentos - draft",
+        "checklist final - draft",
+    )
+
+    start_index = -1
+    for marker in block_markers:
+        found = lowered.find(marker)
+        if found >= 0 and (start_index < 0 or found < start_index):
+            start_index = found
+
+    if start_index >= 0:
+        raw_text = raw_text[start_index:]
+
+    # O frontend pode enviar o título do bloco e o conteúdo na mesma linha.
+    # Ex.: "Resumo Fático — draft (assisted_draft) Trata-se..."
+    # Por isso removemos apenas o cabeçalho do bloco, preservando o corpo.
+    raw_text_lowered = raw_text.lower()
+    for marker in block_markers:
+        if raw_text_lowered.startswith(marker):
+            raw_text = raw_text[len(marker):].lstrip()
+            raw_text_lowered = raw_text.lower()
+            break
+
+    if raw_text_lowered.startswith("(assisted_draft)"):
+        raw_text = raw_text[len("(assisted_draft)"):].lstrip()
+
+    raw_text = raw_text.lstrip(":-— \n")
+
     lines: list[str] = []
-    skip_fragments = (
+    metadata_fragments = (
         "corrige esse",
         "corrigir esse",
         "como está esse",
@@ -1072,18 +1122,19 @@ def _extract_editor_block_body(message: str) -> str:
         "editar bloco",
     )
 
-    for raw_line in str(message or "").replace("\r\n", "\n").split("\n"):
+    for raw_line in raw_text.split("\n"):
         line = raw_line.strip()
-        lowered = line.lower()
+        lowered_line = line.lower()
 
         if not line:
-            lines.append("")
+            if lines and lines[-1] != "":
+                lines.append("")
             continue
 
-        if any(fragment in lowered for fragment in skip_fragments):
+        if any(fragment in lowered_line for fragment in metadata_fragments):
             continue
 
-        if "(assisted_draft)" in lowered or "— draft" in lowered or "- draft" in lowered:
+        if "(assisted_draft)" in lowered_line or "— draft" in lowered_line or "- draft" in lowered_line:
             continue
 
         lines.append(line)
