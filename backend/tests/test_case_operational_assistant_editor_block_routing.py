@@ -193,3 +193,89 @@ Trata-se do caso VEICULO-QUINTINO-PIX-001 — Retomada de veículo por revendedo
     assert "\n\nApós os pagamentos" in output
     assert "\n\nA narrativa permanece sujeita à validação documental" in output
     assert "O objetivo é montar" not in output
+
+
+def test_editor_block_fundamentacao_gets_structured_revision_not_plain_echo():
+    message = """
+verifique o bloco fundamentação se esta de acordo
+
+Fundamentação — draft (assisted_draft)
+I. Do cabimento da pretensão. À luz do quadro fático narrado, a demanda deve ser estruturada para tutelar o direito material afirmado e enfrentar a controvérsia central com base na prova já disponível.
+
+II. Dos fundamentos normativos aplicáveis:
+- Código de Defesa do Consumidor — relação de consumo, responsabilidade do fornecedor, vício/defeito do produto ou serviço e práticas abusivas.
+- Código Civil — responsabilidade civil, perdas e danos e inadimplemento quando aplicável.
+- Código de Processo Civil — tutela de urgência, produção de prova, inversão do ônus probatório quando cabível e técnicas executivas.
+- Constituição Federal, art. 5º e art. 170 — acesso à justiça, defesa do consumidor e ordem econômica.
+
+III. Da estratégia jurídica sugerida. Prosseguir com cautela estratégica, reforçando documentação, cálculo e linha do tempo dos fatos antes da decisão final de litigar.
+
+IV. Dos pontos controvertidos que exigem enfrentamento direto:
+- Relação de consumo com revendedora de veículos, exigindo validação do fornecedor, contrato, negociação e documentos do veículo.
+- Pagamentos relevantes por Pix e entrada com bens usados, exigindo conferência de valores, destinatário dos Pix, notas promissórias e eventual saldo discutido.
+- Retomada/recolhimento do veículo sob alegação de suposto bloqueio, sem documentação clara apresentada até o momento.
+
+V. Das lacunas probatórias a suprir antes do protocolo definitivo:
+- Relação de consumo com revendedora de veículos, exigindo validação do fornecedor, contrato, negociação e documentos do veículo.
+- Pagamentos relevantes por Pix e entrada com bens usados, exigindo conferência de valores, destinatário dos Pix, notas promissórias e eventual saldo discutido.
+- Retomada/recolhimento do veículo sob alegação de suposto bloqueio, sem documentação clara apresentada até o momento.
+"""
+
+    response = _fallback_response(
+        case=_fake_case(),
+        message=message,
+        context={},
+        timeline=[],
+    )
+
+    destinations = [action["destination"] for action in response["suggested_actions"]]
+    suggested_text = response["suggested_actions"][0]["suggested_text"]
+    replacement = suggested_text.split("Texto sugerido para substituir:", 1)[1].split("Ação agora:", 1)[0]
+
+    assert destinations == ["editor_minuta"]
+    assert "Revisar bloco: Fundamentação" in response["suggested_actions"][0]["label"]
+    assert "O bloco está viável, mas precisa ajuste estrutural" in suggested_text
+    assert "II. Da relação de consumo e dos deveres de informação e transparência." in replacement
+    assert "IV. Da retomada/recolhimento do veículo" in replacement
+    assert "V. Da exibição de documentos e da produção de prova." in replacement
+    assert "Não se deve afirmar, sem prova suficiente" in replacement
+    assert "III. Da estratégia jurídica sugerida" not in replacement
+    assert replacement.count("Relação de consumo com revendedora de veículos") == 0
+    assert "linha_do_tempo" not in destinations
+    assert "anexos" not in destinations
+
+
+def test_all_known_editable_blocks_route_to_editor_minuta():
+    block_names = [
+        "Endereçamento",
+        "Qualificação das Partes",
+        "Resumo Fático",
+        "Fundamentação",
+        "Pedidos",
+        "Pedidos e Valores Estimados",
+        "Provas e Requerimentos",
+        "Checklist Final",
+        "Fechamento",
+    ]
+
+    for block_name in block_names:
+        message = f"""
+verifique o bloco {block_name} se esta de acordo
+
+{block_name} — draft (assisted_draft)
+Texto base do bloco {block_name}, pendente de validação profissional.
+"""
+
+        response = _fallback_response(
+            case=_fake_case(),
+            message=message,
+            context={},
+            timeline=[],
+        )
+
+        destinations = [action["destination"] for action in response["suggested_actions"]]
+
+        assert destinations == ["editor_minuta"], block_name
+        assert response["rewritten_input"] == "", block_name
+        assert "linha_do_tempo" not in destinations, block_name
+        assert "anexos" not in destinations, block_name
