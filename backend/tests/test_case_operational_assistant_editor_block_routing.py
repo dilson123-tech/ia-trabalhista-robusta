@@ -131,3 +131,65 @@ def test_editor_block_correction_preserves_inline_resumo_fatico_body():
     assert "O objetivo é montar" not in output
     assert "linha_do_tempo" not in destinations
     assert "anexos" not in destinations
+
+
+def test_editor_block_verification_phrase_routes_to_editor_before_evidence_guidance():
+    message = """
+verifique o resumo fatico se esta de acordo
+
+Resumo Fático — draft (assisted_draft)
+Trata-se do caso VEICULO-QUINTINO-PIX-001 — Retomada de veículo por revendedora após pagamento parcelado via Pix.
+
+Cliente relata que adquiriu veículo junto à revendedora QUINTINO COMÉRCIO DE AUTOMÓVEIS LTDA, nome fantasia QUINTINO AUTOMÓVEIS, CNPJ 15.304.437/0001-96, mediante negociação parcelada por nota promissória ou contrato. Informa que entregou como entrada um veículo Scenic 2004 avaliado em R$ 4.000,00 e uma motocicleta Honda CBX 300 avaliada em R$ 11.000,00, além de ter pago 34 parcelas de R$ 1.180,00 via Pix, totalizando R$ 40.120,00 em parcelas pagas. Considerando a entrada informada de R$ 15.000,00, há possível valor econômico total de R$ 55.120,00, pendente de conferência documental. O cliente informa que perdeu sua via física do contrato, mas possui comprovantes Pix dos pagamentos. Após os pagamentos, relata que a revendedora tomou ou recolheu o veículo alegando que ele estaria “em bloqueio”, sem apresentar, até o momento, ordem judicial, cópia do contrato, prestação de contas, documento formal da dívida, comprovante de busca e apreensão, comprovação do suposto bloqueio ou justificativa completa. O objetivo é montar o caso para avaliação de advogado, com possível pedido de exibição de contrato e documentos, esclarecimento da dívida e do alegado bloqueio, restituição do veículo ou devolução dos valores pagos, além de eventual indenização por danos materiais e morais e análise de tutela de urgência.
+"""
+
+    response = _fallback_response(
+        case=_fake_case(),
+        message=message,
+        context={},
+        timeline=[],
+    )
+
+    output = _joined_response_text(response)
+    destinations = [action["destination"] for action in response["suggested_actions"]]
+
+    assert response["rewritten_input"] == ""
+    assert destinations == ["editor_minuta"]
+    assert "Revisar bloco: Resumo Fático" in output
+    assert "Texto sugerido para substituir:" in output
+    assert "Trata-se do caso VEICULO-QUINTINO-PIX-001" in output
+    assert "Cliente relata que adquiriu veículo" in output
+    assert "34 parcelas de R$ 1.180,00" in output
+    assert "A narrativa permanece sujeita à validação documental" in output
+    assert "O objetivo é montar" not in output
+    assert "linha_do_tempo" not in destinations
+    assert "anexos" not in destinations
+
+
+def test_editor_block_resumo_fatico_replacement_keeps_readable_paragraphs():
+    message = """
+como está esse resumo fático, tá bom ou precisa mexer?
+
+Resumo Fático — draft (assisted_draft)
+Trata-se do caso VEICULO-QUINTINO-PIX-001 — Retomada de veículo por revendedora após pagamento parcelado via Pix. Cliente relata que adquiriu veículo junto à revendedora QUINTINO COMÉRCIO DE AUTOMÓVEIS LTDA. Informa que entregou como entrada um veículo Scenic 2004 avaliado em R$ 4.000,00 e uma motocicleta Honda CBX 300 avaliada em R$ 11.000,00, além de ter pago 34 parcelas de R$ 1.180,00 via Pix. Considerando a entrada informada de R$ 15.000,00, há possível valor econômico total de R$ 55.120,00, pendente de conferência documental. O cliente informa que perdeu sua via física do contrato, mas possui comprovantes Pix dos pagamentos. Após os pagamentos, relata que a revendedora tomou ou recolheu o veículo alegando que ele estaria “em bloqueio”. O objetivo é montar o caso para avaliação de advogado, com possível pedido de exibição de contrato e documentos.
+"""
+
+    response = _fallback_response(
+        case=_fake_case(),
+        message=message,
+        context={},
+        timeline=[],
+    )
+
+    output = _joined_response_text(response)
+    destinations = [action["destination"] for action in response["suggested_actions"]]
+
+    assert destinations == ["editor_minuta"]
+    assert "Trata-se do caso VEICULO-QUINTINO-PIX-001" in output
+    assert "\n\nCliente relata que adquiriu veículo" in output
+    assert "\n\nInforma que entregou como entrada" in output
+    assert "\n\nConsiderando a entrada informada" in output
+    assert "\n\nO cliente informa que perdeu sua via física do contrato" in output
+    assert "\n\nApós os pagamentos" in output
+    assert "\n\nA narrativa permanece sujeita à validação documental" in output
+    assert "O objetivo é montar" not in output
