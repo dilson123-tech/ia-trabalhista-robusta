@@ -326,3 +326,43 @@ V. O enquadramento provisório da análise indica a seguinte diretriz para fecha
     assert "diretriz para fechamento dos pedidos: MODERADA" not in replacement
     assert "linha_do_tempo" not in destinations
     assert "anexos" not in destinations
+
+
+def test_editor_block_pedidos_valores_estimados_gets_structured_revision_not_placeholder():
+    message = """
+verifique o campo pedidos e valores estimados
+
+Pedidos e Valores Estimados — draft (assisted_draft)
+Os pedidos deverão ser acompanhados de indicação de valores estimados ou liquidados antes do protocolo, conforme os dados disponíveis no caso e a memória de cálculo revisada pelo advogado responsável.
+
+Valor da causa atualmente informado: R$ [valor a ser definido pelo advogado].
+
+Caso ainda não exista memória de cálculo, recomenda-se inserir os valores por pedido antes do ajuizamento, com indicação expressa de eventual natureza estimativa/preliminar.
+"""
+
+    response = _fallback_response(
+        case=_fake_case(),
+        message=message,
+        context={},
+        timeline=[],
+    )
+
+    action = response["suggested_actions"][0]
+    destinations = [item["destination"] for item in response["suggested_actions"]]
+    suggested_text = action["suggested_text"]
+    replacement = suggested_text.split("Texto sugerido para substituir:", 1)[1].split("Ação agora:", 1)[0]
+
+    assert destinations == ["editor_minuta"]
+    assert action["label"] == "Revisar bloco: Pedidos e Valores Estimados"
+    assert "Bloco: Pedidos e Valores Estimados." in suggested_text
+    assert "O bloco está viável, mas precisa deixar de ser apenas orientação genérica" in suggested_text
+
+    assert "[Cole aqui o texto revisado" not in suggested_text
+    assert "I. Do valor da causa." in replacement
+    assert "II. Dos valores a apurar por pedido." in replacement
+    assert "III. Da memória de cálculo." in replacement
+    assert "IV. Dos valores estimados ou pendentes de liquidação." in replacement
+    assert "V. Da cautela antes do protocolo." in replacement
+
+    assert "linha_do_tempo" not in destinations
+    assert "anexos" not in destinations
