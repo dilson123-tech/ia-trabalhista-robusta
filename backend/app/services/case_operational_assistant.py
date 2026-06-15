@@ -1044,6 +1044,25 @@ def _is_editor_block_correction_message(lowered: str) -> bool:
         "esta viavel",
         "tá viável",
         "ta viavel",
+        "verifique",
+        "verificar",
+        "confere",
+        "confira",
+        "conferir",
+        "conferência",
+        "conferencia",
+        "está de acordo",
+        "esta de acordo",
+        "se está de acordo",
+        "se esta de acordo",
+        "está correto",
+        "esta correto",
+        "está certo",
+        "esta certo",
+        "avalia",
+        "avalie",
+        "analisar esse bloco",
+        "analise esse bloco",
         "revisa",
         "revise",
     )
@@ -1051,6 +1070,57 @@ def _is_editor_block_correction_message(lowered: str) -> bool:
     return any(marker in text for marker in block_markers) and any(
         marker in text for marker in correction_markers
     )
+
+
+
+def _format_resumo_fatico_paragraphs(text: str) -> str:
+    cleaned = " ".join(str(text or "").replace("\r\n", "\n").replace("\n", " ").split())
+    if not cleaned:
+        return ""
+
+    paragraph_starters = (
+        "Cliente relata",
+        "O cliente relata",
+        "Informa que",
+        "Além da entrada",
+        "Considerando a entrada",
+        "O cliente informa",
+        "Após os pagamentos",
+        "A narrativa permanece",
+    )
+
+    for starter in paragraph_starters:
+        cleaned = cleaned.replace(f" {starter}", f"\n\n{starter}")
+
+    while "\n\n\n" in cleaned:
+        cleaned = cleaned.replace("\n\n\n", "\n\n")
+
+    return cleaned.strip()
+
+
+
+def _clean_editor_block_suggested_text(text: str, max_length: int = 6000) -> str:
+    raw = str(text or "").replace("\r\n", "\n").replace("\r", "\n")
+    lines: list[str] = []
+    previous_blank = False
+
+    for raw_line in raw.split("\n"):
+        line = " ".join(raw_line.strip().split())
+
+        if not line:
+            if lines and not previous_blank:
+                lines.append("")
+            previous_blank = True
+            continue
+
+        lines.append(line)
+        previous_blank = False
+
+    cleaned = "\n".join(lines).strip()
+    if len(cleaned) > max_length:
+        cleaned = cleaned[:max_length].rstrip()
+
+    return cleaned
 
 
 def _extract_editor_block_body(message: str) -> str:
@@ -1177,7 +1247,7 @@ def _build_editor_block_revision(label: str, body: str) -> tuple[str, str]:
         if narrative_close.lower() not in revised.lower():
             revised = f"{revised.rstrip()}\n\n{narrative_close}"
 
-        return problem, revised.strip()
+        return problem, _format_resumo_fatico_paragraphs(revised)
 
     if lowered_label == "pedidos":
         return (
@@ -1218,7 +1288,7 @@ def _editor_block_correction_response(
     if not revised_text:
         revised_text = "[Cole aqui o texto revisado do bloco após validar os dados do caso.]"
 
-    suggested_text = _clean_multiline_text(
+    suggested_text = _clean_editor_block_suggested_text(
         f"""Veredito: viável, com ajuste no bloco editável.
 
 Bloco: {block_label}.
@@ -1240,13 +1310,13 @@ Aplicar o texto sugerido no campo editável "{block_label}" do Editor/minuta. N�
         "summary": f"Veredito: revisar no Editor/minuta o bloco {block_label}.",
         "rewritten_input": "",
         "suggested_actions": [
-            _suggestion(
-                "editor_minuta",
-                f"Revisar bloco: {block_label}",
-                suggested_text,
-                "O texto enviado é um bloco editável de minuta; deve ser corrigido no Editor/minuta, não organizado como fato do caso.",
-                "alta",
-            )
+            {
+                "destination": "editor_minuta",
+                "label": f"Revisar bloco: {block_label}",
+                "suggested_text": suggested_text,
+                "reason": "O texto enviado é um bloco editável de minuta; deve ser corrigido no Editor/minuta, não organizado como fato do caso.",
+                "priority": "alta",
+            }
         ],
         "next_steps": [
             f"Aplicar a sugestão no bloco editável {block_label}.",
