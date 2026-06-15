@@ -1215,6 +1215,94 @@ def _extract_editor_block_body(message: str) -> str:
     return cleaned.strip()
 
 
+def _build_fundamentacao_editor_revision(body: str) -> tuple[str, str]:
+    original = _clean_editor_block_suggested_text(body, 6000)
+    lowered = original.lower()
+
+    has_consumer_context = any(
+        marker in lowered
+        for marker in (
+            "consumidor",
+            "código de defesa do consumidor",
+            "cdc",
+            "fornecedor",
+            "revendedora",
+            "produto",
+            "serviço",
+            "servico",
+        )
+    )
+    has_vehicle_context = any(
+        marker in lowered
+        for marker in (
+            "veículo",
+            "veiculo",
+            "detran",
+            "bloqueio",
+            "busca e apreensão",
+            "busca e apreensao",
+            "recolhimento",
+            "retomada",
+        )
+    )
+
+    problem = (
+        "O bloco está viável, mas precisa ajuste estrutural: ele mistura fundamentação jurídica, estratégia operacional e lacunas probatórias, além de repetir pontos controvertidos. A versão revisada deve ligar fatos, prova mínima e tese jurídica com linguagem prudente."
+    )
+
+    if has_consumer_context or has_vehicle_context:
+        revised = """I. Do cabimento da pretensão.
+
+À luz do quadro fático narrado, a pretensão deve ser estruturada para apurar a regularidade da negociação, dos pagamentos realizados, da eventual existência de saldo pendente e da retomada/recolhimento do veículo informado pelo cliente. A análise deve permanecer condicionada à conferência dos documentos disponíveis e das provas que ainda serão obtidas.
+
+II. Da relação de consumo e dos deveres de informação e transparência.
+
+Em tese, a negociação com revendedora de veículos pode caracterizar relação de consumo, sujeitando o fornecedor aos deveres de informação clara, transparência, boa-fé objetiva e adequada prestação de contas. Assim, é juridicamente relevante apurar o conteúdo do contrato, notas promissórias, recibos, comprovantes de pagamento, dados do veículo e eventual justificativa formal apresentada para o suposto bloqueio ou recolhimento do bem.
+
+III. Dos pagamentos, da entrada e da necessidade de apuração do valor econômico envolvido.
+
+Os pagamentos informados por Pix, somados à entrada alegadamente realizada mediante entrega de bens usados, indicam possível lastro econômico relevante. Contudo, o valor total, eventual saldo, destinatário dos pagamentos, vínculo com a negociação e regularidade da cobrança devem ser confirmados por documentos, comprovantes, recibos, contrato, prestação de contas ou outros elementos idôneos.
+
+IV. Da retomada/recolhimento do veículo e da controvérsia sobre o suposto bloqueio.
+
+O relato de retomada ou recolhimento do veículo sob alegação de bloqueio exige apuração específica. Não se deve afirmar, sem prova suficiente, que houve ilegalidade definitiva, fraude, crime ou abuso. A versão final deve verificar se existiu ordem judicial, busca e apreensão, restrição administrativa, bloqueio no Detran, inadimplemento contratual, acordo entre as partes ou mera alegação comercial da revendedora.
+
+V. Da exibição de documentos e da produção de prova.
+
+Diante da perda da via física do contrato pelo cliente e da ausência de documentação completa apresentada até o momento, mostra-se relevante avaliar pedido de exibição de contrato, prestação de contas, demonstrativo de parcelas, comprovantes de eventual saldo, documento formal do suposto bloqueio e informações sobre a localização ou destino do veículo. A produção de prova deve ser direcionada para confirmar datas, valores, destinatários dos pagamentos, responsáveis pelo recolhimento e base documental da medida.
+
+VI. Da tutela de urgência, restituição, devolução de valores e eventuais danos.
+
+Pedidos de restituição do veículo, devolução total ou parcial de valores, indenização por danos materiais ou morais e tutela de urgência devem ser formulados com cautela e condicionados à prova disponível. A urgência dependerá de elementos concretos, como risco atual, posse ou localização do bem, impacto econômico, documentação mínima da negociação e verossimilhança das alegações.
+
+VII. Síntese conclusiva.
+
+A tese apresenta viabilidade preliminar moderada, desde que fortalecida por prova documental, conferência dos pagamentos, validação do suposto bloqueio e organização da linha fática. A fundamentação final deve evitar conclusões definitivas sem lastro probatório e manter linguagem técnica, prudente e condicionada à revisão profissional antes do protocolo."""
+        return problem, revised.strip()
+
+    revised = """I. Do cabimento da pretensão.
+
+À luz do quadro fático narrado, a demanda deve ser estruturada para tutelar o direito material afirmado, identificar a controvérsia central e relacionar os fatos relevantes às provas disponíveis e às provas ainda pendentes.
+
+II. Dos fundamentos jurídicos aplicáveis.
+
+A fundamentação deve indicar os regimes jurídicos possivelmente aplicáveis ao caso, conforme a natureza da relação entre as partes, o conteúdo dos documentos existentes e a prova mínima disponível. A versão final deve evitar enquadramentos definitivos antes da conferência documental.
+
+III. Da prova mínima e das lacunas ainda pendentes.
+
+A pretensão deve ser apoiada em documentos, comprovantes, registros, comunicações, testemunhas ou outros elementos idôneos. Quando houver lacuna relevante, o texto deve indicar expressamente que o ponto depende de validação, exibição de documento, diligência ou conferência posterior.
+
+IV. Da cautela quanto a responsabilidade, danos e urgência.
+
+Pedidos de indenização, responsabilização, obrigação de fazer, restituição, exibição de documentos ou tutela de urgência devem ser vinculados à prova disponível e aos requisitos legais aplicáveis. Não se deve afirmar culpa, ilicitude definitiva, dano consolidado ou urgência extrema sem suporte documental suficiente.
+
+V. Síntese conclusiva.
+
+A fundamentação é preliminar e deve ser ajustada conforme a prova produzida, os documentos anexados e a revisão técnica do advogado responsável antes do protocolo."""
+    return problem, revised.strip()
+
+
+
 def _build_editor_block_revision(label: str, body: str) -> tuple[str, str]:
     lowered_body = body.lower()
     lowered_label = label.lower()
@@ -1256,10 +1344,7 @@ def _build_editor_block_revision(label: str, body: str) -> tuple[str, str]:
         )
 
     if lowered_label == "fundamentação" or lowered_label == "fundamentacao":
-        return (
-            "Conferir se a fundamentação liga fatos, prova mínima e tese jurídica, sem afirmar culpa, crime ou irregularidade definitiva sem prova.",
-            body,
-        )
+        return _build_fundamentacao_editor_revision(body)
 
     if lowered_label == "provas e requerimentos":
         return (
