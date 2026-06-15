@@ -999,9 +999,43 @@ EDITOR_BLOCK_LABELS: tuple[tuple[str, str], ...] = (
 
 
 def _detect_editor_block_label(lowered: str) -> str:
+    explicit_headers: tuple[tuple[str, str], ...] = (
+        ("pedidos e valores estimados — draft", "Pedidos e Valores Estimados"),
+        ("pedidos e valores estimados - draft", "Pedidos e Valores Estimados"),
+        ("provas e requerimentos — draft", "Provas e Requerimentos"),
+        ("provas e requerimentos - draft", "Provas e Requerimentos"),
+        ("qualificação das partes — draft", "Qualificação das Partes"),
+        ("qualificacao das partes — draft", "Qualificação das Partes"),
+        ("qualificação das partes - draft", "Qualificação das Partes"),
+        ("qualificacao das partes - draft", "Qualificação das Partes"),
+        ("resumo fático — draft", "Resumo Fático"),
+        ("resumo fatico — draft", "Resumo Fático"),
+        ("resumo fático - draft", "Resumo Fático"),
+        ("resumo fatico - draft", "Resumo Fático"),
+        ("fundamentação — draft", "Fundamentação"),
+        ("fundamentacao — draft", "Fundamentação"),
+        ("fundamentação - draft", "Fundamentação"),
+        ("fundamentacao - draft", "Fundamentação"),
+        ("endereçamento — draft", "Endereçamento"),
+        ("enderecamento — draft", "Endereçamento"),
+        ("endereçamento - draft", "Endereçamento"),
+        ("enderecamento - draft", "Endereçamento"),
+        ("checklist final — draft", "Checklist Final"),
+        ("checklist final - draft", "Checklist Final"),
+        ("fechamento — draft", "Fechamento"),
+        ("fechamento - draft", "Fechamento"),
+        ("pedidos — draft", "Pedidos"),
+        ("pedidos - draft", "Pedidos"),
+    )
+
+    for marker, label in explicit_headers:
+        if marker in lowered:
+            return label
+
     for marker, label in EDITOR_BLOCK_LABELS:
         if marker in lowered:
             return label
+
     return "Bloco editável"
 
 
@@ -1215,6 +1249,86 @@ def _extract_editor_block_body(message: str) -> str:
     return cleaned.strip()
 
 
+def _build_pedidos_editor_revision(body: str) -> tuple[str, str]:
+    original = _clean_editor_block_suggested_text(body, 6000)
+    lowered = original.lower()
+
+    has_vehicle_context = any(
+        marker in lowered
+        for marker in (
+            "veículo",
+            "veiculo",
+            "revendedora",
+            "pix",
+            "bloqueio",
+            "detran",
+            "retomada",
+            "recolhimento",
+            "contrato",
+        )
+    )
+
+    problem = (
+        "O bloco precisa ajuste estrutural: há pontos de atenção e fundamentos misturados como se fossem pedidos. A versão revisada deve transformar a análise em requerimentos jurídicos objetivos, prudentes e condicionados à prova disponível."
+    )
+
+    if has_vehicle_context:
+        revised = """I. Da tutela provisória, se presentes os requisitos legais.
+
+Requer-se, se demonstrados a probabilidade do direito e o perigo de dano ou risco ao resultado útil do processo, a concessão da tutela provisória cabível para resguardar a utilidade do provimento final, especialmente quanto à preservação do veículo, esclarecimento de sua localização, impedimento de nova transferência indevida ou outra medida adequada ao caso concreto, conforme prova documental disponível.
+
+II. Da exibição do contrato e documentos da negociação.
+
+Requer-se que a parte ré apresente o contrato ou instrumento equivalente da negociação, eventuais notas promissórias, recibos, demonstrativo de parcelas, comprovantes de saldo alegado, documentos do veículo, registros de cobrança e demais documentos relacionados à compra, financiamento, parcelamento ou promessa de pagamento informada pelo cliente.
+
+III. Da prestação de contas e apuração dos valores pagos.
+
+Requer-se a apresentação de prestação de contas detalhada, com indicação dos valores recebidos, parcelas pagas, eventual saldo pendente, encargos aplicados, destinatário dos pagamentos e forma de imputação dos valores, incluindo a entrada informada mediante entrega de bens usados e os pagamentos realizados via Pix.
+
+IV. Do esclarecimento formal do suposto bloqueio e da retomada/recolhimento do veículo.
+
+Requer-se que a parte ré esclareça formalmente o motivo do alegado bloqueio do veículo e apresente eventual ordem judicial, busca e apreensão, restrição administrativa, registro no Detran, autorização contratual, comunicação prévia, termo de entrega, comprovante de guincho, localização atual do bem ou qualquer documento que justifique a retomada/recolhimento informado pelo cliente.
+
+V. Da restituição do veículo ou devolução de valores, conforme apuração.
+
+Requer-se, conforme o resultado da instrução probatória e da análise do advogado responsável, a restituição do veículo ao cliente ou, subsidiariamente, a devolução total ou parcial dos valores comprovadamente pagos, observada a apuração do contrato, dos pagamentos, do eventual saldo e das circunstâncias da retomada/recolhimento.
+
+VI. Dos danos materiais e morais, se comprovados.
+
+Requer-se a condenação da parte ré ao pagamento de danos materiais e, se cabível, danos morais, desde que comprovados o prejuízo, o nexo com a conduta discutida e os requisitos legais aplicáveis, evitando-se afirmação definitiva de dano ou ilicitude sem prova suficiente.
+
+VII. Dos requerimentos processuais.
+
+Requer-se a citação da parte ré, a produção de todos os meios de prova admitidos em direito, especialmente prova documental suplementar, testemunhal, depoimento pessoal, eventual prova pericial ou diligências necessárias, além dos demais requerimentos acessórios compatíveis com o rito, a causa de pedir e a estratégia processual definida pelo advogado responsável.
+
+VIII. Da procedência.
+
+Ao final, requer-se a procedência dos pedidos compatíveis com os fatos comprovados, a tese jurídica acolhida e a prova produzida, com revisão final do advogado responsável quanto à liquidez dos valores, adequação dos danos, pertinência da tutela e coerência entre pedidos, causa de pedir e documentos anexados."""
+        return problem, revised.strip()
+
+    revised = """I. Da tutela provisória, se cabível.
+
+Requer-se, se presentes os requisitos legais, a concessão da tutela provisória adequada para resguardar a utilidade do provimento final.
+
+II. Dos pedidos principais.
+
+Requer-se a procedência dos pedidos compatíveis com os fatos narrados, a prova disponível, a tese jurídica sustentada e os documentos anexados, evitando-se requerimentos sem lastro probatório mínimo.
+
+III. Da exibição de documentos e produção de prova.
+
+Requer-se, quando necessário, a exibição de documentos, apresentação de informações, produção de prova documental, testemunhal, pericial ou outros meios admitidos em direito.
+
+IV. Dos danos e demais consequências jurídicas.
+
+Requer-se eventual condenação em danos materiais, danos morais, obrigação de fazer, restituição, devolução de valores ou outra medida cabível apenas quando houver suporte fático, documental e jurídico suficiente.
+
+V. Dos requerimentos processuais.
+
+Requer-se a citação da parte ré, a regular tramitação do feito e os demais requerimentos acessórios adequados ao rito e à estratégia processual definida pelo advogado responsável."""
+    return problem, revised.strip()
+
+
+
 def _build_fundamentacao_editor_revision(body: str) -> tuple[str, str]:
     original = _clean_editor_block_suggested_text(body, 6000)
     lowered = original.lower()
@@ -1338,10 +1452,7 @@ def _build_editor_block_revision(label: str, body: str) -> tuple[str, str]:
         return problem, _format_resumo_fatico_paragraphs(revised)
 
     if lowered_label == "pedidos":
-        return (
-            "Conferir se o bloco contém pedidos jurídicos concretos, e não apenas pontos de atenção, riscos ou pendências documentais.",
-            body,
-        )
+        return _build_pedidos_editor_revision(body)
 
     if lowered_label == "fundamentação" or lowered_label == "fundamentacao":
         return _build_fundamentacao_editor_revision(body)

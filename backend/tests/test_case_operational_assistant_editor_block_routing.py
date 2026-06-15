@@ -279,3 +279,50 @@ Texto base do bloco {block_name}, pendente de validação profissional.
         assert response["rewritten_input"] == "", block_name
         assert "linha_do_tempo" not in destinations, block_name
         assert "anexos" not in destinations, block_name
+
+
+def test_editor_block_pedidos_detects_header_before_fechamento_word_and_rewrites_points_as_requests():
+    message = """
+verifique o bloco pedidos se esta de acordo
+
+Pedidos — draft (assisted_draft)
+I. Requer-se, quando presentes os requisitos legais, a concessão da tutela provisória cabível para resguardar desde logo a utilidade do provimento final.
+
+II. Pedidos principais sugeridos para a minuta final:
+- Relação de consumo com revendedora de veículos, exigindo validação do fornecedor, contrato, negociação e documentos do veículo.
+- Pagamentos relevantes por Pix e entrada com bens usados, exigindo conferência de valores, destinatário dos Pix, notas promissórias e eventual saldo discutido.
+- Retomada/recolhimento do veículo sob alegação de suposto bloqueio, sem documentação clara apresentada até o momento.
+- Necessário verificar se houve ordem judicial, busca e apreensão, bloqueio administrativo, restrição no Detran ou mera alegação comercial da revendedora.
+- Avaliar exibição de contrato/documentos, restituição do veículo ou devolução de valores, danos materiais/morais e tutela de urgência conforme prova disponível.
+
+V. O enquadramento provisório da análise indica a seguinte diretriz para fechamento dos pedidos: MODERADA.
+"""
+
+    response = _fallback_response(
+        case=_fake_case(),
+        message=message,
+        context={},
+        timeline=[],
+    )
+
+    action = response["suggested_actions"][0]
+    destinations = [item["destination"] for item in response["suggested_actions"]]
+    suggested_text = action["suggested_text"]
+    replacement = suggested_text.split("Texto sugerido para substituir:", 1)[1].split("Ação agora:", 1)[0]
+
+    assert destinations == ["editor_minuta"]
+    assert action["label"] == "Revisar bloco: Pedidos"
+    assert "Bloco: Pedidos." in suggested_text
+    assert "O bloco precisa ajuste estrutural" in suggested_text
+
+    assert "II. Da exibição do contrato e documentos da negociação." in replacement
+    assert "III. Da prestação de contas e apuração dos valores pagos." in replacement
+    assert "IV. Do esclarecimento formal do suposto bloqueio" in replacement
+    assert "V. Da restituição do veículo ou devolução de valores" in replacement
+    assert "VI. Dos danos materiais e morais, se comprovados." in replacement
+
+    assert "Relação de consumo com revendedora de veículos, exigindo validação" not in replacement
+    assert "Pagamentos relevantes por Pix e entrada com bens usados" not in replacement
+    assert "diretriz para fechamento dos pedidos: MODERADA" not in replacement
+    assert "linha_do_tempo" not in destinations
+    assert "anexos" not in destinations
