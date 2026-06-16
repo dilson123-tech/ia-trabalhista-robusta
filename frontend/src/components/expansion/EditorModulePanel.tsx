@@ -177,6 +177,27 @@ function normalizeText(value: string | undefined) {
   return (value ?? '').replace(/\s+/g, ' ').trim()
 }
 
+
+function stripAssistedDraftMetadata(metadata?: Record<string, unknown> | null) {
+  const cleaned = { ...(metadata ?? {}) }
+  delete cleaned.source
+  delete cleaned.generation_mode
+  delete cleaned.origin
+  return cleaned
+}
+
+function toManualReviewedSection(section: EditableSection): EditableSection {
+  return {
+    ...section,
+    source: 'manual',
+    status: section.status === 'approved' ? 'draft' : section.status,
+    metadata: {
+      ...stripAssistedDraftMetadata(section.metadata),
+      manual_review_snapshot: true,
+    },
+  }
+}
+
 function getSectionIdentifier(section: EditableSection) {
   return section.key || section.title
 }
@@ -824,26 +845,45 @@ export function EditorModulePanel({ token, selectedCaseId, selectedCaseArea, pie
     setCreateSuccess('')
 
     try {
-      const createdVersion = await createEditableDocumentVersion(token, selectedDocument.id, {
-        sections: currentVersion.sections.map((section) => ({
+      const createReviewedDraftFromAssisted = !approved && currentVersionIsAssistedDraft && !selectedDocumentIsStrategicHearing
+      const nextVersionSource = approved
+        ? 'frontend_expansion_approval'
+        : createReviewedDraftFromAssisted
+          ? 'frontend_expansion_manual_review'
+          : 'frontend_expansion_new_version'
+      const nextVersionSections = currentVersion.sections.map((section) => {
+        const copiedSection: EditableSection = {
           key: section.key,
           title: section.title,
           content: section.content,
           source: section.source,
           status: section.status,
           metadata: section.metadata ?? {},
-        })),
+        }
+
+        return createReviewedDraftFromAssisted ? toManualReviewedSection(copiedSection) : copiedSection
+      })
+
+      const createdVersion = await createEditableDocumentVersion(token, selectedDocument.id, {
+        sections: nextVersionSections,
         notes: approved
           ? currentVersion.notes
             ? `${currentVersion.notes}\n\nSnapshot aprovado pelo frontend da expansão.`
             : 'Snapshot aprovado pelo frontend da expansão.'
-          : currentVersion.notes
-            ? `${currentVersion.notes}\n\nNova versão gerada pelo frontend da expansão.`
-            : 'Nova versão gerada pelo frontend da expansão.',
+          : createReviewedDraftFromAssisted
+            ? currentVersion.notes
+              ? `${currentVersion.notes}\n\nVersão revisada/manual criada a partir da minuta assistida.`
+              : 'Versão revisada/manual criada a partir da minuta assistida.'
+            : currentVersion.notes
+              ? `${currentVersion.notes}\n\nNova versão gerada pelo frontend da expansão.`
+              : 'Nova versão gerada pelo frontend da expansão.',
         metadata: {
-          ...(currentVersion.version_metadata ?? {}),
-          source: approved ? 'frontend_expansion_approval' : 'frontend_expansion_new_version',
+          ...(createReviewedDraftFromAssisted
+            ? stripAssistedDraftMetadata(currentVersion.version_metadata)
+            : currentVersion.version_metadata ?? {}),
+          source: nextVersionSource,
           based_on_version_number: currentVersion.version_number,
+          ...(createReviewedDraftFromAssisted ? { manual_review_snapshot: true } : {}),
         },
         approved,
       })
@@ -853,7 +893,9 @@ export function EditorModulePanel({ token, selectedCaseId, selectedCaseArea, pie
       setVersionSuccess(
         approved
           ? `Versão ${createdVersion.version_number} criada como aprovada com sucesso.`
-          : `Nova versão ${createdVersion.version_number} criada com sucesso.`,
+          : createReviewedDraftFromAssisted
+            ? `Versão revisada ${createdVersion.version_number} criada com sucesso. Agora ela pode ser aprovada após conferência manual.`
+            : `Nova versão ${createdVersion.version_number} criada com sucesso.`,
       )
     } catch (err) {
       if (err instanceof ApiError) {
@@ -1287,7 +1329,7 @@ export function EditorModulePanel({ token, selectedCaseId, selectedCaseArea, pie
                     onClick={() => void handleCreateVersion(false)}
                     disabled={Boolean(versionActionLoading) || !currentVersion}
                   >
-                    {versionActionLoading === 'new' ? 'Criando versão...' : 'Nova versão'}
+                    {versionActionLoading === 'new' ? 'Criando versão...' : currentVersionIsAssistedDraft && !selectedDocumentIsStrategicHearing ? 'Criar versão revisada' : 'Nova versão'}
                   </button>
 
                   <button
