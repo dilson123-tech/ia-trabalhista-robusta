@@ -497,6 +497,25 @@ export type EditableDocumentDetail = EditableDocumentItem & {
   versions: EditableDocumentVersionItem[]
 }
 
+export type EditableDocumentFinalVerdict = {
+  document_id: number
+  title: string
+  version_number: number
+  analysis_source: string
+  export_status: string
+  content_status: string
+  final_decision: string
+  risk_level: string
+  approved_points: string[]
+  critical_pending: string[]
+  non_critical_pending: string[]
+  missing_blocks: string[]
+  placeholders: string[]
+  operational_text_flags: string[]
+  next_step: string
+  summary: string
+}
+
 export async function listEditableDocumentsForCase(
   token: string,
   caseId: number,
@@ -594,6 +613,23 @@ export async function createEditableDocumentVersion(
   return response.json()
 }
 
+
+export async function getEditableDocumentFinalVerdict(
+  token: string,
+  documentId: number,
+): Promise<EditableDocumentFinalVerdict> {
+  const response = await fetch(`${API_URL}/editable-documents/${documentId}/final-verdict`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+
+  if (!response.ok) {
+    await parseError(response, "Erro ao gerar veredito final da peça")
+  }
+
+  return response.json()
+}
 
 export async function generateAssistedDraft(
   token: string,

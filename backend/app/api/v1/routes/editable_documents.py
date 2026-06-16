@@ -27,6 +27,7 @@ from app.schemas.editable_document import (
     EditableDocumentOut,
     EditableDocumentVersionCreate,
     EditableDocumentVersionOut,
+    EditableDocumentFinalVerdictOut,
 )
 from app.services.editor_export_service import build_editor_html, generate_editor_pdf
 from app.services.analysis_foundations import build_analysis_foundations
@@ -4163,6 +4164,278 @@ def delete_editable_document(
         "deleted_versions_count": versions_count,
         "detail": "Editable document deleted successfully",
     }
+
+
+
+_FINAL_VERDICT_EXPECTED_BLOCKS = [
+    ("Endereçamento", ("enderecamento", "endereçamento")),
+    ("Qualificação das Partes", ("qualificacao das partes", "qualificação das partes")),
+    ("Resumo Fático", ("resumo fatico", "resumo fático")),
+    ("Fundamentação", ("fundamentacao", "fundamentação")),
+    ("Pedidos", ("pedidos",)),
+    ("Pedidos e Valores Estimados", ("pedidos e valores estimados",)),
+    ("Provas e Requerimentos", ("provas e requerimentos",)),
+    ("Fechamento", ("fechamento",)),
+    ("Checklist Final", ("checklist final", "checklist final para protocolo")),
+]
+
+
+def _normalize_final_verdict_text(value: str) -> str:
+    normalized = unicodedata.normalize("NFD", str(value or ""))
+    normalized = "".join(ch for ch in normalized if unicodedata.category(ch) != "Mn")
+    normalized = re.sub(r"\s+", " ", normalized.lower()).strip()
+    return normalized
+
+
+def _strip_html_for_final_verdict(html: str) -> str:
+    without_scripts = re.sub(r"<(script|style)[^>]*>.*?</\1>", " ", str(html or ""), flags=re.I | re.S)
+    without_tags = re.sub(r"<[^>]+>", " ", without_scripts)
+    return re.sub(r"\s+", " ", without_tags).strip()
+
+
+def _unique_final_verdict_items(items: list[str], *, limit: int = 30) -> list[str]:
+    seen: set[str] = set()
+    result: list[str] = []
+    for item in items:
+        cleaned = re.sub(r"\s+", " ", str(item or "")).strip()
+        if not cleaned:
+            continue
+        key = cleaned.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        result.append(cleaned)
+        if len(result) >= limit:
+            break
+    return result
+
+
+def _build_editable_document_final_verdict(
+    *,
+    document_id: int,
+    title: str,
+    version_number: int,
+    sections: list[dict],
+    export_text: str,
+) -> dict:
+    normalized_export_text = _normalize_final_verdict_text(export_text)
+    normalized_sections_text = _normalize_final_verdict_text(
+        " ".join(
+            f"{section.get('title', '')} {section.get('content', '')}"
+            for section in sections
+            if isinstance(section, dict)
+        )
+    )
+    normalized_full_text = f"{normalized_export_text} {normalized_sections_text}".strip()
+
+    missing_blocks = [
+        block_name
+        for block_name, aliases in _FINAL_VERDICT_EXPECTED_BLOCKS
+        if not any(alias in normalized_export_text for alias in aliases)
+    ]
+
+    raw_export_text = str(export_text or "")
+    placeholder_candidates = re.findall(r"\[[^\]]{2,120}\]", raw_export_text)
+    placeholder_phrases = [
+        "valor a ser definido",
+        "cpf a complementar",
+        "rg a complementar",
+        "cnpj a complementar",
+        "endereço completo",
+        "endereco completo",
+        "comarca a definir",
+        "local], [data",
+        "nome do advogado",
+        "oab/[uf]",
+    ]
+    placeholder_candidates.extend(
+        phrase for phrase in placeholder_phrases if phrase in normalized_full_text
+    )
+    placeholders = _unique_final_verdict_items(placeholder_candidates, limit=40)
+
+    operational_markers = [
+        "objetivo e montar o caso",
+        "objetivo é montar o caso",
+        "benchmark",
+        "nao salvar na linha do tempo",
+        "não salvar na linha do tempo",
+        "abrir anexos automaticamente",
+        "assistente operacional",
+        "proximos passos",
+        "próximos passos",
+        "alertas",
+    ]
+    operational_flags = _unique_final_verdict_items(
+        [marker for marker in operational_markers if _normalize_final_verdict_text(marker) in normalized_full_text],
+        limit=20,
+    )
+
+    approved_points = [
+        f"Versão aprovada v{version_number} localizada para veredito final.",
+        "Estrutura exportável encontrada no Editor Jurídico Vivo.",
+    ]
+
+    if "resumo fatico" in normalized_export_text or "resumo fático" in normalized_export_text:
+        approved_points.append("Resumo fático presente na peça exportável.")
+    if "fundamentacao" in normalized_export_text or "fundamentação" in normalized_export_text:
+        approved_points.append("Fundamentação presente na peça exportável.")
+    if "pedidos" in normalized_export_text:
+        approved_points.append("Bloco de pedidos presente na peça exportável.")
+    if "provas e requerimentos" in normalized_export_text:
+        approved_points.append("Bloco de provas e requerimentos presente na peça exportável.")
+
+    critical_pending: list[str] = []
+    non_critical_pending: list[str] = []
+
+    core_missing = [
+        item
+        for item in missing_blocks
+        if item
+        in {
+            "Endereçamento",
+            "Qualificação das Partes",
+            "Resumo Fático",
+            "Fundamentação",
+            "Pedidos",
+            "Provas e Requerimentos",
+            "Fechamento",
+        }
+    ]
+    if core_missing:
+        critical_pending.append("Blocos essenciais ausentes na peça exportável: " + ", ".join(core_missing) + ".")
+
+    support_missing = [item for item in missing_blocks if item not in core_missing]
+    if support_missing:
+        critical_pending.append(
+            "Blocos esperados para benchmark/verificação final ausentes na exportação: "
+            + ", ".join(support_missing)
+            + "."
+        )
+
+    if placeholders:
+        critical_pending.append(
+            "A peça ainda contém placeholders ou dados pendentes de preenchimento, como comarca, qualificação, valor da causa, assinatura ou documentos."
+        )
+
+    if operational_flags:
+        critical_pending.append(
+            "A peça contém texto operacional/interno que deve ser removido ou reescrito antes de benchmark/protocolo."
+        )
+
+    if "valor da causa" not in normalized_full_text:
+        non_critical_pending.append("Não foi localizada conferência explícita do valor da causa.")
+    elif "valor a ser definido" in normalized_full_text:
+        critical_pending.append("Valor da causa ainda está indefinido.")
+
+    if "advogado" not in normalized_full_text or "oab" not in normalized_full_text:
+        non_critical_pending.append("Conferir identificação do advogado responsável e OAB/UF antes do envio externo.")
+
+    if critical_pending:
+        final_decision = "APROVADO APENAS PARA ADVOGADO AVALIAR"
+        content_status = "pendente_com_ressalvas"
+        risk_level = "médio"
+        next_step = (
+            "Corrigir placeholders, blocos ausentes e textos operacionais antes de considerar a peça como benchmark final. "
+            "Uso seguro atual: encaminhar apenas como minuta preliminar para advogado avaliar."
+        )
+    elif non_critical_pending:
+        final_decision = "APROVADO APENAS PARA ADVOGADO AVALIAR"
+        content_status = "quase_pronto_com_pendencias"
+        risk_level = "baixo"
+        next_step = "Resolver pendências não críticas e fazer revisão profissional antes de marcar como benchmark."
+    else:
+        final_decision = "APROVADO COMO BENCHMARK"
+        content_status = "aprovado"
+        risk_level = "baixo"
+        next_step = "Peça apta a ser usada como benchmark interno, mantendo revisão profissional antes de qualquer protocolo real."
+
+    summary = (
+        f"Veredito final da versão aprovada v{version_number}: {final_decision}. "
+        f"Pendências críticas: {len(critical_pending)}. Pendências não críticas: {len(non_critical_pending)}."
+    )
+
+    return {
+        "document_id": document_id,
+        "title": title,
+        "version_number": version_number,
+        "analysis_source": "approved_version_export_html",
+        "export_status": "versao_aprovada_localizada",
+        "content_status": content_status,
+        "final_decision": final_decision,
+        "risk_level": risk_level,
+        "approved_points": _unique_final_verdict_items(approved_points, limit=20),
+        "critical_pending": _unique_final_verdict_items(critical_pending, limit=20),
+        "non_critical_pending": _unique_final_verdict_items(non_critical_pending, limit=20),
+        "missing_blocks": _unique_final_verdict_items(missing_blocks, limit=20),
+        "placeholders": placeholders,
+        "operational_text_flags": operational_flags,
+        "next_step": next_step,
+        "summary": summary,
+    }
+
+
+
+
+@router.get(
+    "/{document_id}/final-verdict",
+    response_model=EditableDocumentFinalVerdictOut,
+    dependencies=[Depends(require_role("admin", "advogado"))],
+)
+def get_editable_document_final_verdict(
+    document_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_auth),
+):
+    document = (
+        db.query(EditableDocument)
+        .filter(
+            EditableDocument.id == document_id,
+            EditableDocument.tenant_id == current_user["tenant_id"],
+        )
+        .first()
+    )
+    if not document:
+        raise HTTPException(status_code=404, detail="Editable document not found")
+
+    approved_version = (
+        db.query(EditableDocumentVersion)
+        .filter(
+            EditableDocumentVersion.editable_document_id == document.id,
+            EditableDocumentVersion.tenant_id == current_user["tenant_id"],
+            EditableDocumentVersion.approved.is_(True),
+        )
+        .order_by(EditableDocumentVersion.version_number.desc())
+        .first()
+    )
+
+    if not approved_version:
+        raise HTTPException(
+            status_code=409,
+            detail="Editable document does not have an approved version for final verdict",
+        )
+
+    export_title = _resolve_editor_export_title(db, document, current_user["tenant_id"])
+    html = build_editor_html(
+        {
+            "title": export_title,
+            "area": document.area,
+            "document_type": document.document_type,
+        },
+        {
+            "version_number": approved_version.version_number,
+            "sections": approved_version.sections or [],
+        },
+    )
+
+    export_text = _strip_html_for_final_verdict(html)
+
+    return _build_editable_document_final_verdict(
+        document_id=document.id,
+        title=export_title,
+        version_number=approved_version.version_number,
+        sections=approved_version.sections or [],
+        export_text=export_text,
+    )
 
 
 @router.get(

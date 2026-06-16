@@ -64,3 +64,22 @@ class EditableDocumentOut(BaseModel):
 
 class EditableDocumentDetailOut(EditableDocumentOut):
     versions: list[EditableDocumentVersionOut] = Field(default_factory=list)
+
+
+class EditableDocumentFinalVerdictOut(BaseModel):
+    document_id: int
+    title: str
+    version_number: int
+    analysis_source: str
+    export_status: str
+    content_status: str
+    final_decision: str
+    risk_level: str
+    approved_points: list[str] = Field(default_factory=list)
+    critical_pending: list[str] = Field(default_factory=list)
+    non_critical_pending: list[str] = Field(default_factory=list)
+    missing_blocks: list[str] = Field(default_factory=list)
+    placeholders: list[str] = Field(default_factory=list)
+    operational_text_flags: list[str] = Field(default_factory=list)
+    next_step: str
+    summary: str
