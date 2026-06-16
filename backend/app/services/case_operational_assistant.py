@@ -1249,6 +1249,43 @@ def _extract_editor_block_body(message: str) -> str:
     return cleaned.strip()
 
 
+def _build_pedidos_valores_editor_revision(body: str) -> tuple[str, str]:
+    problem = (
+        "O bloco está viável, mas precisa deixar de ser apenas orientação genérica. A versão revisada deve organizar valor da causa, valores por pedido, memória de cálculo, valores comprovados e valores estimados, sempre com ressalva de conferência pelo advogado."
+    )
+
+    revised = """I. Do valor da causa.
+
+O valor da causa deverá ser definido pelo advogado responsável antes do protocolo, com base na soma dos pedidos economicamente apreciáveis, nos documentos disponíveis e na memória de cálculo revisada.
+
+Valor da causa sugerido/preliminar: R$ [valor a calcular pelo advogado], sujeito à conferência dos documentos, comprovantes, contrato, recibos, pagamentos e demais elementos do caso.
+
+II. Dos valores a apurar por pedido.
+
+Os valores deverão ser individualizados por pedido, sempre que possível, separando-se:
+
+a) valor principal de eventual restituição, devolução ou recomposição patrimonial;
+b) valores comprovadamente pagos ou desembolsados;
+c) valores atribuídos a bens entregues, quando houver documento ou outro elemento mínimo de comprovação;
+d) eventual saldo discutido, se houver prestação de contas ou demonstrativo;
+e) eventuais danos materiais, desde que documentados;
+f) eventual dano moral, se postulado, com valor estimativo a ser definido pelo advogado conforme a estratégia processual e a prova disponível.
+
+III. Da memória de cálculo.
+
+Caso ainda não exista memória de cálculo, recomenda-se elaborá-la antes do ajuizamento, indicando para cada pedido: origem do valor, documento correspondente, forma de cálculo, natureza liquidada ou estimada e eventual pendência de conferência.
+
+IV. Dos valores estimados ou pendentes de liquidação.
+
+Quando algum valor ainda depender de contrato, prestação de contas, exibição de documento, consulta oficial, perícia, prova testemunhal ou apuração posterior, o texto deverá indicar expressamente que se trata de valor estimado, preliminar ou pendente de liquidação.
+
+V. Da cautela antes do protocolo.
+
+Antes do protocolo definitivo, o advogado deverá revisar a coerência entre pedidos, causa de pedir, documentos anexados, memória de cálculo, valor da causa e eventual pedido de danos materiais ou morais, evitando valores fechados sem lastro documental suficiente."""
+    return problem, revised.strip()
+
+
+
 def _build_pedidos_editor_revision(body: str) -> tuple[str, str]:
     original = _clean_editor_block_suggested_text(body, 6000)
     lowered = original.lower()
@@ -1450,6 +1487,9 @@ def _build_editor_block_revision(label: str, body: str) -> tuple[str, str]:
             revised = f"{revised.rstrip()}\n\n{narrative_close}"
 
         return problem, _format_resumo_fatico_paragraphs(revised)
+
+    if lowered_label == "pedidos e valores estimados":
+        return _build_pedidos_valores_editor_revision(body)
 
     if lowered_label == "pedidos":
         return _build_pedidos_editor_revision(body)
