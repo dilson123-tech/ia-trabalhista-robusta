@@ -1312,7 +1312,17 @@ def _known_amounts_section_from_texts(texts: list[str]) -> str:
     if not corpus:
         return ""
 
+    lowered = corpus.lower()
+    payment_docs_label = "comprovantes Pix" if "pix" in lowered else "comprovantes/documentos de pagamento"
+
     bullets: list[str] = []
+    used_entries: set[str] = set()
+
+    def add_bullet(key: str, text: str) -> None:
+        if key in used_entries:
+            return
+        used_entries.add(key)
+        bullets.append(text)
 
     installment_match = re.search(
         r"(\d+)\s+parcelas?\s+de\s+R\$\s*([\d.]+,\d{2})",
@@ -1320,39 +1330,73 @@ def _known_amounts_section_from_texts(texts: list[str]) -> str:
         flags=re.IGNORECASE,
     )
 
+    installment_total: float | None = None
     if installment_match:
         quantity = int(installment_match.group(1))
         installment_value = _parse_brazilian_money(installment_match.group(2))
         if installment_value is not None:
-            total = quantity * installment_value
-            bullets.append(
+            installment_total = quantity * installment_value
+            add_bullet(
+                "installments",
                 f"Pagamentos parcelados informados: {quantity} parcelas de "
                 f"{_format_brazilian_money(installment_value)}, total preliminar de "
-                f"{_format_brazilian_money(total)}, pendente de conferência dos comprovantes Pix."
+                f"{_format_brazilian_money(installment_total)}, pendente de conferência dos "
+                f"{payment_docs_label}.",
             )
 
-    if "40.120,00" in corpus and not any("40.120,00" in item for item in bullets):
-        bullets.append(
-            "Pagamentos Pix informados: R$ 40.120,00, pendentes de conferência quanto a datas, "
-            "destinatário, vínculo com a negociação e integralidade dos comprovantes."
-        )
+    payment_total_match = re.search(
+        r"(?:pagamentos?\s+(?:pix\s+)?informados?|valores?\s+pagos?|total\s+(?:pago|quitado|desembolsado)|desembolso\s+informado)\D{0,80}R\$\s*([\d.]+,\d{2})",
+        corpus,
+        flags=re.IGNORECASE,
+    )
 
-    if "15.000,00" in corpus:
-        if "scenic" in corpus.lower() or "honda" in corpus.lower() or "entrada" in corpus.lower():
-            bullets.append(
-                "Entrada informada: R$ 15.000,00, composta por bens usados indicados pelo cliente, "
-                "pendente de comprovação por recibos, contrato, mensagens ou avaliação documental."
-            )
-        else:
-            bullets.append(
-                "Valor de entrada informado: R$ 15.000,00, pendente de conferência documental."
+    if payment_total_match:
+        payment_total = _parse_brazilian_money(payment_total_match.group(1))
+        if payment_total is not None and (
+            installment_total is None or abs(payment_total - installment_total) >= 0.01
+        ):
+            payment_label = "Pagamentos Pix informados" if "pix" in lowered else "Pagamentos informados"
+            add_bullet(
+                f"payment-total:{_format_brazilian_money(payment_total)}",
+                f"{payment_label}: {_format_brazilian_money(payment_total)}, pendentes de conferência "
+                f"quanto a datas, destinatário, vínculo com a negociação e integralidade dos "
+                f"{payment_docs_label}.",
             )
 
-    if "55.120,00" in corpus:
-        bullets.append(
-            "Valor econômico preliminar informado: R$ 55.120,00, sujeito à validação por contrato, "
-            "comprovantes Pix, recibos, prestação de contas e revisão profissional."
-        )
+    entry_match = None
+    for pattern in (
+        r"(?:entrada|valor\s+de\s+entrada|entrada\s+informada)\D{0,80}R\$\s*([\d.]+,\d{2})",
+        r"R\$\s*([\d.]+,\d{2})\D{0,80}(?:como|a\s+t[íi]tulo\s+de|referente\s+a|referente\s+à)?\s*entrada",
+    ):
+        entry_match = re.search(pattern, corpus, flags=re.IGNORECASE)
+        if entry_match:
+            break
+
+    if entry_match:
+        entry_value = _parse_brazilian_money(entry_match.group(1))
+        if entry_value is not None:
+            add_bullet(
+                f"entry:{_format_brazilian_money(entry_value)}",
+                f"Entrada informada: {_format_brazilian_money(entry_value)}, pendente de conferência "
+                "por contrato, recibos, mensagens, comprovantes, avaliação documental ou outros "
+                "elementos mínimos de comprovação.",
+            )
+
+    economic_value_match = re.search(
+        r"(?:valor\s+econ[oô]mico\s+preliminar|valor\s+econ[oô]mico\s+informado|total\s+econ[oô]mico\s+preliminar)\D{0,80}R\$\s*([\d.]+,\d{2})",
+        corpus,
+        flags=re.IGNORECASE,
+    )
+
+    if economic_value_match:
+        economic_value = _parse_brazilian_money(economic_value_match.group(1))
+        if economic_value is not None:
+            add_bullet(
+                f"economic:{_format_brazilian_money(economic_value)}",
+                f"Valor econômico preliminar informado: {_format_brazilian_money(economic_value)}, "
+                "sujeito à validação por contrato, comprovantes/documentos de pagamento, recibos, "
+                "prestação de contas, memória de cálculo e revisão profissional.",
+            )
 
     if not bullets:
         return ""
@@ -1364,7 +1408,6 @@ def _known_amounts_section_from_texts(texts: list[str]) -> str:
 {joined}
 
 Esses valores não substituem memória de cálculo, prestação de contas, liquidação dos pedidos ou revisão do advogado responsável."""
-
 
 def _build_pedidos_valores_editor_revision(
     body: str,
