@@ -1656,10 +1656,20 @@ def _editor_block_correction_response(
     lowered = raw_message.lower()
     block_label = _detect_editor_block_label(lowered)
     block_body = _extract_editor_block_body(raw_message)
+    editor_context = {
+        **(context or {}),
+        "case_context": {
+            "case_number": getattr(case, "case_number", ""),
+            "title": getattr(case, "title", ""),
+            "description": getattr(case, "description", ""),
+            "legal_area": getattr(case, "legal_area", ""),
+            "action_type": getattr(case, "action_type", ""),
+        },
+    }
     problem, revised_text = _build_editor_block_revision(
         block_label,
         block_body,
-        context=context,
+        context=editor_context,
         raw_message=raw_message,
     )
 
