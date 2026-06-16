@@ -1414,24 +1414,45 @@ Antes do protocolo definitivo, o advogado deverá revisar a coerência entre ped
     return problem, revised.strip()
 
 
+
+def _has_vehicle_editor_context(text: str) -> bool:
+    corpus = str(text or "").lower()
+
+    vehicle_markers = (
+        "veículo",
+        "veiculo",
+        "revendedora",
+        "detran",
+        "retomada",
+        "recolhimento",
+        "busca e apreensão",
+        "busca e apreensao",
+    )
+    vehicle_related_markers = (
+        "suposto bloqueio",
+        "bloqueio do veículo",
+        "bloqueio do veiculo",
+        "documentos do veículo",
+        "documentos do veiculo",
+        "localização atual do bem",
+        "localizacao atual do bem",
+        "guincho",
+        "nota promissória",
+        "nota promissoria",
+        "parcelas via pix",
+        "pagamentos via pix",
+    )
+
+    return any(marker in corpus for marker in vehicle_markers) or any(
+        marker in corpus for marker in vehicle_related_markers
+    )
+
+
 def _build_pedidos_editor_revision(body: str) -> tuple[str, str]:
     original = _clean_editor_block_suggested_text(body, 6000)
     lowered = original.lower()
 
-    has_vehicle_context = any(
-        marker in lowered
-        for marker in (
-            "veículo",
-            "veiculo",
-            "revendedora",
-            "pix",
-            "bloqueio",
-            "detran",
-            "retomada",
-            "recolhimento",
-            "contrato",
-        )
-    )
+    has_vehicle_context = _has_vehicle_editor_context(lowered)
 
     problem = (
         "O bloco precisa ajuste estrutural: há pontos de atenção e fundamentos misturados como se fossem pedidos. A versão revisada deve transformar a análise em requerimentos jurídicos objetivos, prudentes e condicionados à prova disponível."
@@ -1511,25 +1532,13 @@ def _build_fundamentacao_editor_revision(body: str) -> tuple[str, str]:
             "servico",
         )
     )
-    has_vehicle_context = any(
-        marker in lowered
-        for marker in (
-            "veículo",
-            "veiculo",
-            "detran",
-            "bloqueio",
-            "busca e apreensão",
-            "busca e apreensao",
-            "recolhimento",
-            "retomada",
-        )
-    )
+    has_vehicle_context = _has_vehicle_editor_context(lowered)
 
     problem = (
         "O bloco está viável, mas precisa ajuste estrutural: ele mistura fundamentação jurídica, estratégia operacional e lacunas probatórias, além de repetir pontos controvertidos. A versão revisada deve ligar fatos, prova mínima e tese jurídica com linguagem prudente."
     )
 
-    if has_consumer_context or has_vehicle_context:
+    if has_vehicle_context:
         revised = """I. Do cabimento da pretensão.
 
 À luz do quadro fático narrado, a pretensão deve ser estruturada para apurar a regularidade da negociação, dos pagamentos realizados, da eventual existência de saldo pendente e da retomada/recolhimento do veículo informado pelo cliente. A análise deve permanecer condicionada à conferência dos documentos disponíveis e das provas que ainda serão obtidas.
@@ -1559,6 +1568,32 @@ VII. Síntese conclusiva.
 A tese apresenta viabilidade preliminar moderada, desde que fortalecida por prova documental, conferência dos pagamentos, validação do suposto bloqueio e organização da linha fática. A fundamentação final deve evitar conclusões definitivas sem lastro probatório e manter linguagem técnica, prudente e condicionada à revisão profissional antes do protocolo."""
         return problem, revised.strip()
 
+    if has_consumer_context:
+        revised = """I. Do cabimento da pretensão.
+
+À luz do quadro fático narrado, a pretensão deve ser estruturada para apurar a relação jurídica entre as partes, a conduta discutida, os deveres de informação, transparência e boa-fé, bem como os documentos disponíveis e as provas ainda pendentes de validação.
+
+II. Da relação de consumo, se confirmada.
+
+Quando os documentos e a natureza da relação indicarem vínculo entre consumidor e fornecedor, a fundamentação poderá invocar os deveres de informação adequada, transparência, boa-fé objetiva, segurança, prestação de contas e equilíbrio na relação contratual ou de prestação de serviço, sempre conforme a prova disponível e a revisão do advogado responsável.
+
+III. Dos documentos, pagamentos e registros relevantes.
+
+A versão final deve vincular os fundamentos aos documentos efetivamente disponíveis, como contrato, recibos, comprovantes de pagamento, mensagens, protocolos, notas fiscais, ordens de serviço, comunicações ou outros registros pertinentes, distinguindo prova já juntada de informação ainda pendente de confirmação.
+
+IV. Das lacunas probatórias e da necessidade de exibição ou complementação documental.
+
+Quando houver documentos em poder da parte contrária ou de terceiros, ou quando existirem lacunas relevantes, a fundamentação deve indicar a necessidade de exibição, complementação documental, prestação de informações, diligência ou outro meio adequado de esclarecimento.
+
+V. Da cautela quanto a responsabilidade, danos e urgência.
+
+Pedidos de obrigação de fazer, restituição, devolução de valores, indenização por danos materiais ou morais e tutela de urgência devem permanecer condicionados aos requisitos legais, ao nexo com os fatos comprovados e ao suporte documental mínimo, evitando-se conclusão definitiva sem lastro probatório suficiente.
+
+VI. Síntese conclusiva.
+
+A fundamentação é preliminar e deverá ser ajustada conforme a prova documental, as informações complementares, eventual resposta da parte contrária e a revisão técnica do advogado responsável antes do protocolo."""
+        return problem, revised.strip()
+
     revised = """I. Do cabimento da pretensão.
 
 À luz do quadro fático narrado, a demanda deve ser estruturada para tutelar o direito material afirmado, identificar a controvérsia central e relacionar os fatos relevantes às provas disponíveis e às provas ainda pendentes.
@@ -1580,6 +1615,79 @@ V. Síntese conclusiva.
 A fundamentação é preliminar e deve ser ajustada conforme a prova produzida, os documentos anexados e a revisão técnica do advogado responsável antes do protocolo."""
     return problem, revised.strip()
 
+
+
+
+def _build_provas_requerimentos_editor_revision(
+    body: str,
+    context: dict[str, Any] | None = None,
+    raw_message: str = "",
+) -> tuple[str, str]:
+    context_texts = [
+        body,
+        raw_message,
+        *_iter_editor_context_strings(context or {}),
+    ]
+    corpus = " ".join(context_texts).lower()
+
+    has_vehicle_context = _has_vehicle_editor_context(corpus)
+
+    problem = (
+        "O bloco está viável, mas precisa deixar de ser genérico. A versão revisada deve separar provas já informadas, documentos pendentes, exibição de documentos, diligências e cautelas, sem tratar relato do cliente como prova documental já comprovada."
+    )
+
+    if has_vehicle_context:
+        revised = """I. Das provas documentais já informadas pelo cliente.
+
+Requer-se a juntada e conferência dos documentos que o cliente informa possuir, especialmente comprovantes Pix relacionados aos pagamentos parcelados, eventuais mensagens, recibos, registros de negociação, fotos, documentos do veículo ou outros elementos que demonstrem a relação entre as partes, os pagamentos realizados e as circunstâncias narradas.
+
+A existência, autenticidade, integralidade e pertinência desses documentos deverão ser verificadas antes do protocolo, evitando-se tratar simples relato como prova documental já confirmada.
+
+II. Das provas documentais pendentes de juntada ou conferência.
+
+Devem ser identificados como pendentes, quando ainda não estiverem disponíveis nos autos internos do caso: contrato ou instrumento equivalente da negociação, notas promissórias, recibos da entrada informada, comprovantes integrais dos Pix, mensagens com a revendedora, documentos do veículo, eventual consulta ao Detran, comprovante de recolhimento, termo de entrega, comunicação prévia e qualquer documento relativo ao suposto bloqueio informado.
+
+III. Da exibição de documentos pela parte ré.
+
+Requer-se, se cabível conforme a estratégia processual, que a parte ré apresente o contrato ou instrumento de negociação, notas promissórias, demonstrativo de parcelas, prestação de contas, comprovantes de saldo alegado, documentos do veículo, registro do suposto bloqueio, ordem judicial ou administrativa eventualmente existente, comunicação enviada ao cliente, comprovante de guincho, termo de recolhimento/entrega e informação sobre a localização atual do bem.
+
+IV. Das diligências e consultas úteis.
+
+Requer-se a possibilidade de realização de diligências e consultas necessárias à elucidação dos fatos, especialmente para verificar a situação cadastral do veículo, eventual restrição administrativa ou judicial, histórico de propriedade, localização do bem, regularidade documental da negociação e vínculo entre os pagamentos informados e a parte ré.
+
+V. Da prova testemunhal.
+
+Requer-se a produção de prova testemunhal, caso existam pessoas que tenham presenciado a negociação, a entrega de bens usados como entrada, os pagamentos, a retirada/recolhimento do veículo, contatos com a revendedora ou outras circunstâncias relevantes. As testemunhas devem ser qualificadas e vinculadas objetivamente ao que sabem ou podem confirmar.
+
+VI. Da cautela quanto à prova.
+
+A narrativa do cliente deve ser tratada como relato inicial, pendente de confirmação por documentos, testemunhas, exibição de documentos, consultas oficiais ou outros meios admitidos em direito. Não se deve afirmar que houve bloqueio irregular, fraude, abuso, dano ou responsabilidade definitiva sem suporte probatório suficiente e revisão do advogado responsável.
+
+VII. Dos requerimentos probatórios finais.
+
+Requer-se a produção de todos os meios de prova em direito admitidos, especialmente documental suplementar, testemunhal, depoimento pessoal da parte ré, exibição de documentos, consultas oficiais, diligências e eventual prova técnica, conforme necessidade demonstrada no curso do processo e adequação ao rito escolhido."""
+        return problem, revised.strip()
+
+    revised = """I. Das provas documentais já informadas.
+
+Requer-se a juntada e conferência dos documentos que a parte informa possuir, com indicação objetiva do que cada documento demonstra e de sua relação com os fatos narrados.
+
+II. Das provas pendentes de juntada ou conferência.
+
+Devem ser identificados expressamente os documentos, registros, mensagens, recibos, comprovantes, laudos, consultas, declarações ou outros elementos ainda pendentes de obtenção, conferência ou validação.
+
+III. Da exibição de documentos e informações.
+
+Requer-se, quando cabível, a exibição de documentos, registros, demonstrativos, contratos, comunicações ou informações que estejam em poder da parte contrária ou de terceiros e sejam relevantes para a apuração dos fatos.
+
+IV. Das diligências e demais meios de prova.
+
+Requer-se a realização das diligências úteis e a produção dos meios de prova admitidos em direito, incluindo prova documental suplementar, testemunhal, depoimento pessoal, perícia ou consulta técnica, conforme a natureza da controvérsia.
+
+V. Da cautela quanto à prova.
+
+A versão final deve distinguir fatos relatados, documentos efetivamente disponíveis, documentos pendentes e pontos que dependem de confirmação, evitando afirmar como provado aquilo que ainda exige validação documental, testemunhal, técnica ou profissional."""
+    return problem, revised.strip()
 
 
 def _build_editor_block_revision(
@@ -1635,9 +1743,10 @@ def _build_editor_block_revision(
         return _build_fundamentacao_editor_revision(body)
 
     if lowered_label == "provas e requerimentos":
-        return (
-            "Conferir se o bloco separa provas existentes, documentos pendentes e requerimentos de exibição/diligência.",
+        return _build_provas_requerimentos_editor_revision(
             body,
+            context=context,
+            raw_message=raw_message,
         )
 
     return (

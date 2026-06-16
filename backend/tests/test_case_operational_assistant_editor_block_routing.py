@@ -8,10 +8,11 @@ def _fake_case(
     title: str = "",
     legal_area: str = "",
     action_type: str = "",
+    case_number: str = "VEICULO-QUINTINO-PIX-001",
 ):
     return SimpleNamespace(
         id=428,
-        case_number="VEICULO-QUINTINO-PIX-001",
+        case_number=case_number,
         description=description,
         title=title,
         legal_area=legal_area,
@@ -456,5 +457,160 @@ Os pedidos deverão ser acompanhados de indicação de valores estimados ou liqu
     assert "R$ 15.000,00" in replacement
     assert "R$ 55.120,00" in replacement
     assert "sujeitos à conferência documental" in replacement
+    assert "linha_do_tempo" not in destinations
+    assert "anexos" not in destinations
+
+
+def test_editor_block_provas_requerimentos_gets_structured_vehicle_revision():
+    message = """
+verifique o bloco provas e requerimentos
+
+Provas e Requerimentos — draft (assisted_draft)
+Requer-se a produção de todos os meios de prova em direito admitidos, especialmente documental, testemunhal e pericial, conforme a natureza das controvérsias identificadas.
+"""
+
+    case = _fake_case(
+        description=(
+            "Cliente relata compra de veículo com revendedora, 34 parcelas via Pix, "
+            "entrada com bens usados, contrato perdido e retomada/recolhimento do veículo "
+            "sob alegação de suposto bloqueio, pendente de conferência documental."
+        )
+    )
+
+    response = _fallback_response(
+        case=case,
+        message=message,
+        context={},
+        timeline=[],
+    )
+
+    action = response["suggested_actions"][0]
+    destinations = [item["destination"] for item in response["suggested_actions"]]
+    suggested_text = action["suggested_text"]
+    replacement = suggested_text.split("Texto sugerido para substituir:", 1)[1].split("Ação agora:", 1)[0]
+
+    assert destinations == ["editor_minuta"]
+    assert action["label"] == "Revisar bloco: Provas e Requerimentos"
+    assert "O bloco está viável, mas precisa deixar de ser genérico" in suggested_text
+
+    assert "I. Das provas documentais já informadas pelo cliente." in replacement
+    assert "II. Das provas documentais pendentes de juntada ou conferência." in replacement
+    assert "III. Da exibição de documentos pela parte ré." in replacement
+    assert "IV. Das diligências e consultas úteis." in replacement
+    assert "V. Da prova testemunhal." in replacement
+    assert "VI. Da cautela quanto à prova." in replacement
+    assert "VII. Dos requerimentos probatórios finais." in replacement
+
+    assert "simples relato como prova documental já confirmada" in replacement
+    assert "contrato ou instrumento de negociação" in replacement
+    assert "registro do suposto bloqueio" in replacement
+    assert "Não se deve afirmar que houve bloqueio irregular, fraude, abuso, dano ou responsabilidade definitiva" in replacement
+
+    assert "linha_do_tempo" not in destinations
+    assert "anexos" not in destinations
+
+def test_editor_block_provas_requerimentos_gets_generic_structured_revision():
+    message = """
+verifique o bloco provas e requerimentos
+
+Provas e Requerimentos — draft (assisted_draft)
+Requer-se a produção de todos os meios de prova em direito admitidos, especialmente documental, testemunhal e pericial.
+"""
+
+    case = _fake_case(
+        case_number="CONTRATO-GENERICO-001",
+        description=(
+            "Cliente relata controvérsia contratual com documentos pendentes de conferência, "
+            "mensagens a validar, possíveis testemunhas e necessidade de exibição de documentos."
+        )
+    )
+
+    response = _fallback_response(
+        case=case,
+        message=message,
+        context={},
+        timeline=[],
+    )
+
+    action = response["suggested_actions"][0]
+    destinations = [item["destination"] for item in response["suggested_actions"]]
+    suggested_text = action["suggested_text"]
+    replacement = suggested_text.split("Texto sugerido para substituir:", 1)[1].split("Ação agora:", 1)[0]
+
+    assert destinations == ["editor_minuta"]
+    assert action["label"] == "Revisar bloco: Provas e Requerimentos"
+    assert "O bloco está viável, mas precisa deixar de ser genérico" in suggested_text
+
+    assert "I. Das provas documentais já informadas." in replacement
+    assert "II. Das provas pendentes de juntada ou conferência." in replacement
+    assert "III. Da exibição de documentos e informações." in replacement
+    assert "IV. Das diligências e demais meios de prova." in replacement
+    assert "V. Da cautela quanto à prova." in replacement
+
+    assert "evitando afirmar como provado aquilo que ainda exige validação" in replacement
+    assert "revendedora" not in replacement.lower()
+    assert "veículo" not in replacement.lower()
+    assert "bloqueio" not in replacement.lower()
+    assert "linha_do_tempo" not in destinations
+    assert "anexos" not in destinations
+
+
+def test_editor_block_pedidos_generic_contract_pix_does_not_get_vehicle_revision():
+    message = """
+verifique o bloco pedidos se esta de acordo
+
+Pedidos — draft (assisted_draft)
+Caso de contrato de prestação de serviços, com pagamento via Pix, comprovantes pendentes e pedido de devolução de valores.
+"""
+
+    response = _fallback_response(
+        case=_fake_case(case_number="CONTRATO-SERVICO-001"),
+        message=message,
+        context={},
+        timeline=[],
+    )
+
+    action = response["suggested_actions"][0]
+    destinations = [item["destination"] for item in response["suggested_actions"]]
+    replacement = action["suggested_text"].split("Texto sugerido para substituir:", 1)[1].split("Ação agora:", 1)[0]
+
+    assert destinations == ["editor_minuta"]
+    assert action["label"] == "Revisar bloco: Pedidos"
+    assert "II. Dos pedidos principais." in replacement
+    assert "III. Da exibição de documentos e produção de prova." in replacement
+    assert "revendedora" not in replacement.lower()
+    assert "veículo" not in replacement.lower()
+    assert "suposto bloqueio" not in replacement.lower()
+    assert "linha_do_tempo" not in destinations
+    assert "anexos" not in destinations
+
+
+def test_editor_block_fundamentacao_consumer_generic_does_not_get_vehicle_revision():
+    message = """
+verifique o bloco fundamentação
+
+Fundamentação — draft (assisted_draft)
+Relação de consumo envolvendo fornecedor de serviço, contrato, pagamento via Pix, falha na prestação e documentos pendentes de conferência.
+"""
+
+    response = _fallback_response(
+        case=_fake_case(case_number="CONSUMIDOR-SERVICO-001"),
+        message=message,
+        context={},
+        timeline=[],
+    )
+
+    action = response["suggested_actions"][0]
+    destinations = [item["destination"] for item in response["suggested_actions"]]
+    replacement = action["suggested_text"].split("Texto sugerido para substituir:", 1)[1].split("Ação agora:", 1)[0]
+
+    assert destinations == ["editor_minuta"]
+    assert action["label"] == "Revisar bloco: Fundamentação"
+    assert "II. Da relação de consumo, se confirmada." in replacement
+    assert "III. Dos documentos, pagamentos e registros relevantes." in replacement
+    assert "IV. Das lacunas probatórias e da necessidade de exibição ou complementação documental." in replacement
+    assert "revendedora de veículos" not in replacement.lower()
+    assert "retomada/recolhimento do veículo" not in replacement.lower()
+    assert "suposto bloqueio" not in replacement.lower()
     assert "linha_do_tempo" not in destinations
     assert "anexos" not in destinations
