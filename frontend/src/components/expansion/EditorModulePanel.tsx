@@ -3,12 +3,14 @@ import {
   ApiError,
   createEditableDocument,
   createEditableDocumentVersion,
+  getEditableDocumentFinalVerdict,
   deleteEditableDocument,
   generateAssistedDraft,
   getEditableDocument,
   listEditableDocumentsForCase,
   type EditableDocumentDetail,
   type EditableDocumentItem,
+  type EditableDocumentFinalVerdict,
 } from '../../services/api'
 
 const EDITOR_SUPPORTED_AREAS = [
@@ -219,6 +221,8 @@ export function EditorModulePanel({ token, selectedCaseId, selectedCaseArea, pie
   const [versionError, setVersionError] = useState('')
   const [versionSuccess, setVersionSuccess] = useState('')
   const [exportLoading, setExportLoading] = useState<'html' | 'pdf' | null>(null)
+  const [finalVerdictLoading, setFinalVerdictLoading] = useState(false)
+  const [finalVerdict, setFinalVerdict] = useState<EditableDocumentFinalVerdict | null>(null)
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [assistedDraftLoading, setAssistedDraftLoading] = useState(false)
   const [compareBaseVersionNumber, setCompareBaseVersionNumber] = useState<number | null>(null)
@@ -829,6 +833,28 @@ export function EditorModulePanel({ token, selectedCaseId, selectedCaseArea, pie
     ? false
     : isAssistedDraftVersion(currentVersion)
 
+  async function handleReviewFinalVerdict() {
+    if (!selectedDocumentId || !approvedVersion || !token.trim()) return
+
+    try {
+      setFinalVerdictLoading(true)
+      setVersionError('')
+      setVersionSuccess('')
+
+      const verdict = await getEditableDocumentFinalVerdict(token, selectedDocumentId)
+      setFinalVerdict(verdict)
+      setVersionSuccess(`Veredito final gerado: ${verdict.final_decision}.`)
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setVersionError(err.message)
+      } else {
+        setVersionError('Não foi possível gerar o veredito final da peça.')
+      }
+    } finally {
+      setFinalVerdictLoading(false)
+    }
+  }
+
   async function handleCreateVersion(approved: boolean) {
     if (!token.trim() || !selectedDocument || !currentVersion) return
 
@@ -1379,7 +1405,85 @@ export function EditorModulePanel({ token, selectedCaseId, selectedCaseArea, pie
                   >
                     {exportLoading === 'pdf' ? 'Exportando PDF...' : 'Exportar PDF'}
                   </button>
+
+                  <button
+                    type="button"
+                    className={`btn ${
+                      approvedVersion && !finalVerdictLoading ? 'btn-secondary' : 'btn-muted'
+                    }`}
+                    onClick={() => void handleReviewFinalVerdict()}
+                    disabled={!approvedVersion || finalVerdictLoading || exportLoading !== null}
+                    title={approvedVersion ? 'Gerar veredito final da versão aprovada' : 'O veredito exige uma versão aprovada'}
+                  >
+                    {finalVerdictLoading ? 'Analisando peça...' : 'Veredito final da peça'}
+                  </button>
                 </div>
+
+                {finalVerdict && (
+                  <div
+                    className="info-meta"
+                    style={{
+                      marginTop: '12px',
+                      padding: '12px',
+                      borderRadius: '12px',
+                      background: 'rgba(15, 23, 42, 0.55)',
+                      border: '1px solid rgba(148, 163, 184, 0.22)',
+                    }}
+                  >
+                    <strong>Veredito final da peça</strong>
+                    <p style={{ marginTop: '8px' }}>
+                      <strong>Decisão:</strong> {finalVerdict.final_decision}
+                    </p>
+                    <p>
+                      <strong>Risco:</strong> {finalVerdict.risk_level} · <strong>Versão:</strong> v{finalVerdict.version_number}
+                    </p>
+                    <p>{finalVerdict.summary}</p>
+
+                    {finalVerdict.critical_pending.length > 0 && (
+                      <>
+                        <strong>Pendências críticas</strong>
+                        <ul className="info-list">
+                          {finalVerdict.critical_pending.map((item, index) => (
+                            <li key={`critical-${index}`}>{item}</li>
+                          ))}
+                        </ul>
+                      </>
+                    )}
+
+                    {finalVerdict.non_critical_pending.length > 0 && (
+                      <>
+                        <strong>Pendências não críticas</strong>
+                        <ul className="info-list">
+                          {finalVerdict.non_critical_pending.map((item, index) => (
+                            <li key={`non-critical-${index}`}>{item}</li>
+                          ))}
+                        </ul>
+                      </>
+                    )}
+
+                    {finalVerdict.missing_blocks.length > 0 && (
+                      <p>
+                        <strong>Blocos ausentes:</strong> {finalVerdict.missing_blocks.join(', ')}
+                      </p>
+                    )}
+
+                    {finalVerdict.placeholders.length > 0 && (
+                      <p>
+                        <strong>Placeholders encontrados:</strong> {finalVerdict.placeholders.slice(0, 8).join(', ')}
+                      </p>
+                    )}
+
+                    {finalVerdict.operational_text_flags.length > 0 && (
+                      <p>
+                        <strong>Texto operacional detectado:</strong> {finalVerdict.operational_text_flags.join(', ')}
+                      </p>
+                    )}
+
+                    <p>
+                      <strong>Próximo passo:</strong> {finalVerdict.next_step}
+                    </p>
+                  </div>
+                )}
               </article>
 
               <article className="info-card">
