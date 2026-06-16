@@ -773,3 +773,41 @@ Requer-se a procedência dos pedidos, com tutela provisória se cabível, exibi�
     assert "Da restituição do veículo ou devolução de valores" in replacement
     assert "linha_do_tempo" not in destinations
     assert "anexos" not in destinations
+
+
+def test_editor_block_checklist_final_gets_structured_revision():
+    message = """
+verificar Checklist Final para Protocolo
+
+Checklist Final para Protocolo — draft (assisted_draft)
+Checklist interno de prontidão para protocolo. Este bloco serve como apoio operacional do escritório e deve ser revisado antes do ajuizamento.
+
+Pendências e conferências obrigatórias:
+- Informar e conferir CPF da parte autora.
+- Informar e conferir CNPJ da parte ré.
+- Definir ou revisar valor da causa antes do protocolo.
+"""
+
+    response = _fallback_response(
+        case=_fake_case(case_number="CHECKLIST-GENERICO-001"),
+        message=message,
+        context={},
+        timeline=[],
+    )
+
+    action = response["suggested_actions"][0]
+    destinations = [item["destination"] for item in response["suggested_actions"]]
+    replacement = action["suggested_text"].split("Texto sugerido para substituir:", 1)[1].split("Ação agora:", 1)[0]
+
+    assert destinations == ["editor_minuta"]
+    assert action["label"] == "Revisar bloco: Checklist Final"
+    assert "I. Conferência da qualificação das partes." in replacement
+    assert "II. Conferência do advogado responsável e assinatura." in replacement
+    assert "III. Conferência da competência, rito e endereçamento." in replacement
+    assert "IV. Conferência dos fatos, fundamentos e pedidos." in replacement
+    assert "V. Conferência do valor da causa e cálculos." in replacement
+    assert "VI. Conferência de documentos, anexos e provas." in replacement
+    assert "VII. Conferência final antes do protocolo." in replacement
+    assert "[Cole aqui o texto revisado" not in replacement
+    assert "linha_do_tempo" not in destinations
+    assert "anexos" not in destinations
