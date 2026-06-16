@@ -614,3 +614,68 @@ Relação de consumo envolvendo fornecedor de serviço, contrato, pagamento via 
     assert "suposto bloqueio" not in replacement.lower()
     assert "linha_do_tempo" not in destinations
     assert "anexos" not in destinations
+
+
+def test_editor_block_resumo_fatico_generic_case_uses_universal_caution():
+    message = """
+verifique o resumo fático
+
+Resumo Fático — draft (assisted_draft)
+Cliente relata contrato de prestação de serviços, pagamento realizado, mensagens pendentes de conferência e possível descumprimento contratual.
+
+O objetivo é montar uma ação com pedido de devolução de valores e indenização.
+"""
+
+    response = _fallback_response(
+        case=_fake_case(case_number="CONTRATO-SERVICO-RESUMO-001"),
+        message=message,
+        context={},
+        timeline=[],
+    )
+
+    action = response["suggested_actions"][0]
+    destinations = [item["destination"] for item in response["suggested_actions"]]
+    replacement = action["suggested_text"].split("Texto sugerido para substituir:", 1)[1].split("Ação agora:", 1)[0]
+
+    assert destinations == ["editor_minuta"]
+    assert action["label"] == "Revisar bloco: Resumo Fático"
+    assert "A narrativa permanece sujeita à validação documental e revisão profissional" in replacement
+    assert "confirmação dos fatos relatados" in replacement
+    assert "pontos ainda pendentes de prova" in replacement
+    assert "O objetivo é montar" not in replacement
+    assert "Pix" not in replacement
+    assert "suposto bloqueio" not in replacement
+    assert "retomada/recolhimento do veículo" not in replacement
+    assert "linha_do_tempo" not in destinations
+    assert "anexos" not in destinations
+
+
+def test_editor_block_resumo_fatico_vehicle_case_keeps_vehicle_caution():
+    message = """
+verifique o resumo fático
+
+Resumo Fático — draft (assisted_draft)
+Cliente relata compra de veículo em revendedora, pagamento parcelado via Pix, contrato perdido e retomada/recolhimento do veículo sob alegação de suposto bloqueio.
+
+O objetivo é montar o caso para avaliação de advogado.
+"""
+
+    response = _fallback_response(
+        case=_fake_case(),
+        message=message,
+        context={},
+        timeline=[],
+    )
+
+    action = response["suggested_actions"][0]
+    destinations = [item["destination"] for item in response["suggested_actions"]]
+    replacement = action["suggested_text"].split("Texto sugerido para substituir:", 1)[1].split("Ação agora:", 1)[0]
+
+    assert destinations == ["editor_minuta"]
+    assert action["label"] == "Revisar bloco: Resumo Fático"
+    assert "destinatário dos Pix" in replacement
+    assert "motivo formal do suposto bloqueio" in replacement
+    assert "circunstâncias da retomada/recolhimento do veículo" in replacement
+    assert "O objetivo é montar" not in replacement
+    assert "linha_do_tempo" not in destinations
+    assert "anexos" not in destinations

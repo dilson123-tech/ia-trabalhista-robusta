@@ -1720,9 +1720,21 @@ def _build_editor_block_revision(
                 revised = revised[:idx].rstrip()
                 break
 
-        narrative_close = (
-            "A narrativa permanece sujeita à validação documental, especialmente quanto à existência e conteúdo do contrato, valores efetivamente pagos, destinatário dos Pix, eventual saldo pendente, motivo formal do suposto bloqueio e circunstâncias da retomada/recolhimento do veículo."
-        )
+        context_texts = [
+            body,
+            raw_message,
+            *_iter_editor_context_strings(context or {}),
+        ]
+        has_vehicle_context = _has_vehicle_editor_context(" ".join(context_texts))
+
+        if has_vehicle_context:
+            narrative_close = (
+                "A narrativa permanece sujeita à validação documental, especialmente quanto à existência e conteúdo do contrato, valores efetivamente pagos, destinatário dos Pix, eventual saldo pendente, motivo formal do suposto bloqueio e circunstâncias da retomada/recolhimento do veículo."
+            )
+        else:
+            narrative_close = (
+                "A narrativa permanece sujeita à validação documental e revisão profissional, especialmente quanto à confirmação dos fatos relatados, documentos disponíveis, datas relevantes, partes envolvidas, comunicações, valores informados, danos alegados e pontos ainda pendentes de prova."
+            )
 
         if narrative_close.lower() not in revised.lower():
             revised = f"{revised.rstrip()}\n\n{narrative_close}"
