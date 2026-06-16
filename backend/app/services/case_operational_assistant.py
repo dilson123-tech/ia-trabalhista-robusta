@@ -1742,6 +1742,62 @@ A versão final deve distinguir fatos relatados, documentos efetivamente dispon�
     return problem, revised.strip()
 
 
+
+def _build_checklist_final_editor_revision(body: str) -> tuple[str, str]:
+    problem = (
+        "O bloco está viável, mas precisa substituir o placeholder por um checklist operacional estruturado, genérico e útil para conferência antes do protocolo."
+    )
+
+    revised = """I. Conferência da qualificação das partes.
+
+- Conferir nome completo, CPF/CNPJ, RG ou documento equivalente, estado civil, profissão, endereço completo e demais dados relevantes da parte autora.
+- Conferir nome completo, CPF/CNPJ, endereço completo e demais dados relevantes da parte ré.
+- Confirmar legitimidade ativa e passiva, representação, procuração, sucessão, espólio, litisconsórcio ou qualquer particularidade subjetiva do caso.
+
+II. Conferência do advogado responsável e assinatura.
+
+- Informar e conferir nome do advogado responsável.
+- Informar e conferir OAB/UF.
+- Conferir procuração, poderes, substabelecimento, contrato de honorários quando aplicável e autorização para protocolo.
+- Informar local e data de assinatura.
+- Confirmar assinatura da peça e dos documentos necessários.
+
+III. Conferência da competência, rito e endereçamento.
+
+- Confirmar comarca, foro, juízo competente, competência material e territorial.
+- Conferir rito processual adequado, eventual prevenção, conexão, dependência ou distribuição por dependência.
+- Revisar endereçamento antes do protocolo.
+
+IV. Conferência dos fatos, fundamentos e pedidos.
+
+- Confirmar se o resumo fático está coerente com documentos, relatos e provas disponíveis.
+- Conferir se a fundamentação jurídica está adequada ao caso concreto e não contém afirmações sem suporte documental.
+- Conferir se os pedidos estão claros, objetivos, compatíveis com a causa de pedir e condicionados à prova disponível.
+- Conferir eventual tutela de urgência, obrigação de fazer, exibição de documentos, restituição, devolução de valores, indenização ou outro pedido específico.
+
+V. Conferência do valor da causa e cálculos.
+
+- Definir ou revisar valor da causa antes do protocolo.
+- Conferir memória de cálculo, valores liquidados, valores estimados, documentos de pagamento, recibos, contratos, prestação de contas ou demais elementos econômicos.
+- Evitar valor fechado sem lastro documental mínimo ou sem validação do advogado responsável.
+
+VI. Conferência de documentos, anexos e provas.
+
+- Conferir se todos os documentos essenciais foram juntados, nomeados e organizados.
+- Separar documentos já disponíveis, documentos pendentes e documentos que deverão ser requeridos por exibição.
+- Conferir procuração, documentos pessoais, comprovantes, contratos, recibos, mensagens, laudos, fotos, vídeos, protocolos, notificações, consultas oficiais e demais provas pertinentes ao caso.
+- Confirmar se há necessidade de prova testemunhal, pericial, documental suplementar, depoimento pessoal, diligência ou consulta técnica.
+
+VII. Conferência final antes do protocolo.
+
+- Revisar ortografia, datas, nomes, números de documentos, valores, endereços, anexos e coerência geral da peça.
+- Confirmar se a peça não afirma como comprovado aquilo que ainda depende de validação documental, testemunhal, técnica ou profissional.
+- Confirmar se a versão final foi revisada e aprovada pelo advogado responsável antes do ajuizamento.
+- Registrar internamente eventuais pendências que não impedem o protocolo, mas exigem acompanhamento posterior."""
+
+    return problem, revised.strip()
+
+
 def _build_editor_block_revision(
     label: str,
     body: str,
@@ -1812,6 +1868,9 @@ def _build_editor_block_revision(
             context=context,
             raw_message=raw_message,
         )
+
+    if lowered_label == "checklist final":
+        return _build_checklist_final_editor_revision(body)
 
     return (
         "Revisar o conteúdo como bloco editável da minuta, sem salvar como fato da Linha do Tempo.",
