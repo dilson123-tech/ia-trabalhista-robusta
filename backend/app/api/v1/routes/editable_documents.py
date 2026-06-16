@@ -2860,29 +2860,51 @@ def _build_assisted_sections(
         ]
     )
 
-    provas_requerimentos = _paragraphs(
-        [
-            "Requer-se a produção de todos os meios de prova em direito admitidos, especialmente documental, testemunhal e pericial, conforme a natureza das controvérsias identificadas.",
-            (
-                "Na versão final, devem ser especificados e anexados os documentos de cobrança: contrato assinado, comprovante de pagamento parcial, relatório de execução dos serviços, fotografias, mensagens de reconhecimento da dívida, notificação extrajudicial, e-mails e planilha de cálculo atualizada."
-                if is_civel_cobranca
-                else (
-                    "Na versão final, devem ser especificados os documentos já existentes, contratos, comprovantes, comunicações, avaliação do bem, prova testemunhal e eventual perícia contábil ou técnica pertinente ao dano alegado."
-                    if normalized_area == "civel"
-                    else (
-                        "Na versão final, devem ser especificados os documentos já existentes, a necessidade de prova técnica ambiental/acústica, eventual inspeção judicial e o fundamento da tutela de urgência."
-                        if normalized_area == "civil_ambiental"
-                        else "Na versão final, devem ser especificados os documentos já existentes, a prova técnica pertinente e os requerimentos probatórios adequados ao caso."
-                    )
-                )
-            ),
-            (
-                "Também devem ser ajustados os requerimentos acessórios, especialmente valor da causa, memória de cálculo, índice de correção monetária, comprovação de mora e eventual tentativa extrajudicial de composição."
-                if is_civel_cobranca
-                else "Também devem ser ajustados os requerimentos acessórios, a intimação da parte contrária e as providências processuais cabíveis ao rito escolhido."
-            ),
-        ]
-    )
+    if is_civel_cobranca:
+        provas_requerimentos = _paragraphs(
+            [
+                "I. Das provas documentais já informadas.",
+                "Requer-se a juntada e conferência dos documentos que a parte informa possuir, especialmente contrato, comprovantes de pagamento parcial, relatório de execução dos serviços, fotografias, mensagens, notificações extrajudiciais, e-mails, planilhas de cálculo ou outros registros relacionados à cobrança.",
+                "II. Das provas pendentes de juntada ou conferência.",
+                "Devem ser identificados expressamente os documentos ainda pendentes de obtenção, conferência ou validação, inclusive demonstrativos de débito, memória de cálculo, comprovação de mora, comunicações entre as partes e eventual tentativa extrajudicial de composição.",
+                "III. Da exibição de documentos e informações.",
+                "Requer-se, quando cabível, a exibição de documentos, registros, demonstrativos, contratos, comunicações ou informações que estejam em poder da parte contrária ou de terceiros e sejam relevantes para a apuração do crédito, dos pagamentos e do inadimplemento alegado.",
+                "IV. Das diligências e demais meios de prova.",
+                "Requer-se a produção dos meios de prova admitidos em direito, incluindo prova documental suplementar, testemunhal, depoimento pessoal, eventual prova pericial ou diligências necessárias à confirmação da relação contratual, da execução do serviço, dos pagamentos e do saldo discutido.",
+                "V. Da cautela quanto à prova.",
+                "A versão final deve distinguir documentos já existentes, valores comprovados, valores estimados, documentos pendentes e pontos que dependem de confirmação, evitando afirmar como provado aquilo que ainda exige validação documental, contábil, testemunhal ou profissional.",
+            ]
+        )
+    elif normalized_area == "civil_ambiental":
+        provas_requerimentos = _paragraphs(
+            [
+                "I. Das provas documentais já informadas.",
+                "Requer-se a juntada e conferência dos documentos que a parte informa possuir, incluindo fotografias, vídeos, registros de ruído ou impacto, notificações, protocolos, documentos públicos, comunicações, laudos particulares ou outros elementos relacionados à situação ambiental narrada.",
+                "II. Das provas técnicas pendentes.",
+                "Devem ser identificadas as provas técnicas ainda pendentes, como laudo ambiental, medição acústica, inspeção técnica, vistoria, registros oficiais, informações de órgãos públicos ou outros elementos necessários à verificação objetiva dos fatos.",
+                "III. Da exibição de documentos e informações.",
+                "Requer-se, quando cabível, a exibição de documentos, licenças, autorizações, relatórios, medições, protocolos, comunicações, registros administrativos ou informações que estejam em poder da parte contrária, de terceiros ou de órgãos competentes.",
+                "IV. Das diligências e demais meios de prova.",
+                "Requer-se a realização de diligências úteis, incluindo eventual inspeção judicial, perícia, vistoria, consulta a órgãos públicos, prova documental suplementar, testemunhal e demais meios admitidos em direito, conforme a controvérsia e o rito escolhido.",
+                "V. Da cautela quanto à prova.",
+                "A versão final deve distinguir relato inicial, documentos disponíveis, prova técnica pendente e pontos que dependem de validação por profissional habilitado, órgão público, perícia, inspeção ou decisão judicial.",
+            ]
+        )
+    else:
+        provas_requerimentos = _paragraphs(
+            [
+                "I. Das provas documentais já informadas.",
+                "Requer-se a juntada e conferência dos documentos que a parte informa possuir, com indicação objetiva do que cada documento demonstra e de sua relação com os fatos narrados.",
+                "II. Das provas pendentes de juntada ou conferência.",
+                "Devem ser identificados expressamente os documentos, registros, mensagens, recibos, comprovantes, laudos, consultas, declarações ou outros elementos ainda pendentes de obtenção, conferência ou validação.",
+                "III. Da exibição de documentos e informações.",
+                "Requer-se, quando cabível, a exibição de documentos, registros, demonstrativos, contratos, comunicações ou informações que estejam em poder da parte contrária ou de terceiros e sejam relevantes para a apuração dos fatos.",
+                "IV. Das diligências e demais meios de prova.",
+                "Requer-se a realização das diligências úteis e a produção dos meios de prova admitidos em direito, incluindo prova documental suplementar, testemunhal, depoimento pessoal, perícia ou consulta técnica, conforme a natureza da controvérsia.",
+                "V. Da cautela quanto à prova.",
+                "A versão final deve distinguir fatos relatados, documentos efetivamente disponíveis, documentos pendentes e pontos que dependem de confirmação, evitando afirmar como provado aquilo que ainda exige validação documental, testemunhal, técnica ou profissional.",
+            ]
+        )
 
 
 
