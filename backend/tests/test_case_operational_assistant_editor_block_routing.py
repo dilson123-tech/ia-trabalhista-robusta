@@ -739,3 +739,37 @@ Cliente informa 34 parcelas de R$ 1.180,00 via Pix, entrada informada de R$ 15.0
     assert "Entrada informada: R$ 15.000,00" in replacement
     assert "Valor econômico preliminar informado: R$ 55.120,00" in replacement
     assert "comprovantes Pix" in replacement
+
+
+def test_editor_block_pedidos_uses_vehicle_case_context_when_body_is_generic():
+    message = """
+verifique pedidos
+
+Pedidos — draft (assisted_draft)
+Requer-se a procedência dos pedidos, com tutela provisória se cabível, exibição de documentos, produção de provas e condenação da parte ré nas medidas aplicáveis.
+"""
+
+    response = _fallback_response(
+        case=_fake_case(
+            description=(
+                "Cliente relata compra de veículo junto à revendedora, pagamentos via Pix, "
+                "perda do contrato e retomada/recolhimento do veículo sob alegação de suposto bloqueio."
+            )
+        ),
+        message=message,
+        context={},
+        timeline=[],
+    )
+
+    action = response["suggested_actions"][0]
+    destinations = [item["destination"] for item in response["suggested_actions"]]
+    replacement = action["suggested_text"].split("Texto sugerido para substituir:", 1)[1].split("Ação agora:", 1)[0]
+
+    assert destinations == ["editor_minuta"]
+    assert action["label"] == "Revisar bloco: Pedidos"
+    assert "Da exibição do contrato e documentos da negociação" in replacement
+    assert "Da prestação de contas e apuração dos valores pagos" in replacement
+    assert "Do esclarecimento formal do suposto bloqueio" in replacement
+    assert "Da restituição do veículo ou devolução de valores" in replacement
+    assert "linha_do_tempo" not in destinations
+    assert "anexos" not in destinations
