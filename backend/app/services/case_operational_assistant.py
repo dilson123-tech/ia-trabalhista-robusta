@@ -1491,9 +1491,18 @@ def _has_vehicle_editor_context(text: str) -> bool:
     )
 
 
-def _build_pedidos_editor_revision(body: str) -> tuple[str, str]:
+def _build_pedidos_editor_revision(
+    body: str,
+    context: dict[str, Any] | None = None,
+    raw_message: str = "",
+) -> tuple[str, str]:
     original = _clean_editor_block_suggested_text(body, 6000)
-    lowered = original.lower()
+    context_texts = [
+        original,
+        raw_message,
+        *_iter_editor_context_strings(context or {}),
+    ]
+    lowered = " ".join(context_texts).lower()
 
     has_vehicle_context = _has_vehicle_editor_context(lowered)
 
@@ -1792,7 +1801,7 @@ def _build_editor_block_revision(
         )
 
     if lowered_label == "pedidos":
-        return _build_pedidos_editor_revision(body)
+        return _build_pedidos_editor_revision(body, context=context, raw_message=raw_message)
 
     if lowered_label == "fundamentação" or lowered_label == "fundamentacao":
         return _build_fundamentacao_editor_revision(body)
