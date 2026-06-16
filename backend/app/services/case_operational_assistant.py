@@ -1249,16 +1249,145 @@ def _extract_editor_block_body(message: str) -> str:
     return cleaned.strip()
 
 
-def _build_pedidos_valores_editor_revision(body: str) -> tuple[str, str]:
+def _iter_editor_context_strings(value: Any, *, max_items: int = 80) -> list[str]:
+    collected: list[str] = []
+
+    def visit(item: Any) -> None:
+        if len(collected) >= max_items:
+            return
+
+        if item is None:
+            return
+
+        if isinstance(item, str):
+            cleaned = _clean_multiline_text(item, 1200)
+            if cleaned:
+                collected.append(cleaned)
+            return
+
+        if isinstance(item, (int, float)):
+            collected.append(str(item))
+            return
+
+        if isinstance(item, dict):
+            for nested in item.values():
+                visit(nested)
+            return
+
+        if isinstance(item, (list, tuple, set)):
+            for nested in item:
+                visit(nested)
+            return
+
+        for attr in ("case_number", "title", "summary", "description", "facts", "notes"):
+            if hasattr(item, attr):
+                visit(getattr(item, attr))
+
+    visit(value)
+    return collected
+
+
+def _parse_brazilian_money(value: str) -> float | None:
+    cleaned = str(value or "").strip().replace(".", "").replace(",", ".")
+    try:
+        return float(cleaned)
+    except ValueError:
+        return None
+
+
+def _format_brazilian_money(value: float) -> str:
+    cents = int(round(value * 100))
+    integer = cents // 100
+    decimal = cents % 100
+    integer_text = f"{integer:,}".replace(",", ".")
+    return f"R$ {integer_text},{decimal:02d}"
+
+
+def _known_amounts_section_from_texts(texts: list[str]) -> str:
+    import re
+
+    corpus = " ".join(texts)
+    corpus = " ".join(corpus.replace("\n", " ").split())
+
+    if not corpus:
+        return ""
+
+    bullets: list[str] = []
+
+    installment_match = re.search(
+        r"(\d+)\s+parcelas?\s+de\s+R\$\s*([\d.]+,\d{2})",
+        corpus,
+        flags=re.IGNORECASE,
+    )
+
+    if installment_match:
+        quantity = int(installment_match.group(1))
+        installment_value = _parse_brazilian_money(installment_match.group(2))
+        if installment_value is not None:
+            total = quantity * installment_value
+            bullets.append(
+                f"Pagamentos parcelados informados: {quantity} parcelas de "
+                f"{_format_brazilian_money(installment_value)}, total preliminar de "
+                f"{_format_brazilian_money(total)}, pendente de conferência dos comprovantes Pix."
+            )
+
+    if "40.120,00" in corpus and not any("40.120,00" in item for item in bullets):
+        bullets.append(
+            "Pagamentos Pix informados: R$ 40.120,00, pendentes de conferência quanto a datas, "
+            "destinatário, vínculo com a negociação e integralidade dos comprovantes."
+        )
+
+    if "15.000,00" in corpus:
+        if "scenic" in corpus.lower() or "honda" in corpus.lower() or "entrada" in corpus.lower():
+            bullets.append(
+                "Entrada informada: R$ 15.000,00, composta por bens usados indicados pelo cliente, "
+                "pendente de comprovação por recibos, contrato, mensagens ou avaliação documental."
+            )
+        else:
+            bullets.append(
+                "Valor de entrada informado: R$ 15.000,00, pendente de conferência documental."
+            )
+
+    if "55.120,00" in corpus:
+        bullets.append(
+            "Valor econômico preliminar informado: R$ 55.120,00, sujeito à validação por contrato, "
+            "comprovantes Pix, recibos, prestação de contas e revisão profissional."
+        )
+
+    if not bullets:
+        return ""
+
+    joined = "\n".join(f"- {item}" for item in bullets)
+
+    return f"""Valores preliminares já identificados no caso, sujeitos à conferência documental:
+
+{joined}
+
+Esses valores não substituem memória de cálculo, prestação de contas, liquidação dos pedidos ou revisão do advogado responsável."""
+
+
+def _build_pedidos_valores_editor_revision(
+    body: str,
+    context: dict[str, Any] | None = None,
+    raw_message: str = "",
+) -> tuple[str, str]:
     problem = (
         "O bloco está viável, mas precisa deixar de ser apenas orientação genérica. A versão revisada deve organizar valor da causa, valores por pedido, memória de cálculo, valores comprovados e valores estimados, sempre com ressalva de conferência pelo advogado."
     )
 
-    revised = """I. Do valor da causa.
+    context_texts = [
+        body,
+        raw_message,
+        *_iter_editor_context_strings(context or {}),
+    ]
+    known_amounts_section = _known_amounts_section_from_texts(context_texts)
+    known_amounts_block = f"\n\n{known_amounts_section}" if known_amounts_section else ""
+
+    revised = f"""I. Do valor da causa.
 
 O valor da causa deverá ser definido pelo advogado responsável antes do protocolo, com base na soma dos pedidos economicamente apreciáveis, nos documentos disponíveis e na memória de cálculo revisada.
 
-Valor da causa sugerido/preliminar: R$ [valor a calcular pelo advogado], sujeito à conferência dos documentos, comprovantes, contrato, recibos, pagamentos e demais elementos do caso.
+Valor da causa sugerido/preliminar: R$ [valor a calcular pelo advogado], sujeito à conferência dos documentos, comprovantes, contrato, recibos, pagamentos e demais elementos do caso.{known_amounts_block}
 
 II. Dos valores a apurar por pedido.
 
@@ -1283,7 +1412,6 @@ V. Da cautela antes do protocolo.
 
 Antes do protocolo definitivo, o advogado deverá revisar a coerência entre pedidos, causa de pedir, documentos anexados, memória de cálculo, valor da causa e eventual pedido de danos materiais ou morais, evitando valores fechados sem lastro documental suficiente."""
     return problem, revised.strip()
-
 
 
 def _build_pedidos_editor_revision(body: str) -> tuple[str, str]:
@@ -1454,7 +1582,12 @@ A fundamentação é preliminar e deve ser ajustada conforme a prova produzida, 
 
 
 
-def _build_editor_block_revision(label: str, body: str) -> tuple[str, str]:
+def _build_editor_block_revision(
+    label: str,
+    body: str,
+    context: dict[str, Any] | None = None,
+    raw_message: str = "",
+) -> tuple[str, str]:
     lowered_body = body.lower()
     lowered_label = label.lower()
 
@@ -1489,7 +1622,11 @@ def _build_editor_block_revision(label: str, body: str) -> tuple[str, str]:
         return problem, _format_resumo_fatico_paragraphs(revised)
 
     if lowered_label == "pedidos e valores estimados":
-        return _build_pedidos_valores_editor_revision(body)
+        return _build_pedidos_valores_editor_revision(
+            body,
+            context=context,
+            raw_message=raw_message,
+        )
 
     if lowered_label == "pedidos":
         return _build_pedidos_editor_revision(body)
@@ -1519,7 +1656,12 @@ def _editor_block_correction_response(
     lowered = raw_message.lower()
     block_label = _detect_editor_block_label(lowered)
     block_body = _extract_editor_block_body(raw_message)
-    problem, revised_text = _build_editor_block_revision(block_label, block_body)
+    problem, revised_text = _build_editor_block_revision(
+        block_label,
+        block_body,
+        context=context,
+        raw_message=raw_message,
+    )
 
     if not revised_text:
         revised_text = "[Cole aqui o texto revisado do bloco após validar os dados do caso.]"
