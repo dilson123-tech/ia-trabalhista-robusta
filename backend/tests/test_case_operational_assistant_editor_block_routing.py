@@ -366,3 +366,42 @@ Caso ainda não exista memória de cálculo, recomenda-se inserir os valores por
 
     assert "linha_do_tempo" not in destinations
     assert "anexos" not in destinations
+
+def test_editor_block_pedidos_valores_uses_known_case_amounts_from_context():
+    message = """
+verifique o campo pedidos e valores estimados
+
+Pedidos e Valores Estimados — draft (assisted_draft)
+Os pedidos deverão ser acompanhados de indicação de valores estimados ou liquidados antes do protocolo.
+"""
+
+    context = {
+        "case_summary": (
+            "Cliente relata 34 parcelas de R$ 1.180,00 via Pix, total R$ 40.120,00. "
+            "Entrada informada de R$ 15.000,00 com Scenic e Honda. "
+            "Valor econômico preliminar informado: R$ 55.120,00."
+        )
+    }
+
+    response = _fallback_response(
+        case=_fake_case(),
+        message=message,
+        context=context,
+        timeline=[],
+    )
+
+    action = response["suggested_actions"][0]
+    destinations = [item["destination"] for item in response["suggested_actions"]]
+    suggested_text = action["suggested_text"]
+    replacement = suggested_text.split("Texto sugerido para substituir:", 1)[1].split("Ação agora:", 1)[0]
+
+    assert destinations == ["editor_minuta"]
+    assert action["label"] == "Revisar bloco: Pedidos e Valores Estimados"
+    assert "Valores preliminares já identificados no caso" in replacement
+    assert "34 parcelas de R$ 1.180,00" in replacement
+    assert "R$ 40.120,00" in replacement
+    assert "R$ 15.000,00" in replacement
+    assert "R$ 55.120,00" in replacement
+    assert "sujeitos à conferência documental" in replacement
+    assert "linha_do_tempo" not in destinations
+    assert "anexos" not in destinations
