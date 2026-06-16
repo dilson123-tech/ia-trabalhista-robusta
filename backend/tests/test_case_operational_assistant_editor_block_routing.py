@@ -679,3 +679,63 @@ O objetivo é montar o caso para avaliação de advogado.
     assert "O objetivo é montar" not in replacement
     assert "linha_do_tempo" not in destinations
     assert "anexos" not in destinations
+
+
+def test_editor_block_pedidos_valores_uses_generic_amounts_without_pix_or_quintino_values():
+    message = """
+verifique pedidos e valores
+
+Pedidos e Valores Estimados — draft (assisted_draft)
+Cliente relata contrato de prestação de serviços com 12 parcelas de R$ 500,00, entrada de R$ 2.000,00 e valor econômico preliminar de R$ 8.000,00.
+"""
+
+    response = _fallback_response(
+        case=_fake_case(
+            case_number="CONTRATO-SERVICO-VALORES-001",
+            description="Contrato de prestação de serviços com pagamento parcelado e entrada.",
+        ),
+        message=message,
+        context={},
+        timeline=[],
+    )
+
+    action = response["suggested_actions"][0]
+    destinations = [item["destination"] for item in response["suggested_actions"]]
+    replacement = action["suggested_text"].split("Texto sugerido para substituir:", 1)[1].split("Ação agora:", 1)[0]
+
+    assert destinations == ["editor_minuta"]
+    assert action["label"] == "Revisar bloco: Pedidos e Valores Estimados"
+    assert "12 parcelas de R$ 500,00" in replacement
+    assert "total preliminar de R$ 6.000,00" in replacement
+    assert "Entrada informada: R$ 2.000,00" in replacement
+    assert "Valor econômico preliminar informado: R$ 8.000,00" in replacement
+    assert "comprovantes/documentos de pagamento" in replacement
+    assert "comprovantes Pix" not in replacement
+    assert "R$ 40.120,00" not in replacement
+    assert "R$ 15.000,00" not in replacement
+    assert "R$ 55.120,00" not in replacement
+
+
+def test_editor_block_pedidos_valores_keeps_pix_language_when_context_mentions_pix():
+    message = """
+verifique pedidos e valores
+
+Pedidos e Valores Estimados — draft (assisted_draft)
+Cliente informa 34 parcelas de R$ 1.180,00 via Pix, entrada informada de R$ 15.000,00 e valor econômico preliminar de R$ 55.120,00.
+"""
+
+    response = _fallback_response(
+        case=_fake_case(),
+        message=message,
+        context={},
+        timeline=[],
+    )
+
+    action = response["suggested_actions"][0]
+    replacement = action["suggested_text"].split("Texto sugerido para substituir:", 1)[1].split("Ação agora:", 1)[0]
+
+    assert "34 parcelas de R$ 1.180,00" in replacement
+    assert "total preliminar de R$ 40.120,00" in replacement
+    assert "Entrada informada: R$ 15.000,00" in replacement
+    assert "Valor econômico preliminar informado: R$ 55.120,00" in replacement
+    assert "comprovantes Pix" in replacement
