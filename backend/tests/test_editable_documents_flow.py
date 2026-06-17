@@ -436,3 +436,134 @@ def test_trabalhista_insalubridade_assisted_draft_uses_labor_template(monkeypatc
     ]
     for term in forbidden_terms:
         assert term not in combined_text
+
+
+
+def test_new_draft_version_becomes_current_even_when_approved_version_exists(monkeypatch):
+    headers = _auth_headers(monkeypatch)
+
+    create_case_payload = {
+        "case_number": f"EDITOR-DRAFT-CURRENT-{uuid.uuid4().hex[:8]}",
+        "title": "Caso para testar versão draft atual",
+        "description": "Caso de teste para validar fluxo de versões aprovadas e rascunhos editáveis.",
+        "legal_area": "consumidor",
+        "action_type": "Petição Inicial",
+        "status": "draft",
+    }
+
+    r_case = client.post("/api/v1/cases", json=create_case_payload, headers=headers)
+    assert r_case.status_code == 200
+    case_id = r_case.json()["id"]
+
+    create_document_payload = {
+        "case_id": case_id,
+        "area": "consumidor",
+        "document_type": "peticao_inicial",
+        "title": "Petição Inicial — Teste de versão atual",
+        "notes": "Documento criado para regressão de versão atual.",
+        "metadata": {"source": "test_new_draft_current"},
+        "sections": [
+            {
+                "key": "resumo_fatico",
+                "title": "Resumo Fático",
+                "content": "Resumo inicial.",
+                "source": "manual",
+                "status": "draft",
+                "metadata": {},
+            },
+            {
+                "key": "pedidos",
+                "title": "Pedidos",
+                "content": "Pedidos iniciais.",
+                "source": "manual",
+                "status": "draft",
+                "metadata": {},
+            },
+        ],
+    }
+
+    r_doc = client.post("/api/v1/editable-documents", json=create_document_payload, headers=headers)
+    assert r_doc.status_code == 200
+    document_id = r_doc.json()["id"]
+
+    approve_payload = {
+        "approved": True,
+        "notes": "Versão aprovada para exportação.",
+        "metadata": {"source": "test_approval"},
+        "sections": [
+            {
+                "key": "resumo_fatico",
+                "title": "Resumo Fático",
+                "content": "Resumo aprovado.",
+                "source": "manual",
+                "status": "reviewed",
+                "metadata": {},
+            },
+            {
+                "key": "pedidos",
+                "title": "Pedidos",
+                "content": "Pedidos aprovados.",
+                "source": "manual",
+                "status": "reviewed",
+                "metadata": {},
+            },
+        ],
+    }
+
+    r_approved = client.post(
+        f"/api/v1/editable-documents/{document_id}/versions",
+        json=approve_payload,
+        headers=headers,
+    )
+    assert r_approved.status_code == 200
+    assert r_approved.json()["version_number"] == 2
+    assert r_approved.json()["approved"] is True
+
+    draft_payload = {
+        "approved": False,
+        "notes": "Nova versão draft para edição após aprovação.",
+        "metadata": {"source": "test_new_draft_after_approval"},
+        "sections": [
+            {
+                "key": "resumo_fatico",
+                "title": "Resumo Fático",
+                "content": "Resumo editável v3.",
+                "source": "manual",
+                "status": "draft",
+                "metadata": {},
+            },
+            {
+                "key": "pedidos",
+                "title": "Pedidos",
+                "content": "Pedidos editáveis v3.",
+                "source": "manual",
+                "status": "draft",
+                "metadata": {},
+            },
+        ],
+    }
+
+    r_draft = client.post(
+        f"/api/v1/editable-documents/{document_id}/versions",
+        json=draft_payload,
+        headers=headers,
+    )
+    assert r_draft.status_code == 200
+    assert r_draft.json()["version_number"] == 3
+    assert r_draft.json()["approved"] is False
+
+    r_detail = client.get(f"/api/v1/editable-documents/{document_id}", headers=headers)
+    assert r_detail.status_code == 200
+    detail = r_detail.json()
+
+    assert detail["current_version_number"] == 3
+    assert detail["status"] == "draft"
+
+    versions = {item["version_number"]: item for item in detail["versions"]}
+    assert versions[2]["approved"] is True
+    assert versions[3]["approved"] is False
+
+    r_export = client.get(f"/api/v1/editable-documents/{document_id}/export/html", headers=headers)
+    assert r_export.status_code == 200
+    assert "Resumo aprovado." in r_export.text
+    assert "Resumo editável v3." not in r_export.text

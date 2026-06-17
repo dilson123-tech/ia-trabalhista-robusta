@@ -4805,10 +4805,9 @@ def create_editable_document_version(
     if payload.approved:
         document.current_version_number = next_version_number
         document.status = "approved"
-    elif approved_version_number is not None:
-        document.current_version_number = approved_version_number
-        document.status = "approved"
     else:
+        # A new draft/manual version must become the current editable version,
+        # even when an older approved version still exists for export.
         document.current_version_number = next_version_number
         document.status = "draft"
 
