@@ -4383,6 +4383,214 @@ def _build_cause_value_analysis_for_final_verdict(
     }
 
 
+def _final_verdict_text_has_any(text: str, *terms: str) -> bool:
+    return any(_normalize_final_verdict_text(term) in text for term in terms)
+
+
+def _build_fact_proof_request_links_for_final_verdict(
+    *,
+    normalized_full_text: str,
+) -> list[dict]:
+    links: list[dict] = []
+
+    def add_link(
+        *,
+        fact: str,
+        proof: str,
+        request: str,
+        fact_status: str,
+        risk_level: str,
+        risk_if_missing: str,
+    ) -> None:
+        links.append(
+            {
+                "fact": fact,
+                "proof": proof,
+                "request": request,
+                "fact_status": fact_status,
+                "risk_level": risk_level,
+                "risk_if_missing": risk_if_missing,
+            }
+        )
+
+    has_payment_context = _final_verdict_text_has_any(
+        normalized_full_text,
+        "pix",
+        "pagamento",
+        "pagamentos",
+        "valores pagos",
+        "valor pago",
+        "parcela",
+        "parcelas",
+        "comprovantes de pagamento",
+    )
+    if has_payment_context:
+        has_payment_proof = _final_verdict_text_has_any(
+            normalized_full_text,
+            "comprovante de pix",
+            "comprovantes de pix",
+            "comprovante de pagamento",
+            "comprovantes de pagamento",
+            "recibo",
+            "recibos",
+            "extrato bancario",
+            "extrato bancário",
+        )
+        add_link(
+            fact="Pagamento ou valores pagos pela parte",
+            proof=(
+                "Comprovantes de Pix/pagamento, recibos ou extratos bancários."
+                if has_payment_proof
+                else "Comprovantes de Pix/pagamento ainda pendentes de organização ou conferência."
+            ),
+            request="Apuração/restituição dos valores pagos e vinculação de cada pagamento à obrigação discutida.",
+            fact_status="fato_com_prova_minima_indicada" if has_payment_proof else "fato_relatado_com_prova_pendente",
+            risk_level="baixo" if has_payment_proof else "médio",
+            risk_if_missing="Sem comprovantes, o pedido de restituição/apuração de valores fica frágil ou depende de exibição/diligência.",
+        )
+
+    has_retention_context = _final_verdict_text_has_any(
+        normalized_full_text,
+        "retomada",
+        "recolhimento",
+        "retenção",
+        "retencao",
+        "tomou o veiculo",
+        "tomou o veículo",
+        "bloqueio",
+        "restrição",
+        "restricao",
+        "busca e apreensão",
+        "busca e apreensao",
+    )
+    if has_retention_context:
+        has_retention_proof = _final_verdict_text_has_any(
+            normalized_full_text,
+            "documento formal",
+            "consulta oficial",
+            "ordem judicial",
+            "prova documental minima",
+            "prova documental mínima",
+            "fotografia",
+            "fotografias",
+            "video",
+            "vídeo",
+            "boletim de ocorrencia",
+            "boletim de ocorrência",
+        )
+        add_link(
+            fact="Retomada, retenção, bloqueio ou recolhimento do bem",
+            proof=(
+                "Documento formal, consulta oficial, ordem judicial, fotos/vídeos ou BO que demonstrem a medida."
+                if has_retention_proof
+                else "Prova da retirada/retenção, responsável, data, local e justificativa ainda pendente."
+            ),
+            request="Restituição do bem, justificativa formal da medida, tutela de urgência ou providência equivalente.",
+            fact_status="fato_com_prova_minima_indicada" if has_retention_proof else "fato_relatado_com_prova_pendente",
+            risk_level="médio" if has_retention_proof else "alto",
+            risk_if_missing="Sem prova da medida e de seu responsável, pedidos de restituição/tutela podem ficar vulneráveis.",
+        )
+
+    has_contract_context = _final_verdict_text_has_any(
+        normalized_full_text,
+        "contrato",
+        "financiamento",
+        "parcelamento",
+        "nota promiss",
+        "recibo",
+        "demonstrativo",
+        "prestação de contas",
+        "prestacao de contas",
+    )
+    if has_contract_context:
+        has_contract_proof = _final_verdict_text_has_any(
+            normalized_full_text,
+            "contrato assinado",
+            "contrato de prestacao",
+            "contrato de prestação",
+            "instrumento contratual",
+            "nota promissoria",
+            "nota promissória",
+            "recibo",
+            "recibos",
+            "demonstrativo de parcelas",
+        )
+        contract_missing = _final_verdict_text_has_any(
+            normalized_full_text,
+            "contrato perdido",
+            "contrato nao localizado",
+            "contrato não localizado",
+            "contrato ausente",
+            "contrato pendente",
+        )
+        add_link(
+            fact="Relação contratual, financiamento, parcelamento ou obrigação documental",
+            proof=(
+                "Contrato/instrumento, notas promissórias, recibos ou demonstrativos indicados na peça."
+                if has_contract_proof and not contract_missing
+                else "Contrato/instrumentos/documentos da relação jurídica ainda pendentes ou dependentes de exibição."
+            ),
+            request="Exibição de contrato/documentos, prestação de contas, validação da relação jurídica e pedidos materiais correspondentes.",
+            fact_status=(
+                "fato_com_prova_minima_indicada"
+                if has_contract_proof and not contract_missing
+                else "fato_relatado_com_prova_pendente"
+            ),
+            risk_level="baixo" if has_contract_proof and not contract_missing else "médio",
+            risk_if_missing="Sem contrato ou demonstrativo, a extensão da obrigação pode depender de exibição judicial ou prova suplementar.",
+        )
+
+    has_damage_context = _final_verdict_text_has_any(
+        normalized_full_text,
+        "dano",
+        "danos",
+        "prejuizo",
+        "prejuízo",
+        "indenização",
+        "indenizacao",
+        "danos materiais",
+        "danos morais",
+    )
+    if has_damage_context:
+        has_damage_proof = _final_verdict_text_has_any(
+            normalized_full_text,
+            "prova suficiente",
+            "prejuizo concreto",
+            "prejuízo concreto",
+            "nexo causal",
+            "fotografias",
+            "laudo",
+            "orcamento",
+            "orçamento",
+            "nota fiscal",
+        )
+        add_link(
+            fact="Dano, prejuízo material/moral ou consequência econômica alegada",
+            proof=(
+                "Documentos, fotos, laudos, orçamentos, notas ou elementos de nexo causal indicados."
+                if has_damage_proof
+                else "Prova concreta do prejuízo e do nexo causal ainda pendente de conferência."
+            ),
+            request="Indenização ou reparação apenas na extensão demonstrada por prova suficiente.",
+            fact_status="fato_com_prova_minima_indicada" if has_damage_proof else "fato_relatado_com_prova_pendente",
+            risk_level="médio" if has_damage_proof else "alto",
+            risk_if_missing="Sem prova do dano e do nexo causal, pedido indenizatório pode ser excessivo ou frágil.",
+        )
+
+    deduped: list[dict] = []
+    seen: set[str] = set()
+    for link in links:
+        key = "|".join(str(link.get(field, "")) for field in ("fact", "proof", "request")).lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(link)
+        if len(deduped) >= 12:
+            break
+
+    return deduped
+
+
 def _build_editable_document_final_verdict(
     *,
     document_id: int,
@@ -4431,6 +4639,9 @@ def _build_editable_document_final_verdict(
     )
     cause_value_analysis = _build_cause_value_analysis_for_final_verdict(
         raw_export_text=raw_export_text,
+        normalized_full_text=normalized_full_text,
+    )
+    fact_proof_request_links = _build_fact_proof_request_links_for_final_verdict(
         normalized_full_text=normalized_full_text,
     )
 
@@ -4505,6 +4716,17 @@ def _build_editable_document_final_verdict(
             + "."
         )
 
+    if fact_proof_request_links:
+        approved_points.append("Amarração mínima entre fatos, provas e pedidos identificada no Veredito Final.")
+        if any(link.get("fact_status") == "fato_relatado_com_prova_pendente" for link in fact_proof_request_links):
+            non_critical_pending.append(
+                "Há fatos relevantes com prova mínima pendente de conferência antes do protocolo."
+            )
+    else:
+        non_critical_pending.append(
+            "Não foi localizada amarração explícita entre fatos, provas e pedidos na peça exportável."
+        )
+
     if operational_flags:
         critical_pending.append(
             "A peça contém texto operacional/interno que deve ser removido ou reescrito antes de benchmark/protocolo."
@@ -4560,6 +4782,7 @@ def _build_editable_document_final_verdict(
         "placeholders": placeholders,
         "required_data_pending": required_data_pending,
         "cause_value_analysis": cause_value_analysis,
+        "fact_proof_request_links": fact_proof_request_links,
         "operational_text_flags": operational_flags,
         "next_step": next_step,
         "summary": summary,

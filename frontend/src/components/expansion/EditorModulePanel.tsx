@@ -1500,6 +1500,25 @@ export function EditorModulePanel({ token, selectedCaseId, selectedCaseArea, pie
                       </>
                     )}
 
+                    {finalVerdict.fact_proof_request_links.length > 0 && (
+                      <>
+                        <strong>Prova → fato → pedido</strong>
+                        <ul className="info-list">
+                          {finalVerdict.fact_proof_request_links.map((link, index) => (
+                            <li key={`proof-fact-request-${index}`}>
+                              <strong>{link.fact}</strong>
+                              <br />
+                              Prova: {link.proof}
+                              <br />
+                              Pedido: {link.request}
+                              <br />
+                              Risco: {link.risk_level} — {link.risk_if_missing}
+                            </li>
+                          ))}
+                        </ul>
+                      </>
+                    )}
+
                     {finalVerdict.placeholders.length > 0 && (
                       <p>
                         <strong>Placeholders técnicos encontrados:</strong> {finalVerdict.placeholders.slice(0, 8).join(', ')}
