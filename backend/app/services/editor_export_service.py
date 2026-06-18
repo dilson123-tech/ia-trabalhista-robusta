@@ -10,19 +10,8 @@ def _normalize_html_text(value: str | None) -> str:
     return value.strip()
 
 
-# PATCH: hide_internal_sections_from_final_export_v1
+# PATCH: include_final_checklist_in_final_export_v1
 def _include_section_in_final_export(section: Dict) -> bool:
-    # PATCH: hide_protocol_checklist_by_key_v1
-    # Checklist de protocolo é controle interno do escritório, não conteúdo da petição final.
-    section_key = str(section.get("key") or "").strip().lower()
-    section_title = str(section.get("title") or "").strip().lower()
-
-    if section_key == "checklist_final_protocolo":
-        return False
-
-    if "checklist final para protocolo" in section_title:
-        return False
-
     metadata = section.get("metadata") or {}
     if not isinstance(metadata, dict):
         return True
