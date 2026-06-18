@@ -1467,9 +1467,23 @@ export function EditorModulePanel({ token, selectedCaseId, selectedCaseArea, pie
                       </p>
                     )}
 
+                    {finalVerdict.required_data_pending.length > 0 && (
+                      <>
+                        <strong>Dados obrigatórios pendentes</strong>
+                        <p>
+                          A peça ainda não deve ser tratada como pronta para protocolo enquanto estes dados não forem conferidos.
+                        </p>
+                        <ul className="info-list">
+                          {finalVerdict.required_data_pending.map((item, index) => (
+                            <li key={`required-data-${index}`}>{item}</li>
+                          ))}
+                        </ul>
+                      </>
+                    )}
+
                     {finalVerdict.placeholders.length > 0 && (
                       <p>
-                        <strong>Placeholders encontrados:</strong> {finalVerdict.placeholders.slice(0, 8).join(', ')}
+                        <strong>Placeholders técnicos encontrados:</strong> {finalVerdict.placeholders.slice(0, 8).join(', ')}
                       </p>
                     )}
 

@@ -4210,6 +4210,77 @@ def _unique_final_verdict_items(items: list[str], *, limit: int = 30) -> list[st
     return result
 
 
+def _build_required_data_pending_for_final_verdict(
+    *,
+    placeholders: list[str],
+    normalized_full_text: str,
+) -> list[str]:
+    searchable_text = _normalize_final_verdict_text(
+        f"{normalized_full_text} {' '.join(placeholders)}"
+    )
+
+    field_markers = [
+        ("Comarca/foro competente", ("comarca a definir", "[comarca", "foro a definir")),
+        (
+            "Nome da parte autora",
+            (
+                "nome da parte autora",
+                "parte autora a complementar",
+                "autor a complementar",
+                "reclamante a complementar",
+            ),
+        ),
+        ("CPF da parte autora", ("cpf a complementar", "[cpf")),
+        ("RG/documento da parte autora", ("rg a complementar", "[rg")),
+        (
+            "Endereço completo da parte",
+            (
+                "endereco completo",
+                "endereço completo",
+                "endereco a complementar",
+                "endereço a complementar",
+            ),
+        ),
+        (
+            "Parte ré",
+            (
+                "nome da parte re",
+                "nome da parte ré",
+                "parte re a complementar",
+                "parte ré a complementar",
+                "reclamada a complementar",
+            ),
+        ),
+        ("CNPJ da parte ré", ("cnpj a complementar", "[cnpj")),
+        (
+            "Local e data de assinatura",
+            (
+                "local], [data",
+                "[local]",
+                "[data]",
+                "local de assinatura",
+                "data de assinatura",
+            ),
+        ),
+    ]
+
+    pending: list[str] = []
+    for field_name, markers in field_markers:
+        if any(_normalize_final_verdict_text(marker) in searchable_text for marker in markers):
+            pending.append(field_name)
+
+    if "valor da causa" not in searchable_text or "valor a ser definido" in searchable_text:
+        pending.append("Valor da causa")
+
+    if "advogado responsavel" not in searchable_text or "nome do advogado" in searchable_text:
+        pending.append("Advogado responsável")
+
+    if "oab" not in searchable_text or "oab/[uf]" in searchable_text:
+        pending.append("OAB/UF do advogado")
+
+    return _unique_final_verdict_items(pending, limit=20)
+
+
 def _build_editable_document_final_verdict(
     *,
     document_id: int,
@@ -4252,6 +4323,10 @@ def _build_editable_document_final_verdict(
         phrase for phrase in placeholder_phrases if phrase in normalized_full_text
     )
     placeholders = _unique_final_verdict_items(placeholder_candidates, limit=40)
+    required_data_pending = _build_required_data_pending_for_final_verdict(
+        placeholders=placeholders,
+        normalized_full_text=normalized_full_text,
+    )
 
     operational_markers = [
         "objetivo e montar o caso",
@@ -4317,6 +4392,13 @@ def _build_editable_document_final_verdict(
             "A peça ainda contém placeholders ou dados pendentes de preenchimento, como comarca, qualificação, valor da causa, assinatura ou documentos."
         )
 
+    if required_data_pending:
+        critical_pending.append(
+            "Dados obrigatórios pendentes para protocolo: "
+            + ", ".join(required_data_pending)
+            + "."
+        )
+
     if operational_flags:
         critical_pending.append(
             "A peça contém texto operacional/interno que deve ser removido ou reescrito antes de benchmark/protocolo."
@@ -4368,6 +4450,7 @@ def _build_editable_document_final_verdict(
         "non_critical_pending": _unique_final_verdict_items(non_critical_pending, limit=20),
         "missing_blocks": _unique_final_verdict_items(missing_blocks, limit=20),
         "placeholders": placeholders,
+        "required_data_pending": required_data_pending,
         "operational_text_flags": operational_flags,
         "next_step": next_step,
         "summary": summary,

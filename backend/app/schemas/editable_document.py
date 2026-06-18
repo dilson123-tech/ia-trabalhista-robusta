@@ -80,6 +80,7 @@ class EditableDocumentFinalVerdictOut(BaseModel):
     non_critical_pending: list[str] = Field(default_factory=list)
     missing_blocks: list[str] = Field(default_factory=list)
     placeholders: list[str] = Field(default_factory=list)
+    required_data_pending: list[str] = Field(default_factory=list)
     operational_text_flags: list[str] = Field(default_factory=list)
     next_step: str
     summary: str
