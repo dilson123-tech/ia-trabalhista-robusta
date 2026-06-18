@@ -26,6 +26,11 @@ def test_final_verdict_flags_placeholders_missing_blocks_and_operational_text():
     assert result["risk_level"] == "médio"
     assert "Checklist Final" in result["missing_blocks"]
     assert result["placeholders"]
+    assert "Comarca/foro competente" in result["required_data_pending"]
+    assert "CPF da parte autora" in result["required_data_pending"]
+    assert "Valor da causa" in result["required_data_pending"]
+    assert "Advogado responsável" in result["required_data_pending"]
+    assert "OAB/UF do advogado" in result["required_data_pending"]
     assert result["operational_text_flags"]
     assert result["critical_pending"]
 
@@ -54,3 +59,4 @@ def test_final_verdict_approves_clean_complete_export_text():
     assert result["final_decision"] == "APROVADO COMO BENCHMARK"
     assert result["critical_pending"] == []
     assert result["missing_blocks"] == []
+    assert result["required_data_pending"] == []

@@ -511,6 +511,7 @@ export type EditableDocumentFinalVerdict = {
   non_critical_pending: string[]
   missing_blocks: string[]
   placeholders: string[]
+  required_data_pending: string[]
   operational_text_flags: string[]
   next_step: string
   summary: string
