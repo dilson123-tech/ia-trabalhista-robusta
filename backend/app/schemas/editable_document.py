@@ -81,6 +81,7 @@ class EditableDocumentFinalVerdictOut(BaseModel):
     missing_blocks: list[str] = Field(default_factory=list)
     placeholders: list[str] = Field(default_factory=list)
     required_data_pending: list[str] = Field(default_factory=list)
+    cause_value_analysis: dict = Field(default_factory=dict)
     operational_text_flags: list[str] = Field(default_factory=list)
     next_step: str
     summary: str

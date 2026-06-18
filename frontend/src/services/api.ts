@@ -512,6 +512,15 @@ export type EditableDocumentFinalVerdict = {
   missing_blocks: string[]
   placeholders: string[]
   required_data_pending: string[]
+  cause_value_analysis: {
+    status: string
+    label: string
+    has_value: boolean
+    has_minimum_calculation: boolean
+    amount_candidates: string[]
+    pending_items: string[]
+    summary: string
+  }
   operational_text_flags: string[]
   next_step: string
   summary: string
