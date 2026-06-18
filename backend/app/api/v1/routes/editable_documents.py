@@ -4014,8 +4014,8 @@ def _build_assisted_sections(
                 "origin_sources": ["case", "calculation", "strategy", "protocol_readiness"],
                 "generation_mode": "assisted_draft_from_analysis",
                 "guardrail_status": "requires_professional_review",
-                "export_visibility": "internal",
-                "include_in_final_pdf": False,
+                "export_visibility": "final",
+                "include_in_final_pdf": True,
             },
         },
     ]

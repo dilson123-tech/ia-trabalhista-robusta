@@ -567,3 +567,152 @@ def test_new_draft_version_becomes_current_even_when_approved_version_exists(mon
     assert r_export.status_code == 200
     assert "Resumo aprovado." in r_export.text
     assert "Resumo editável v3." not in r_export.text
+
+
+def test_final_verdict_accepts_exported_protocol_checklist(monkeypatch):
+    headers = _auth_headers(monkeypatch)
+
+    create_case_payload = {
+        "case_number": f"EDOC-CHECKLIST-{uuid.uuid4().hex[:8]}",
+        "title": "Caso com checklist final exportável",
+        "description": "Validação de Checklist Final presente na exportação e no veredito.",
+        "legal_area": "consumidor",
+        "action_type": "Petição Inicial",
+        "status": "draft",
+    }
+
+    r_case = client.post("/api/v1/cases", json=create_case_payload, headers=headers)
+    assert r_case.status_code == 200
+    case_id = r_case.json()["id"]
+
+    create_document_payload = {
+        "case_id": case_id,
+        "area": "consumidor",
+        "document_type": "peticao_inicial",
+        "title": "Petição com checklist final",
+        "notes": "Documento base para regressão do Checklist Final exportável.",
+        "metadata": {"source": "test_final_verdict_accepts_exported_protocol_checklist"},
+        "sections": [
+            {
+                "key": "resumo_fatico",
+                "title": "Resumo Fático",
+                "content": "Resumo inicial do caso.",
+                "source": "manual",
+                "status": "draft",
+                "metadata": {},
+            },
+        ],
+    }
+
+    r_create_doc = client.post(
+        "/api/v1/editable-documents",
+        json=create_document_payload,
+        headers=headers,
+    )
+    assert r_create_doc.status_code == 200
+    document_id = r_create_doc.json()["id"]
+
+    approved_payload = {
+        "approved": True,
+        "notes": "Versão aprovada com Checklist Final exportável.",
+        "metadata": {"source": "test_v0190_checklist_final_exported"},
+        "sections": [
+            {
+                "key": "enderecamento",
+                "title": "Endereçamento",
+                "content": "Excelentíssimo Juízo competente da Comarca de Joinville/SC.",
+                "source": "manual",
+                "status": "reviewed",
+                "metadata": {},
+            },
+            {
+                "key": "qualificacao_partes",
+                "title": "Qualificação das Partes",
+                "content": "Parte autora e parte ré qualificadas conforme dados do caso.",
+                "source": "manual",
+                "status": "reviewed",
+                "metadata": {},
+            },
+            {
+                "key": "resumo_fatico",
+                "title": "Resumo Fático",
+                "content": "A parte autora relata pagamento e posterior inadimplemento contratual.",
+                "source": "manual",
+                "status": "reviewed",
+                "metadata": {},
+            },
+            {
+                "key": "fundamentacao",
+                "title": "Fundamentação",
+                "content": "Aplicam-se os princípios da boa-fé objetiva e da reparação integral.",
+                "source": "manual",
+                "status": "reviewed",
+                "metadata": {},
+            },
+            {
+                "key": "pedidos",
+                "title": "Pedidos",
+                "content": "Requer a procedência dos pedidos formulados na peça.",
+                "source": "manual",
+                "status": "reviewed",
+                "metadata": {},
+            },
+            {
+                "key": "pedidos_valores_estimados",
+                "title": "Pedidos e Valores Estimados",
+                "content": "Valor da causa estimado em R$ 10.000,00, sujeito à validação do advogado.",
+                "source": "manual",
+                "status": "reviewed",
+                "metadata": {},
+            },
+            {
+                "key": "provas_requerimentos",
+                "title": "Provas e Requerimentos",
+                "content": "Requer produção de prova documental suplementar e demais provas admitidas.",
+                "source": "manual",
+                "status": "reviewed",
+                "metadata": {},
+            },
+            {
+                "key": "fechamento",
+                "title": "Fechamento",
+                "content": "Termos em que, pede deferimento. Joinville/SC, 17 de junho de 2026.",
+                "source": "manual",
+                "status": "reviewed",
+                "metadata": {},
+            },
+            {
+                "key": "checklist_final_protocolo",
+                "title": "Checklist Final para Protocolo",
+                "content": "Checklist Final: dados essenciais conferidos, anexos revisados e peça liberada para avaliação profissional.",
+                "source": "manual",
+                "status": "reviewed",
+                "metadata": {
+                    "export_visibility": "final",
+                    "include_in_final_pdf": True,
+                },
+            },
+        ],
+    }
+
+    r_version = client.post(
+        f"/api/v1/editable-documents/{document_id}/versions",
+        json=approved_payload,
+        headers=headers,
+    )
+    assert r_version.status_code == 200
+    assert r_version.json()["approved"] is True
+
+    r_export = client.get(f"/api/v1/editable-documents/{document_id}/export/html", headers=headers)
+    assert r_export.status_code == 200
+    assert "Checklist Final para Protocolo" in r_export.text
+    assert "dados essenciais conferidos" in r_export.text
+
+    r_verdict = client.get(
+        f"/api/v1/editable-documents/{document_id}/final-verdict",
+        headers=headers,
+    )
+    assert r_verdict.status_code == 200
+    verdict = r_verdict.json()
+
+    assert "Checklist Final" not in verdict["missing_blocks"]
