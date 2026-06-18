@@ -521,6 +521,14 @@ export type EditableDocumentFinalVerdict = {
     pending_items: string[]
     summary: string
   }
+  fact_proof_request_links: {
+    fact: string
+    proof: string
+    request: string
+    fact_status: string
+    risk_level: string
+    risk_if_missing: string
+  }[]
   operational_text_flags: string[]
   next_step: string
   summary: string

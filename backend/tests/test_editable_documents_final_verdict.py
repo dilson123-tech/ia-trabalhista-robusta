@@ -48,10 +48,13 @@ def test_final_verdict_approves_clean_complete_export_text():
         ENDEREÇAMENTO
         QUALIFICAÇÃO DAS PARTES
         RESUMO FÁTICO
+        A parte autora realizou pagamento por Pix, com comprovantes de Pix vinculados aos valores pagos.
         FUNDAMENTAÇÃO
         PEDIDOS
+        Requer a restituição dos valores pagos conforme a prova documental apresentada.
         PEDIDOS E VALORES ESTIMADOS
         PROVAS E REQUERIMENTOS
+        Comprovantes de Pix e comprovantes de pagamento serão conferidos por data, valor e destinatário.
         FECHAMENTO
         CHECKLIST FINAL
         Valor da causa: R$ 10.000,00.
@@ -67,6 +70,7 @@ def test_final_verdict_approves_clean_complete_export_text():
     assert result["cause_value_analysis"]["status"] in {"informado", "estimado", "calculado"}
     assert result["cause_value_analysis"]["has_value"] is True
     assert result["cause_value_analysis"]["has_minimum_calculation"] is True
+    assert result["fact_proof_request_links"]
 
 
 
@@ -96,3 +100,44 @@ def test_final_verdict_flags_value_without_minimum_calculation_as_non_critical_p
     assert result["cause_value_analysis"]["has_minimum_calculation"] is False
     assert "Valor da causa informado sem memória mínima de cálculo ou justificativa técnica explícita." in result["non_critical_pending"]
     assert result["final_decision"] == "APROVADO APENAS PARA ADVOGADO AVALIAR"
+
+
+
+def test_final_verdict_builds_fact_proof_request_links_for_common_consumer_case():
+    result = _build_editable_document_final_verdict(
+        document_id=428,
+        title="Retomada de veículo",
+        version_number=21,
+        sections=[],
+        export_text="""
+        ENDEREÇAMENTO
+        QUALIFICAÇÃO DAS PARTES
+        RESUMO FÁTICO
+        A parte autora relata pagamento por Pix das parcelas do veículo, com comprovantes de Pix e comprovantes de pagamento.
+        Também relata retomada do veículo pela revendedora, com fotos, vídeo e boletim de ocorrência.
+        O contrato não localizado deverá ser exibido pela parte ré.
+        FUNDAMENTAÇÃO
+        PEDIDOS
+        Requer restituição dos valores pagos, exibição do contrato e tutela de urgência para restituição do bem.
+        PEDIDOS E VALORES ESTIMADOS
+        Valor da causa: R$ 10.000,00.
+        Memória mínima de cálculo: valores pagos por Pix estimados em R$ 10.000,00, sujeitos à conferência documental.
+        PROVAS E REQUERIMENTOS
+        Comprovantes de Pix, fotos, vídeo, boletim de ocorrência e pedido de exibição de contrato.
+        FECHAMENTO
+        CHECKLIST FINAL
+        Advogado responsável: Nome Exemplo. OAB/SC 00000.
+        """,
+    )
+
+    links = result["fact_proof_request_links"]
+
+    assert any("Pagamento" in link["fact"] for link in links)
+    assert any("Retomada" in link["fact"] for link in links)
+    assert any("Relação contratual" in link["fact"] for link in links)
+    assert any("restituição" in link["request"].lower() for link in links)
+    assert any("Exibição" in link["request"] or "exibição" in link["request"] for link in links)
+    assert result["final_decision"] in {
+        "APROVADO COMO BENCHMARK",
+        "APROVADO APENAS PARA ADVOGADO AVALIAR",
+    }
