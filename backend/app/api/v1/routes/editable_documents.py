@@ -4281,6 +4281,108 @@ def _build_required_data_pending_for_final_verdict(
     return _unique_final_verdict_items(pending, limit=20)
 
 
+def _extract_brl_amounts_for_final_verdict(value: str) -> list[str]:
+    amounts = re.findall(
+        r"R\$\s*(?:\d{1,3}(?:\.\d{3})*|\d+),\d{2}",
+        str(value or ""),
+        flags=re.I,
+    )
+    return _unique_final_verdict_items(amounts, limit=10)
+
+
+def _build_cause_value_analysis_for_final_verdict(
+    *,
+    raw_export_text: str,
+    normalized_full_text: str,
+) -> dict:
+    amount_candidates = _extract_brl_amounts_for_final_verdict(raw_export_text)
+
+    has_cause_value_reference = (
+        "valor da causa" in normalized_full_text
+        or "da-se a causa" in normalized_full_text
+        or "dá-se à causa" in normalized_full_text
+    )
+    has_pending_marker = any(
+        marker in normalized_full_text
+        for marker in (
+            "valor a ser definido",
+            "valor da causa devera ser definido",
+            "valor da causa deverá ser definido",
+            "[valor",
+        )
+    )
+
+    calculation_markers = (
+        "memoria preliminar de calculo",
+        "memória preliminar de cálculo",
+        "memoria de calculo",
+        "memória de cálculo",
+        "base informada/identificada",
+        "diferencas estimadas",
+        "diferenças estimadas",
+        "saldo principal inadimplido",
+        "valor principal inadimplido corresponde",
+        "pedidos economicamente quantificados",
+        "planilha de calculo",
+        "planilha de cálculo",
+    )
+    has_minimum_calculation = any(marker in normalized_full_text for marker in calculation_markers)
+
+    if not has_cause_value_reference or has_pending_marker or not amount_candidates:
+        status = "pendente"
+        label = "Valor da causa pendente"
+    elif any(
+        marker in normalized_full_text
+        for marker in (
+            "valor estimado da causa",
+            "valor provisorio",
+            "valor provisório",
+            "valor inicial",
+            "valor da causa estimado",
+        )
+    ):
+        status = "estimado"
+        label = "Valor da causa estimado"
+    elif has_minimum_calculation and any(
+        marker in normalized_full_text
+        for marker in (
+            "calculo preliminar",
+            "cálculo preliminar",
+            "diferencas estimadas",
+            "diferenças estimadas",
+            "valor principal inadimplido corresponde",
+        )
+    ):
+        status = "calculado"
+        label = "Valor da causa calculado/preliminar"
+    else:
+        status = "informado"
+        label = "Valor da causa informado"
+
+    pending_items: list[str] = []
+    if status == "pendente":
+        pending_items.append("Definir valor da causa antes do protocolo.")
+    if status != "pendente" and not has_minimum_calculation:
+        pending_items.append("Incluir memória mínima de cálculo ou justificativa técnica do valor da causa.")
+
+    if status == "pendente":
+        summary = "Valor da causa não foi identificado de forma protocolável na peça exportável."
+    elif has_minimum_calculation:
+        summary = f"{label} com memória mínima ou justificativa técnica localizada."
+    else:
+        summary = f"{label}, mas sem memória mínima de cálculo localizada."
+
+    return {
+        "status": status,
+        "label": label,
+        "has_value": status != "pendente",
+        "has_minimum_calculation": has_minimum_calculation,
+        "amount_candidates": amount_candidates,
+        "pending_items": _unique_final_verdict_items(pending_items, limit=10),
+        "summary": summary,
+    }
+
+
 def _build_editable_document_final_verdict(
     *,
     document_id: int,
@@ -4325,6 +4427,10 @@ def _build_editable_document_final_verdict(
     placeholders = _unique_final_verdict_items(placeholder_candidates, limit=40)
     required_data_pending = _build_required_data_pending_for_final_verdict(
         placeholders=placeholders,
+        normalized_full_text=normalized_full_text,
+    )
+    cause_value_analysis = _build_cause_value_analysis_for_final_verdict(
+        raw_export_text=raw_export_text,
         normalized_full_text=normalized_full_text,
     )
 
@@ -4404,10 +4510,12 @@ def _build_editable_document_final_verdict(
             "A peça contém texto operacional/interno que deve ser removido ou reescrito antes de benchmark/protocolo."
         )
 
-    if "valor da causa" not in normalized_full_text:
-        non_critical_pending.append("Não foi localizada conferência explícita do valor da causa.")
-    elif "valor a ser definido" in normalized_full_text:
-        critical_pending.append("Valor da causa ainda está indefinido.")
+    if cause_value_analysis.get("status") == "pendente":
+        critical_pending.append("Valor da causa ainda está pendente ou indefinido.")
+    elif not cause_value_analysis.get("has_minimum_calculation"):
+        non_critical_pending.append(
+            "Valor da causa informado sem memória mínima de cálculo ou justificativa técnica explícita."
+        )
 
     if "advogado" not in normalized_full_text or "oab" not in normalized_full_text:
         non_critical_pending.append("Conferir identificação do advogado responsável e OAB/UF antes do envio externo.")
@@ -4451,6 +4559,7 @@ def _build_editable_document_final_verdict(
         "missing_blocks": _unique_final_verdict_items(missing_blocks, limit=20),
         "placeholders": placeholders,
         "required_data_pending": required_data_pending,
+        "cause_value_analysis": cause_value_analysis,
         "operational_text_flags": operational_flags,
         "next_step": next_step,
         "summary": summary,

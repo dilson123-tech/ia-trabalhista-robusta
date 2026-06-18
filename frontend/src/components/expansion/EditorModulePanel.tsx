@@ -1481,6 +1481,25 @@ export function EditorModulePanel({ token, selectedCaseId, selectedCaseArea, pie
                       </>
                     )}
 
+                    {finalVerdict.cause_value_analysis && (
+                      <>
+                        <strong>Valor da causa e memória mínima</strong>
+                        <p>{finalVerdict.cause_value_analysis.summary}</p>
+                        {finalVerdict.cause_value_analysis.amount_candidates.length > 0 && (
+                          <p>
+                            <strong>Valores localizados:</strong> {finalVerdict.cause_value_analysis.amount_candidates.join(', ')}
+                          </p>
+                        )}
+                        {finalVerdict.cause_value_analysis.pending_items.length > 0 && (
+                          <ul className="info-list">
+                            {finalVerdict.cause_value_analysis.pending_items.map((item, index) => (
+                              <li key={`cause-value-${index}`}>{item}</li>
+                            ))}
+                          </ul>
+                        )}
+                      </>
+                    )}
+
                     {finalVerdict.placeholders.length > 0 && (
                       <p>
                         <strong>Placeholders técnicos encontrados:</strong> {finalVerdict.placeholders.slice(0, 8).join(', ')}
