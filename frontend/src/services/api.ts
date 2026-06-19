@@ -539,6 +539,13 @@ export type EditableDocumentFinalVerdict = {
     release_checklist: string[]
     summary: string
   }
+  preliminary_draft_analysis: {
+    is_preliminary_draft: boolean
+    formal_pending_items: string[]
+    party_pending_items: string[]
+    summary: string
+    next_step: string
+  }
   operational_text_flags: string[]
   next_step: string
   summary: string

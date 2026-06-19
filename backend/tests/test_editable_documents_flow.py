@@ -716,3 +716,18 @@ def test_final_verdict_accepts_exported_protocol_checklist(monkeypatch):
     verdict = r_verdict.json()
 
     assert "Checklist Final" not in verdict["missing_blocks"]
+
+
+
+def test_assisted_draft_does_not_export_internal_final_status_as_request_direction():
+    from app.api.v1.routes.editable_documents import _paragraphs
+
+    generated = _paragraphs(
+        [
+            "V. A definição final dos pedidos deverá observar a narrativa validada, a prova disponível, a extensão dos danos, o rito aplicável e a estratégia revisada pelo advogado responsável."
+        ]
+    )
+
+    assert "diretriz para fechamento dos pedidos" not in generated
+    assert "MODERADA" not in generated
+    assert "A definição final dos pedidos deverá observar" in generated

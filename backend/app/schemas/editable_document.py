@@ -84,6 +84,7 @@ class EditableDocumentFinalVerdictOut(BaseModel):
     cause_value_analysis: dict = Field(default_factory=dict)
     fact_proof_request_links: list[dict] = Field(default_factory=list)
     benchmark_analysis: dict = Field(default_factory=dict)
+    preliminary_draft_analysis: dict = Field(default_factory=dict)
     operational_text_flags: list[str] = Field(default_factory=list)
     next_step: str
     summary: str
