@@ -1439,6 +1439,30 @@ export function EditorModulePanel({ token, selectedCaseId, selectedCaseArea, pie
                     </p>
                     <p>{finalVerdict.summary}</p>
 
+                    {finalVerdict.benchmark_analysis && (
+                      <>
+                        <strong>Modo Benchmark Final</strong>
+                        <p>
+                          {finalVerdict.benchmark_analysis.label} · Score {finalVerdict.benchmark_analysis.score}/100
+                        </p>
+                        <p>{finalVerdict.benchmark_analysis.summary}</p>
+                        {finalVerdict.benchmark_analysis.blocking_reasons.length > 0 && (
+                          <ul className="info-list">
+                            {finalVerdict.benchmark_analysis.blocking_reasons.map((item, index) => (
+                              <li key={`benchmark-block-${index}`}>{item}</li>
+                            ))}
+                          </ul>
+                        )}
+                        {finalVerdict.benchmark_analysis.caution_points.length > 0 && (
+                          <ul className="info-list">
+                            {finalVerdict.benchmark_analysis.caution_points.map((item, index) => (
+                              <li key={`benchmark-caution-${index}`}>{item}</li>
+                            ))}
+                          </ul>
+                        )}
+                      </>
+                    )}
+
                     {finalVerdict.critical_pending.length > 0 && (
                       <>
                         <strong>Pendências críticas</strong>

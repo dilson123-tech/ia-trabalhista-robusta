@@ -36,6 +36,9 @@ def test_final_verdict_flags_placeholders_missing_blocks_and_operational_text():
     assert "OAB/UF do advogado" in result["required_data_pending"]
     assert result["operational_text_flags"]
     assert result["critical_pending"]
+    assert result["benchmark_analysis"]["benchmark_ready"] is False
+    assert result["benchmark_analysis"]["status"] == "bloqueado_para_benchmark"
+    assert result["benchmark_analysis"]["blocking_reasons"]
 
 
 def test_final_verdict_approves_clean_complete_export_text():
@@ -71,6 +74,11 @@ def test_final_verdict_approves_clean_complete_export_text():
     assert result["cause_value_analysis"]["has_value"] is True
     assert result["cause_value_analysis"]["has_minimum_calculation"] is True
     assert result["fact_proof_request_links"]
+    assert result["benchmark_analysis"]["benchmark_ready"] is True
+    assert result["benchmark_analysis"]["status"] == "pronto_para_benchmark"
+    assert result["benchmark_analysis"]["score"] == 100
+    assert result["benchmark_analysis"]["blocking_reasons"] == []
+    assert result["benchmark_analysis"]["caution_points"] == []
 
 
 
@@ -100,6 +108,9 @@ def test_final_verdict_flags_value_without_minimum_calculation_as_non_critical_p
     assert result["cause_value_analysis"]["has_minimum_calculation"] is False
     assert "Valor da causa informado sem memória mínima de cálculo ou justificativa técnica explícita." in result["non_critical_pending"]
     assert result["final_decision"] == "APROVADO APENAS PARA ADVOGADO AVALIAR"
+    assert result["benchmark_analysis"]["benchmark_ready"] is False
+    assert result["benchmark_analysis"]["status"] == "quase_pronto_com_ressalvas"
+    assert result["benchmark_analysis"]["caution_points"]
 
 
 

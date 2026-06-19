@@ -4591,6 +4591,84 @@ def _build_fact_proof_request_links_for_final_verdict(
     return deduped
 
 
+def _build_benchmark_analysis_for_final_verdict(
+    *,
+    critical_pending: list[str],
+    non_critical_pending: list[str],
+    missing_blocks: list[str],
+    required_data_pending: list[str],
+    cause_value_analysis: dict,
+    fact_proof_request_links: list[dict],
+    operational_flags: list[str],
+) -> dict:
+    blocking_reasons: list[str] = []
+    caution_points: list[str] = []
+
+    if critical_pending:
+        blocking_reasons.append("Zerar pendências críticas antes de marcar como benchmark final.")
+    if missing_blocks:
+        blocking_reasons.append("Completar todos os blocos esperados da peça exportável.")
+    if required_data_pending:
+        blocking_reasons.append("Preencher dados obrigatórios de protocolo.")
+    if operational_flags:
+        blocking_reasons.append("Remover textos operacionais/internos da peça final.")
+
+    cause_status = str(cause_value_analysis.get("status") or "").strip()
+    if cause_status == "pendente":
+        blocking_reasons.append("Definir valor da causa de forma protocolável.")
+    elif cause_value_analysis and not cause_value_analysis.get("has_minimum_calculation"):
+        caution_points.append("Valor da causa precisa de memória mínima de cálculo ou justificativa técnica.")
+
+    if not fact_proof_request_links:
+        caution_points.append("Amarração prova → fato → pedido não foi localizada.")
+    elif any(link.get("fact_status") == "fato_relatado_com_prova_pendente" for link in fact_proof_request_links):
+        caution_points.append("Há fatos relevantes com prova mínima pendente de conferência.")
+
+    caution_points.extend(non_critical_pending[:5])
+
+    blocking_reasons = _unique_final_verdict_items(blocking_reasons, limit=12)
+    caution_points = _unique_final_verdict_items(caution_points, limit=12)
+
+    score = 100
+    score -= min(70, len(blocking_reasons) * 25)
+    score -= min(40, len(caution_points) * 10)
+    score = max(0, min(100, score))
+
+    benchmark_ready = not blocking_reasons and not caution_points
+    if benchmark_ready:
+        status = "pronto_para_benchmark"
+        label = "Pronto para benchmark final"
+        summary = "Peça sem bloqueios ou ressalvas relevantes para benchmark interno."
+    elif blocking_reasons:
+        status = "bloqueado_para_benchmark"
+        label = "Bloqueado para benchmark final"
+        summary = "Peça ainda possui bloqueios que impedem benchmark final."
+    else:
+        status = "quase_pronto_com_ressalvas"
+        label = "Quase pronto, com ressalvas"
+        summary = "Peça sem bloqueios críticos, mas ainda com ressalvas antes do benchmark final."
+
+    release_checklist = [
+        "Blocos essenciais e blocos de apoio conferidos.",
+        "Dados obrigatórios de protocolo conferidos.",
+        "Valor da causa e memória mínima conferidos.",
+        "Amarração prova → fato → pedido revisada.",
+        "Textos operacionais/internos removidos.",
+        "Revisão profissional final realizada antes de qualquer protocolo real.",
+    ]
+
+    return {
+        "benchmark_ready": benchmark_ready,
+        "status": status,
+        "label": label,
+        "score": score,
+        "blocking_reasons": blocking_reasons,
+        "caution_points": caution_points,
+        "release_checklist": release_checklist,
+        "summary": summary,
+    }
+
+
 def _build_editable_document_final_verdict(
     *,
     document_id: int,
@@ -4765,6 +4843,15 @@ def _build_editable_document_final_verdict(
         f"Veredito final da versão aprovada v{version_number}: {final_decision}. "
         f"Pendências críticas: {len(critical_pending)}. Pendências não críticas: {len(non_critical_pending)}."
     )
+    benchmark_analysis = _build_benchmark_analysis_for_final_verdict(
+        critical_pending=critical_pending,
+        non_critical_pending=non_critical_pending,
+        missing_blocks=missing_blocks,
+        required_data_pending=required_data_pending,
+        cause_value_analysis=cause_value_analysis,
+        fact_proof_request_links=fact_proof_request_links,
+        operational_flags=operational_flags,
+    )
 
     return {
         "document_id": document_id,
@@ -4783,6 +4870,7 @@ def _build_editable_document_final_verdict(
         "required_data_pending": required_data_pending,
         "cause_value_analysis": cause_value_analysis,
         "fact_proof_request_links": fact_proof_request_links,
+        "benchmark_analysis": benchmark_analysis,
         "operational_text_flags": operational_flags,
         "next_step": next_step,
         "summary": summary,

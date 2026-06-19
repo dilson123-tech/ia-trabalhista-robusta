@@ -529,6 +529,16 @@ export type EditableDocumentFinalVerdict = {
     risk_level: string
     risk_if_missing: string
   }[]
+  benchmark_analysis: {
+    benchmark_ready: boolean
+    status: string
+    label: string
+    score: number
+    blocking_reasons: string[]
+    caution_points: string[]
+    release_checklist: string[]
+    summary: string
+  }
   operational_text_flags: string[]
   next_step: string
   summary: string
