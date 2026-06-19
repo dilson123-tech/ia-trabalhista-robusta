@@ -2828,7 +2828,7 @@ def _build_assisted_sections(
                 "V. Requer-se a condenação da parte ré ao pagamento das custas processuais e honorários advocatícios, nos termos da legislação processual aplicável."
                 if is_civel_cobranca
                 else (
-                    f"V. O enquadramento provisório da análise indica a seguinte diretriz para fechamento dos pedidos: {final_status}."
+                    "V. A definição final dos pedidos deverá observar a narrativa validada, a prova disponível, a extensão dos danos, o rito aplicável e a estratégia revisada pelo advogado responsável."
                     if final_status and "dados insuficientes" not in final_status.lower()
                     else ""
                 )
@@ -4591,6 +4591,60 @@ def _build_fact_proof_request_links_for_final_verdict(
     return deduped
 
 
+def _build_preliminary_draft_analysis_for_final_verdict(
+    *,
+    required_data_pending: list[str],
+) -> dict:
+    formal_items = [
+        item
+        for item in required_data_pending
+        if item
+        in {
+            "Comarca/foro competente",
+            "Local e data de assinatura",
+            "Advogado responsável",
+            "OAB/UF do advogado",
+        }
+    ]
+
+    party_items = [
+        item
+        for item in required_data_pending
+        if item
+        in {
+            "Nome da parte autora",
+            "CPF da parte autora",
+            "RG/documento da parte autora",
+            "Endereço completo da parte",
+            "Parte ré",
+            "CNPJ da parte ré",
+        }
+    ]
+
+    is_preliminary = bool(formal_items or party_items)
+    if is_preliminary:
+        summary = (
+            "Minuta preliminar apta à avaliação profissional, com dados formais pendentes. "
+            "Essas pendências são esperadas quando ainda não há advogado responsável, comarca, OAB, local/data "
+            "ou qualificação completa informados no cadastro, mas impedem protocolo e benchmark final."
+        )
+        next_step = (
+            "Encaminhar para advogado revisar, preencher dados formais, conferir qualificação das partes "
+            "e decidir se a minuta pode avançar para versão protocolável."
+        )
+    else:
+        summary = "Não foram identificadas pendências formais típicas de minuta preliminar."
+        next_step = "Manter revisão profissional final antes de qualquer uso externo."
+
+    return {
+        "is_preliminary_draft": is_preliminary,
+        "formal_pending_items": formal_items,
+        "party_pending_items": party_items,
+        "summary": summary,
+        "next_step": next_step,
+    }
+
+
 def _build_benchmark_analysis_for_final_verdict(
     *,
     critical_pending: list[str],
@@ -4852,6 +4906,9 @@ def _build_editable_document_final_verdict(
         fact_proof_request_links=fact_proof_request_links,
         operational_flags=operational_flags,
     )
+    preliminary_draft_analysis = _build_preliminary_draft_analysis_for_final_verdict(
+        required_data_pending=required_data_pending,
+    )
 
     return {
         "document_id": document_id,
@@ -4871,6 +4928,7 @@ def _build_editable_document_final_verdict(
         "cause_value_analysis": cause_value_analysis,
         "fact_proof_request_links": fact_proof_request_links,
         "benchmark_analysis": benchmark_analysis,
+        "preliminary_draft_analysis": preliminary_draft_analysis,
         "operational_text_flags": operational_flags,
         "next_step": next_step,
         "summary": summary,

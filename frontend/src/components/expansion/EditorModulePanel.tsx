@@ -1491,6 +1491,16 @@ export function EditorModulePanel({ token, selectedCaseId, selectedCaseArea, pie
                       </p>
                     )}
 
+                    {finalVerdict.preliminary_draft_analysis?.is_preliminary_draft && (
+                      <>
+                        <strong>Minuta preliminar</strong>
+                        <p>{finalVerdict.preliminary_draft_analysis.summary}</p>
+                        <p>
+                          <strong>Próximo passo:</strong> {finalVerdict.preliminary_draft_analysis.next_step}
+                        </p>
+                      </>
+                    )}
+
                     {finalVerdict.required_data_pending.length > 0 && (
                       <>
                         <strong>Dados obrigatórios pendentes</strong>

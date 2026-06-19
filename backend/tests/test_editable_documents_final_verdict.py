@@ -39,6 +39,9 @@ def test_final_verdict_flags_placeholders_missing_blocks_and_operational_text():
     assert result["benchmark_analysis"]["benchmark_ready"] is False
     assert result["benchmark_analysis"]["status"] == "bloqueado_para_benchmark"
     assert result["benchmark_analysis"]["blocking_reasons"]
+    assert result["preliminary_draft_analysis"]["is_preliminary_draft"] is True
+    assert "Comarca/foro competente" in result["preliminary_draft_analysis"]["formal_pending_items"]
+    assert "Advogado responsável" in result["preliminary_draft_analysis"]["formal_pending_items"]
 
 
 def test_final_verdict_approves_clean_complete_export_text():
@@ -79,6 +82,7 @@ def test_final_verdict_approves_clean_complete_export_text():
     assert result["benchmark_analysis"]["score"] == 100
     assert result["benchmark_analysis"]["blocking_reasons"] == []
     assert result["benchmark_analysis"]["caution_points"] == []
+    assert result["preliminary_draft_analysis"]["is_preliminary_draft"] is False
 
 
 
@@ -152,3 +156,43 @@ def test_final_verdict_builds_fact_proof_request_links_for_common_consumer_case(
         "APROVADO COMO BENCHMARK",
         "APROVADO APENAS PARA ADVOGADO AVALIAR",
     }
+
+
+
+def test_final_verdict_explains_formal_pending_as_preliminary_draft():
+    result = _build_editable_document_final_verdict(
+        document_id=428,
+        title="Minuta preliminar para avaliação",
+        version_number=23,
+        sections=[],
+        export_text="""
+        ENDEREÇAMENTO
+        EXCELENTÍSSIMO(A) SENHOR(A) DOUTOR(A) DE [COMARCA A DEFINIR PELO ADVOGADO].
+        QUALIFICAÇÃO DAS PARTES
+        [NOME COMPLETO DA PARTE AUTORA], CPF nº [CPF a complementar].
+        RESUMO FÁTICO
+        Pagamento por Pix com comprovantes de pagamento.
+        FUNDAMENTAÇÃO
+        PEDIDOS
+        Requer restituição dos valores pagos.
+        PEDIDOS E VALORES ESTIMADOS
+        Valor da causa: R$ [valor a ser definido pelo advogado].
+        PROVAS E REQUERIMENTOS
+        Comprovantes de pagamento por Pix.
+        FECHAMENTO
+        Dá-se à causa o valor de R$ [valor a ser definido pelo advogado].
+        [Local], [data].
+        [Nome do advogado] — OAB/[UF] [número].
+        CHECKLIST FINAL
+        """,
+    )
+
+    analysis = result["preliminary_draft_analysis"]
+
+    assert result["final_decision"] == "APROVADO APENAS PARA ADVOGADO AVALIAR"
+    assert analysis["is_preliminary_draft"] is True
+    assert "Comarca/foro competente" in analysis["formal_pending_items"]
+    assert "Advogado responsável" in analysis["formal_pending_items"]
+    assert "OAB/UF do advogado" in analysis["formal_pending_items"]
+    assert "CPF da parte autora" in analysis["party_pending_items"]
+    assert "impedem protocolo e benchmark final" in analysis["summary"]
