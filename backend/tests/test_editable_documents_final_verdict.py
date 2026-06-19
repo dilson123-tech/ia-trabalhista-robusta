@@ -196,3 +196,90 @@ def test_final_verdict_explains_formal_pending_as_preliminary_draft():
     assert "OAB/UF do advogado" in analysis["formal_pending_items"]
     assert "CPF da parte autora" in analysis["party_pending_items"]
     assert "impedem protocolo e benchmark final" in analysis["summary"]
+
+
+
+def test_final_verdict_uses_sanitized_export_for_legacy_operational_request_direction():
+    from app.api.v1.routes.editable_documents import (
+        _build_editable_document_final_verdict,
+        _strip_html_for_final_verdict,
+    )
+    from app.services.editor_export_service import build_editor_html
+
+    html = build_editor_html(
+        {
+            "title": "Minuta preliminar genérica",
+            "area": "consumidor",
+            "document_type": "peticao_inicial",
+        },
+        {
+            "version_number": 7,
+            "sections": [
+                {
+                    "title": "Endereçamento",
+                    "content": "EXCELENTÍSSIMO(A) SENHOR(A) DE [COMARCA A DEFINIR PELO ADVOGADO].",
+                    "metadata": {"export_visibility": "final", "include_in_final_pdf": True},
+                },
+                {
+                    "title": "Qualificação das Partes",
+                    "content": "[NOME COMPLETO DA PARTE AUTORA], CPF nº [CPF a complementar].",
+                    "metadata": {"export_visibility": "final", "include_in_final_pdf": True},
+                },
+                {
+                    "title": "Resumo Fático",
+                    "content": "A parte autora relata pagamento por Pix e retenção indevida de bem.",
+                    "metadata": {"export_visibility": "final", "include_in_final_pdf": True},
+                },
+                {
+                    "title": "Fundamentação",
+                    "content": "Fundamentação preliminar sujeita à revisão profissional.",
+                    "metadata": {"export_visibility": "final", "include_in_final_pdf": True},
+                },
+                {
+                    "title": "Pedidos",
+                    "content": (
+                        "Requer exibição de documentos e apuração dos valores pagos. "
+                        "V. O enquadramento provisório da análise indica a seguinte diretriz "
+                        "para fechamento dos pedidos: MODERADA. "
+                        "VI. Antes do protocolo definitivo, o advogado deverá revisar a aderência."
+                    ),
+                    "metadata": {"export_visibility": "final", "include_in_final_pdf": True},
+                },
+                {
+                    "title": "Pedidos e Valores Estimados",
+                    "content": "Valor da causa: R$ [valor a ser definido pelo advogado].",
+                    "metadata": {"export_visibility": "final", "include_in_final_pdf": True},
+                },
+                {
+                    "title": "Provas e Requerimentos",
+                    "content": "Comprovantes de pagamento por Pix e documentos pendentes.",
+                    "metadata": {"export_visibility": "final", "include_in_final_pdf": True},
+                },
+                {
+                    "title": "Fechamento",
+                    "content": "[Local], [data]. [Nome do advogado] — OAB/[UF] [número].",
+                    "metadata": {"export_visibility": "final", "include_in_final_pdf": True},
+                },
+                {
+                    "title": "Checklist Final para Protocolo",
+                    "content": "Conferir dados formais e revisão profissional.",
+                    "metadata": {"export_visibility": "final", "include_in_final_pdf": True},
+                },
+            ],
+        },
+    )
+
+    export_text = _strip_html_for_final_verdict(html)
+    result = _build_editable_document_final_verdict(
+        document_id=999,
+        title="Minuta preliminar genérica",
+        version_number=7,
+        sections=[],
+        export_text=export_text,
+    )
+
+    assert "diretriz para fechamento dos pedidos" not in export_text.lower()
+    assert "fechamento dos pedidos: moderada" not in export_text.lower()
+    assert "A definição final dos pedidos deverá observar" in export_text
+    assert result["preliminary_draft_analysis"]["is_preliminary_draft"] is True
+    assert result["benchmark_analysis"]["benchmark_ready"] is False

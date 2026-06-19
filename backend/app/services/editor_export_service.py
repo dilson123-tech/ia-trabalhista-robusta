@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from html import escape
+import re
 from typing import Dict, List
 
 
@@ -30,6 +31,31 @@ def _include_section_in_final_export(section: Dict) -> bool:
     return True
 
 
+
+# PATCH: sanitize_legacy_operational_export_text_v1
+def _sanitize_legacy_operational_export_text(value: str | None) -> str:
+    if not value:
+        return ""
+
+    sanitized = str(value)
+
+    replacements = [
+        (
+            r'(?:<p>\s*)?V\.\s*O\s+enquadramento\s+provis[oó]rio\s+da\s+an[aá]lise\s+indica\s+a\s+seguinte\s+diretriz\s+para\s+fechamento\s+dos\s+pedidos\s*:\s*[^.<\n]+\.?(?:\s*</p>)?',
+            "V. A definição final dos pedidos deverá observar a narrativa validada, a prova disponível, a extensão dos danos, o rito aplicável e a estratégia revisada pelo advogado responsável.",
+        ),
+    ]
+
+    for pattern, replacement in replacements:
+        sanitized = re.sub(
+            pattern,
+            replacement,
+            sanitized,
+            flags=re.IGNORECASE | re.UNICODE,
+        )
+
+    return sanitized
+
 def build_editor_html(document: dict, version: dict) -> str:
     title = escape(document.get("title", "Documento Jurídico"))
     area = escape(document.get("area", "Jurídico"))
@@ -42,7 +68,9 @@ def build_editor_html(document: dict, version: dict) -> str:
 
     for index, section in enumerate(export_sections, start=1):
         section_title = escape(section.get("title", f"Seção {index}"))
-        content = _normalize_html_text(section.get("content", ""))
+        content = _normalize_html_text(
+            _sanitize_legacy_operational_export_text(section.get("content", ""))
+        )
 
         html_sections.append(
             f"""
