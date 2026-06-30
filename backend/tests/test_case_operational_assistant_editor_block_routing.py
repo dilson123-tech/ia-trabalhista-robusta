@@ -811,3 +811,52 @@ Pendências e conferências obrigatórias:
     assert "[Cole aqui o texto revisado" not in replacement
     assert "linha_do_tempo" not in destinations
     assert "anexos" not in destinations
+
+
+def test_editor_block_pure_text_request_returns_only_rewritten_input():
+    message = """
+Reescreva somente o bloco Resumo Fático deste caso em formato de texto pronto para minuta preliminar.
+
+Entregue apenas o texto final pronto para copiar e colar no bloco Resumo Fático do Editor/minuta.
+
+Não traga checklist, linha do tempo, anexos, testemunhas, análise, próximos passos, alertas ou explicações.
+
+Não invente dados. Use linguagem prudente, como “o Autor relata”, “segundo informado”, “a confirmar”, “até o momento” e “sujeito à conferência documental”.
+
+Quando faltar informação, escreva “a confirmar”.
+
+Comece direto pelo texto do bloco.
+"""
+
+    response = _fallback_response(
+        case=_fake_case(
+            description=(
+                "Autor relata aquisição de veículo junto à revendedora Quintino Automóveis, "
+                "entrega de Renault Scenic 2004 e Honda CBX 300 como entrada, "
+                "pagamento de 34 parcelas via Pix de R$ 1.180,00, perda da via física do contrato "
+                "e retomada/recolhimento do veículo sob alegação de bloqueio sem apresentação de documentos."
+            )
+        ),
+        message=message,
+        context={},
+        timeline=[],
+    )
+
+    output = _joined_response_text(response)
+
+    assert response["assistant_mode"] == "editor_block_pure_text"
+    assert response["metadata"]["source"] == "case_operational_assistant_editor_block_pure_text_v1"
+    assert response["rewritten_input"]
+    assert response["suggested_actions"] == []
+    assert response["next_steps"] == []
+    assert response["warnings"] == []
+    assert response["disclaimer"] == ""
+
+    assert "O Autor" in response["rewritten_input"] or "Autor" in response["rewritten_input"]
+    assert "Linha do Tempo" not in output
+    assert "Checklist" not in output
+    assert "Anexos" not in output
+    assert "Testemunhas" not in output
+    assert "Próximos passos" not in output
+    assert "Alertas" not in output
+    assert "Sugestões de aplicação" not in output

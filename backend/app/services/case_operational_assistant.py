@@ -1039,6 +1039,46 @@ def _detect_editor_block_label(lowered: str) -> str:
     return "Bloco editável"
 
 
+
+def _is_editor_block_pure_text_message(lowered: str) -> bool:
+    text = f" {lowered.strip()} "
+    if not text.strip():
+        return False
+
+    block_intent_markers = (
+        "reescreva somente o bloco",
+        "reescrever somente o bloco",
+        "somente o bloco",
+        "texto final pronto",
+        "pronto para copiar e colar",
+        "comece direto pelo texto do bloco",
+        "entregue apenas o texto final",
+        "não traga checklist",
+        "nao traga checklist",
+        "não traga linha do tempo",
+        "nao traga linha do tempo",
+        "não traga anexos",
+        "nao traga anexos",
+        "não traga alertas",
+        "nao traga alertas",
+    )
+
+    editor_block_markers = (
+        "resumo fático",
+        "resumo fatico",
+        "fundamentação",
+        "fundamentacao",
+        "pedidos",
+        "endereçamento",
+        "enderecamento",
+        "provas e requerimentos",
+        "checklist final",
+        "fechamento",
+        "[nome do bloco]",
+    )
+
+    return any(marker in text for marker in block_intent_markers) and any(marker in text for marker in editor_block_markers)
+
 def _is_editor_block_correction_message(lowered: str) -> bool:
     text = f" {lowered.strip()} "
     if not text.strip():
@@ -1883,6 +1923,8 @@ def _editor_block_correction_response(
     message: str,
     context: dict[str, Any],
     timeline: list[dict[str, Any]],
+    *,
+    pure_text_only: bool = False,
 ) -> dict[str, Any]:
     raw_message = str(message or "")
     lowered = raw_message.lower()
@@ -1907,6 +1949,25 @@ def _editor_block_correction_response(
 
     if not revised_text:
         revised_text = "[Cole aqui o texto revisado do bloco após validar os dados do caso.]"
+
+    if pure_text_only:
+        return {
+            "case_id": case.id,
+            "assistant_mode": "editor_block_pure_text",
+            "summary": f"Texto pronto para colar no bloco {block_label}.",
+            "rewritten_input": _clean_editor_block_suggested_text(revised_text, 6000),
+            "suggested_actions": [],
+            "next_steps": [],
+            "warnings": [],
+            "disclaimer": "",
+            "metadata": {
+                "source": "case_operational_assistant_editor_block_pure_text_v1",
+                "provider": "fallback",
+                "case_number": _clean_text(getattr(case, "case_number", "")),
+                "timeline_items_considered": len(timeline),
+                "block_label": block_label,
+            },
+        }
 
     suggested_text = _clean_editor_block_suggested_text(
         f"""Veredito: viável, com ajuste no bloco editável.
@@ -2220,12 +2281,13 @@ def _fallback_response(case: Case, message: str, context: dict[str, Any], timeli
     text = _clean_text(message, 2500)
     lowered = text.lower()
 
-    if _is_editor_block_correction_message(lowered):
+    if _is_editor_block_pure_text_message(lowered) or _is_editor_block_correction_message(lowered):
         return _editor_block_correction_response(
             case=case,
             message=message,
             context=context,
             timeline=timeline,
+            pure_text_only=_is_editor_block_pure_text_message(lowered),
         )
 
     if _is_review_validation_message(lowered):
@@ -2597,6 +2659,9 @@ def build_case_operational_assistant_response(
     context = _build_case_operational_context(db=db, case=case, current_user=current_user)
     timeline = _load_timeline_items(db=db, case=case, current_user=current_user)
     fallback = _fallback_response(case=case, message=cleaned_message, context=context, timeline=timeline)
+
+    if _is_editor_block_pure_text_message(cleaned_message.lower()):
+        return fallback
 
     try:
         raw = request_structured_analysis(_build_prompt(case=case, message=cleaned_message, context=context, timeline=timeline))
