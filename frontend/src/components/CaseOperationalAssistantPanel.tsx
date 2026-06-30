@@ -6,7 +6,9 @@ import {
   type CaseOperationalAssistantSuggestion,
 } from '../services/api'
 
-const STANDARD_OPERATIONAL_ANALYSIS_PROMPT = `Analise este caso de forma operacional para preparação de minuta preliminar para advogado avaliar. Não invente dados. Separe a resposta em:
+const STANDARD_OPERATIONAL_ANALYSIS_PROMPT = `Analise este caso de forma operacional para preparação de minuta preliminar para advogado avaliar. Não invente dados.
+
+Separe a resposta em:
 
 1. Resumo do caso
 2. Fatos confirmados
@@ -21,6 +23,49 @@ const STANDARD_OPERATIONAL_ANALYSIS_PROMPT = `Analise este caso de forma operaci
 11. Pedidos possíveis
 12. Pendências antes de qualquer protocolo
 13. Próximo passo recomendado dentro do sistema
+
+Depois da análise, gere também um bloco chamado:
+
+RESUMO OPERACIONAL PARA O ADVOGADO
+
+Nesse resumo, escreva de forma clara:
+- qual é o problema principal;
+- qual é a tese inicial possível;
+- quais provas já existem;
+- quais provas faltam;
+- quais riscos impedem protocolo imediato;
+- o que o advogado deve revisar antes de transformar em peça.
+
+Depois gere outro bloco chamado:
+
+CAMPOS PRONTOS PARA PREENCHER OS MÓDULOS
+
+Comece pela Linha do Tempo. Para cada item, use exatamente este formato:
+
+Data/período:
+Título do fato:
+Descrição do fato:
+Prova relacionada:
+Testemunha/depoente relacionado:
+Pendência/observação:
+Ordem:
+
+Depois gere o Checklist de provas neste formato:
+
+Documento/prova:
+Finalidade:
+Status sugerido:
+Observação:
+
+Depois gere Testemunhas/depoentes neste formato:
+
+Nome:
+Contato:
+Relação com o caso:
+O que pode confirmar:
+Pendência:
+
+Não invente datas, nomes, placas, RENAVAM, contrato, valores não informados ou testemunhas. Quando faltar informação, escreva “a confirmar”.
 
 Considere que a peça ainda não será protocolada e que todos os dados formais, comarca, valor da causa, pedidos finais e estratégia devem ser confirmados por advogado.`
 
@@ -448,7 +493,7 @@ ${initialDescription}`,
             <div>
               <strong>Prompt padrão para análise operacional</strong>
               <p style={{ margin: '4px 0 0 0', color: 'var(--muted-text)' }}>
-                Use quando quiser que a IA organize qualquer caso em fatos, provas, riscos, pedidos e próximos passos.
+                Use para receber análise, resumo operacional para o advogado e campos prontos para preencher os módulos.
               </p>
             </div>
 
