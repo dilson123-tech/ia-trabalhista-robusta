@@ -69,6 +69,21 @@ Não invente datas, nomes, placas, RENAVAM, contrato, valores não informados ou
 
 Considere que a peça ainda não será protocolada e que todos os dados formais, comarca, valor da causa, pedidos finais e estratégia devem ser confirmados por advogado.`
 
+const BLOCK_READY_MINUTA_PROMPT = `Reescreva somente o bloco [NOME DO BLOCO] deste caso em formato de texto pronto para minuta preliminar.
+
+Entregue apenas o texto final pronto para copiar e colar no bloco [NOME DO BLOCO] do Editor/minuta.
+
+Não traga checklist, linha do tempo, anexos, testemunhas, análise, próximos passos, alertas ou explicações.
+
+Não invente dados. Use linguagem prudente, como “o Autor relata”, “segundo informado”, “a confirmar”, “até o momento” e “sujeito à conferência documental”.
+
+Quando faltar informação, escreva “a confirmar”.
+
+Antes de gerar, considere os dados já existentes no caso em foco e mantenha coerência com os fatos, provas disponíveis, pendências e revisão obrigatória do advogado.
+
+Comece direto pelo texto do bloco.`
+
+
 type CaseOperationalAssistantPanelProps = {
   token: string
   caseId: number | null
@@ -318,6 +333,7 @@ export function CaseOperationalAssistantPanel({ token, caseId, caseLabel, onDest
   const [error, setError] = useState('')
   const [response, setResponse] = useState<CaseOperationalAssistantResponse | null>(null)
   const [standardPromptCopied, setStandardPromptCopied] = useState(false)
+  const [blockReadyPromptCopied, setBlockReadyPromptCopied] = useState(false)
 
   async function handleCopyStandardPrompt() {
     try {
@@ -333,6 +349,24 @@ export function CaseOperationalAssistantPanel({ token, caseId, caseLabel, onDest
 
   function handleUseStandardPrompt() {
     setMessage(STANDARD_OPERATIONAL_ANALYSIS_PROMPT)
+    setResponse(null)
+    setError('')
+  }
+
+  async function handleCopyBlockReadyPrompt() {
+    try {
+      await navigator.clipboard.writeText(BLOCK_READY_MINUTA_PROMPT)
+      setBlockReadyPromptCopied(true)
+      window.setTimeout(() => setBlockReadyPromptCopied(false), 2200)
+    } catch {
+      setMessage(BLOCK_READY_MINUTA_PROMPT)
+      setBlockReadyPromptCopied(true)
+      window.setTimeout(() => setBlockReadyPromptCopied(false), 2200)
+    }
+  }
+
+  function handleUseBlockReadyPrompt() {
+    setMessage(BLOCK_READY_MINUTA_PROMPT)
     setResponse(null)
     setError('')
   }
@@ -533,6 +567,62 @@ ${initialDescription}`,
             }}
           >
             {STANDARD_OPERATIONAL_ANALYSIS_PROMPT}
+          </pre>
+        </div>
+
+        <div
+          style={{
+            border: '1px solid rgba(59,130,246,0.24)',
+            borderRadius: '16px',
+            margin: '12px 0',
+            padding: '12px',
+            background: 'rgba(37,99,235,0.08)',
+          }}
+        >
+          <div style={{ alignItems: 'center', display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'space-between' }}>
+            <div>
+              <strong>Prompt para bloco pronto da minuta</strong>
+              <p style={{ margin: '4px 0 0 0', color: 'var(--muted-text)' }}>
+                Use para pedir somente o texto final de um bloco, como Resumo Fático, Fundamentação ou Pedidos.
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  void handleCopyBlockReadyPrompt()
+                }}
+                className="case-card__action case-card__action--summary"
+                style={{ padding: '9px 12px' }}
+              >
+                {blockReadyPromptCopied ? 'Prompt copiado' : 'Copiar prompt'}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleUseBlockReadyPrompt}
+                className="case-card__action case-card__action--analysis"
+                style={{ padding: '9px 12px' }}
+              >
+                Usar no campo
+              </button>
+            </div>
+          </div>
+
+          <pre
+            style={{
+              margin: '10px 0 0 0',
+              maxHeight: '135px',
+              overflow: 'auto',
+              whiteSpace: 'pre-wrap',
+              fontFamily: 'inherit',
+              fontSize: '0.88rem',
+              lineHeight: 1.45,
+              color: 'var(--muted-text)',
+            }}
+          >
+            {BLOCK_READY_MINUTA_PROMPT}
           </pre>
         </div>
 
