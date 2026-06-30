@@ -6,6 +6,24 @@ import {
   type CaseOperationalAssistantSuggestion,
 } from '../services/api'
 
+const STANDARD_OPERATIONAL_ANALYSIS_PROMPT = `Analise este caso de forma operacional para preparação de minuta preliminar para advogado avaliar. Não invente dados. Separe a resposta em:
+
+1. Resumo do caso
+2. Fatos confirmados
+3. Fatos apenas relatados
+4. Provas existentes
+5. Provas pendentes
+6. Documentos que devo pedir ao cliente
+7. Linha do tempo mínima
+8. Testemunhas/depoentes a confirmar
+9. Pontos de risco
+10. Teses possíveis
+11. Pedidos possíveis
+12. Pendências antes de qualquer protocolo
+13. Próximo passo recomendado dentro do sistema
+
+Considere que a peça ainda não será protocolada e que todos os dados formais, comarca, valor da causa, pedidos finais e estratégia devem ser confirmados por advogado.`
+
 type CaseOperationalAssistantPanelProps = {
   token: string
   caseId: number | null
@@ -254,6 +272,25 @@ export function CaseOperationalAssistantPanel({ token, caseId, caseLabel, onDest
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [response, setResponse] = useState<CaseOperationalAssistantResponse | null>(null)
+  const [standardPromptCopied, setStandardPromptCopied] = useState(false)
+
+  async function handleCopyStandardPrompt() {
+    try {
+      await navigator.clipboard.writeText(STANDARD_OPERATIONAL_ANALYSIS_PROMPT)
+      setStandardPromptCopied(true)
+      window.setTimeout(() => setStandardPromptCopied(false), 2200)
+    } catch {
+      setMessage(STANDARD_OPERATIONAL_ANALYSIS_PROMPT)
+      setStandardPromptCopied(true)
+      window.setTimeout(() => setStandardPromptCopied(false), 2200)
+    }
+  }
+
+  function handleUseStandardPrompt() {
+    setMessage(STANDARD_OPERATIONAL_ANALYSIS_PROMPT)
+    setResponse(null)
+    setError('')
+  }
 
   async function handleAskAssistant() {
     const cleanedMessage = message.trim()
@@ -397,6 +434,62 @@ ${initialDescription}`,
         <p style={{ margin: '0 0 10px 0', color: 'var(--muted-text)' }}>
           <strong>Contexto:</strong> {caseLabel || 'Modo montagem inicial: descreva o caso e eu te ajudo a organizar antes de cadastrar.'}
         </p>
+
+        <div
+          style={{
+            border: '1px solid rgba(250,204,21,0.22)',
+            borderRadius: '16px',
+            margin: '12px 0',
+            padding: '12px',
+            background: 'rgba(250,204,21,0.08)',
+          }}
+        >
+          <div style={{ alignItems: 'center', display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'space-between' }}>
+            <div>
+              <strong>Prompt padrão para análise operacional</strong>
+              <p style={{ margin: '4px 0 0 0', color: 'var(--muted-text)' }}>
+                Use quando quiser que a IA organize qualquer caso em fatos, provas, riscos, pedidos e próximos passos.
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  void handleCopyStandardPrompt()
+                }}
+                className="case-card__action case-card__action--summary"
+                style={{ padding: '9px 12px' }}
+              >
+                {standardPromptCopied ? 'Prompt copiado' : 'Copiar prompt'}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleUseStandardPrompt}
+                className="case-card__action case-card__action--analysis"
+                style={{ padding: '9px 12px' }}
+              >
+                Usar no campo
+              </button>
+            </div>
+          </div>
+
+          <pre
+            style={{
+              margin: '10px 0 0 0',
+              maxHeight: '155px',
+              overflow: 'auto',
+              whiteSpace: 'pre-wrap',
+              fontFamily: 'inherit',
+              fontSize: '0.88rem',
+              lineHeight: 1.45,
+              color: 'var(--muted-text)',
+            }}
+          >
+            {STANDARD_OPERATIONAL_ANALYSIS_PROMPT}
+          </pre>
+        </div>
 
         <textarea
           value={message}
