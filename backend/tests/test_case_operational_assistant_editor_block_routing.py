@@ -852,7 +852,15 @@ Comece direto pelo texto do bloco.
     assert response["warnings"] == []
     assert response["disclaimer"] == ""
 
-    assert "O Autor" in response["rewritten_input"] or "Autor" in response["rewritten_input"]
+    rewritten = response["rewritten_input"]
+
+    assert "Autor" in rewritten
+    assert "Quintino Automóveis" in rewritten
+    assert "34 parcelas" in rewritten or "R$ 1.180,00" in rewritten
+    assert "Reescreva somente o bloco" not in rewritten
+    assert "Entregue apenas o texto final" not in rewritten
+    assert "Não traga checklist" not in rewritten
+    assert "Comece direto pelo texto do bloco" not in rewritten
     assert "Linha do Tempo" not in output
     assert "Checklist" not in output
     assert "Anexos" not in output
