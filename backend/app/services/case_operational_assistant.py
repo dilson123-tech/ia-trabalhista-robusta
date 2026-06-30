@@ -1918,6 +1918,50 @@ def _build_editor_block_revision(
     )
 
 
+def _looks_like_editor_block_prompt_text(text: str) -> bool:
+    lowered = str(text or "").lower()
+    if not lowered.strip():
+        return False
+
+    prompt_markers = (
+        "reescreva somente o bloco",
+        "entregue apenas o texto final",
+        "texto final pronto para copiar e colar",
+        "não traga checklist",
+        "nao traga checklist",
+        "não traga linha do tempo",
+        "nao traga linha do tempo",
+        "não invente dados",
+        "nao invente dados",
+        "quando faltar informação",
+        "quando faltar informacao",
+        "comece direto pelo texto do bloco",
+    )
+
+    return sum(1 for marker in prompt_markers if marker in lowered) >= 2
+
+
+def _select_editor_block_source_body(
+    *,
+    case: Case,
+    extracted_body: str,
+    raw_message: str,
+) -> str:
+    candidate = _clean_text(extracted_body, 6000)
+    if candidate and not _looks_like_editor_block_prompt_text(candidate):
+        return candidate
+
+    description = _clean_text(getattr(case, "description", ""), 6000)
+    if description:
+        return description
+
+    title = _clean_text(getattr(case, "title", ""), 1000)
+    if title:
+        return title
+
+    return candidate or _clean_text(raw_message, 6000)
+
+
 def _editor_block_correction_response(
     case: Case,
     message: str,
@@ -1930,6 +1974,12 @@ def _editor_block_correction_response(
     lowered = raw_message.lower()
     block_label = _detect_editor_block_label(lowered)
     block_body = _extract_editor_block_body(raw_message)
+    if pure_text_only:
+        block_body = _select_editor_block_source_body(
+            case=case,
+            extracted_body=block_body,
+            raw_message=raw_message,
+        )
     editor_context = {
         **(context or {}),
         "case_context": {
