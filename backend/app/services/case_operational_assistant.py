@@ -1079,6 +1079,45 @@ def _is_editor_block_pure_text_message(lowered: str) -> bool:
 
     return any(marker in text for marker in block_intent_markers) and any(marker in text for marker in editor_block_markers)
 
+
+def _is_editor_all_blocks_ready_message(lowered: str) -> bool:
+    text = f" {lowered.strip()} "
+    if not text.strip():
+        return False
+
+    all_blocks_intent_markers = (
+        "gere todos os blocos",
+        "todos os blocos principais",
+        "blocos principais da minuta",
+        "todos os blocos da minuta",
+        "separados por títulos exatamente assim",
+        "separados por titulos exatamente assim",
+        "comece direto pelo bloco 1",
+    )
+
+    required_block_markers = (
+        "bloco 1",
+        "bloco 2",
+        "bloco 3",
+        "bloco 4",
+        "bloco 5",
+        "bloco 6",
+        "bloco 7",
+        "qualificação das partes",
+        "qualificacao das partes",
+        "resumo fático",
+        "resumo fatico",
+        "fundamentação preliminar",
+        "fundamentacao preliminar",
+        "provas e requerimentos",
+        "fechamento",
+    )
+
+    return any(marker in text for marker in all_blocks_intent_markers) and sum(
+        1 for marker in required_block_markers if marker in text
+    ) >= 4
+
+
 def _is_editor_block_correction_message(lowered: str) -> bool:
     text = f" {lowered.strip()} "
     if not text.strip():
@@ -1936,6 +1975,17 @@ def _looks_like_editor_block_prompt_text(text: str) -> bool:
         "quando faltar informação",
         "quando faltar informacao",
         "comece direto pelo texto do bloco",
+        "gere todos os blocos",
+        "todos os blocos principais",
+        "blocos principais da minuta",
+        "entregue somente os blocos finais",
+        "separados por títulos exatamente assim",
+        "separados por titulos exatamente assim",
+        "não traga checklist operacional",
+        "nao traga checklist operacional",
+        "não misture pedidos",
+        "nao misture pedidos",
+        "comece direto pelo bloco 1",
     )
 
     return sum(1 for marker in prompt_markers if marker in lowered) >= 2
@@ -1960,6 +2010,158 @@ def _select_editor_block_source_body(
         return title
 
     return candidate or _clean_text(raw_message, 6000)
+
+
+def _extract_editor_labeled_fragment(
+    source_text: str,
+    start_markers: tuple[str, ...],
+    stop_markers: tuple[str, ...],
+    limit: int = 1800,
+) -> str:
+    raw = str(source_text or "")
+    lowered = raw.lower()
+
+    start_index = -1
+    selected_marker = ""
+
+    for marker in start_markers:
+        index = lowered.find(marker.lower())
+        if index >= 0 and (start_index < 0 or index < start_index):
+            start_index = index
+            selected_marker = marker
+
+    if start_index < 0:
+        return ""
+
+    value_start = start_index + len(selected_marker)
+    value_end = len(raw)
+
+    for marker in stop_markers:
+        index = lowered.find(marker.lower(), value_start)
+        if index >= 0 and index < value_end:
+            value_end = index
+
+    return _clean_text(raw[start_index:value_end], limit)
+
+
+def _editor_all_blocks_ready_response(
+    case: Case,
+    message: str,
+    context: dict[str, Any],
+    timeline: list[dict[str, Any]],
+) -> dict[str, Any]:
+    raw_message = str(message or "")
+    extracted_body = _extract_editor_block_body(raw_message)
+    source_body = _select_editor_block_source_body(
+        case=case,
+        extracted_body=extracted_body,
+        raw_message=raw_message,
+    )
+
+    editor_context = {
+        **(context or {}),
+        "case_context": {
+            "case_number": getattr(case, "case_number", ""),
+            "title": getattr(case, "title", ""),
+            "description": getattr(case, "description", ""),
+            "legal_area": getattr(case, "legal_area", ""),
+            "action_type": getattr(case, "action_type", ""),
+        },
+    }
+
+    _, enderecamento = _build_editor_block_revision(
+        "Endereçamento",
+        "",
+        context=editor_context,
+        raw_message=raw_message,
+    )
+    _, resumo_fatico = _build_editor_block_revision(
+        "Resumo Fático",
+        source_body,
+        context=editor_context,
+        raw_message=raw_message,
+    )
+
+    parte_autora = _extract_editor_labeled_fragment(
+        source_body,
+        ("Parte autora:", "Autor:", "Autora:"),
+        ("Parte ré:", "Parte re:", "Ré:", "Re:", "O autor relata", "A autora relata", "Fatos:"),
+    )
+    parte_re = _extract_editor_labeled_fragment(
+        source_body,
+        ("Parte ré:", "Parte re:", "Ré:", "Re:", "Requerida:", "Requerido:"),
+        ("O autor relata", "A autora relata", "Fatos:", "Como entrada", "Provas existentes", "Provas:"),
+    )
+
+    qualificacao = "\n\n".join(
+        item
+        for item in (
+            parte_autora or "Parte autora: a confirmar, conforme documentos pessoais, comprovante de endereço, procuração e cadastro do caso.",
+            parte_re or "Parte ré: a confirmar, conforme contrato, comprovantes, cadastro público, documentos da relação jurídica e revisão do advogado.",
+        )
+        if item
+    )
+
+    fundamentacao = (
+        "A fundamentação preliminar deverá ser avaliada pelo advogado responsável à luz dos fatos relatados, "
+        "dos documentos disponíveis, da natureza da relação jurídica, dos deveres de informação, boa-fé, "
+        "transparência, cumprimento contratual, prestação de contas e eventual responsabilidade civil ou restituitória, "
+        "conforme o enquadramento jurídico confirmado após análise documental. "
+        "As teses jurídicas, a base legal específica, o rito, a competência, a urgência e a extensão dos pedidos permanecem sujeitos à revisão profissional."
+    )
+
+    pedidos = (
+        "Diante do exposto, e sem prejuízo de adequação pelo advogado responsável, requer-se a citação da parte ré, "
+        "a exibição dos documentos essenciais da relação jurídica, a prestação de contas ou esclarecimentos formais sobre os fatos controvertidos, "
+        "a apuração dos valores envolvidos, a preservação e juntada das provas disponíveis, e a adoção das medidas necessárias para recompor o direito alegado pelo Autor, "
+        "inclusive restituição, obrigação de fazer ou não fazer e eventual indenização por danos materiais e/ou morais, caso haja lastro documental suficiente. "
+        "Os pedidos finais, tutela de urgência, valor da causa, correção monetária, juros, custas, honorários e demais requerimentos devem ser definidos pelo advogado."
+    )
+
+    provas = (
+        "Protesta-se pela produção de todos os meios de prova em direito admitidos, especialmente documentos já disponíveis, comprovantes de pagamento, contratos, recibos, mensagens, prints, áudios, vídeos, consultas oficiais, registros administrativos, depoimento pessoal da parte ré, oitiva de testemunhas a confirmar e demais provas que se mostrarem necessárias. "
+        "Requer-se, se pertinente e após revisão do advogado, a expedição de ofícios, a exibição de documentos e a juntada posterior de novos elementos que confirmem os fatos narrados."
+    )
+
+    fechamento = (
+        "A presente minuta é preliminar e deve ser revisada pelo advogado responsável antes de qualquer protocolo. "
+        "Devem ser confirmados dados formais das partes, comarca, competência, rito, valor da causa, documentos essenciais, provas mínimas, datas relevantes, estratégia processual, pedidos finais e eventual urgência. "
+        "Onde houver informação incompleta, divergente ou sem documento, deve constar a expressão “a confirmar” ou equivalente prudente."
+    )
+
+    blocks = (
+        ("BLOCO 1 — Endereçamento", enderecamento),
+        ("BLOCO 2 — Qualificação das partes", qualificacao),
+        ("BLOCO 3 — Resumo Fático", resumo_fatico),
+        ("BLOCO 4 — Fundamentação preliminar", fundamentacao),
+        ("BLOCO 5 — Pedidos", pedidos),
+        ("BLOCO 6 — Provas e requerimentos", provas),
+        ("BLOCO 7 — Fechamento e conferência final", fechamento),
+    )
+
+    rewritten_input = "\n\n".join(
+        f"{title}\n\n{_clean_editor_block_suggested_text(body, 5000)}"
+        for title, body in blocks
+    )
+
+    return {
+        "case_id": case.id,
+        "assistant_mode": "editor_all_blocks_ready",
+        "summary": "Texto pronto para colar nos principais blocos da minuta.",
+        "rewritten_input": _clean_editor_block_suggested_text(rewritten_input, 12000),
+        "suggested_actions": [],
+        "next_steps": [],
+        "warnings": [],
+        "disclaimer": "",
+        "metadata": {
+            "source": "case_operational_assistant_editor_all_blocks_ready_v1",
+            "provider": "fallback",
+            "case_number": _clean_text(getattr(case, "case_number", "")),
+            "timeline_items_considered": len(timeline),
+            "blocks": [title for title, _ in blocks],
+        },
+    }
+
 
 
 def _editor_block_correction_response(
@@ -2330,6 +2532,14 @@ def _review_validation_response(
 def _fallback_response(case: Case, message: str, context: dict[str, Any], timeline: list[dict[str, Any]]) -> dict[str, Any]:
     text = _clean_text(message, 2500)
     lowered = text.lower()
+
+    if _is_editor_all_blocks_ready_message(lowered):
+        return _editor_all_blocks_ready_response(
+            case=case,
+            message=message,
+            context=context,
+            timeline=timeline,
+        )
 
     if _is_editor_block_pure_text_message(lowered) or _is_editor_block_correction_message(lowered):
         return _editor_block_correction_response(
@@ -2710,7 +2920,7 @@ def build_case_operational_assistant_response(
     timeline = _load_timeline_items(db=db, case=case, current_user=current_user)
     fallback = _fallback_response(case=case, message=cleaned_message, context=context, timeline=timeline)
 
-    if _is_editor_block_pure_text_message(cleaned_message.lower()):
+    if _is_editor_all_blocks_ready_message(cleaned_message.lower()) or _is_editor_block_pure_text_message(cleaned_message.lower()):
         return fallback
 
     try:
