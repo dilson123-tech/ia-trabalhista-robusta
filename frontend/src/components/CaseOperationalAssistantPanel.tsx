@@ -6,69 +6,6 @@ import {
   type CaseOperationalAssistantSuggestion,
 } from '../services/api'
 
-const STANDARD_OPERATIONAL_ANALYSIS_PROMPT = `Analise este caso de forma operacional para preparação de minuta preliminar para advogado avaliar. Não invente dados.
-
-Separe a resposta em:
-
-1. Resumo do caso
-2. Fatos confirmados
-3. Fatos apenas relatados
-4. Provas existentes
-5. Provas pendentes
-6. Documentos que devo pedir ao cliente
-7. Linha do tempo mínima
-8. Testemunhas/depoentes a confirmar
-9. Pontos de risco
-10. Teses possíveis
-11. Pedidos possíveis
-12. Pendências antes de qualquer protocolo
-13. Próximo passo recomendado dentro do sistema
-
-Depois da análise, gere também um bloco chamado:
-
-RESUMO OPERACIONAL PARA O ADVOGADO
-
-Nesse resumo, escreva de forma clara:
-- qual é o problema principal;
-- qual é a tese inicial possível;
-- quais provas já existem;
-- quais provas faltam;
-- quais riscos impedem protocolo imediato;
-- o que o advogado deve revisar antes de transformar em peça.
-
-Depois gere outro bloco chamado:
-
-CAMPOS PRONTOS PARA PREENCHER OS MÓDULOS
-
-Comece pela Linha do Tempo. Para cada item, use exatamente este formato:
-
-Data/período:
-Título do fato:
-Descrição do fato:
-Prova relacionada:
-Testemunha/depoente relacionado:
-Pendência/observação:
-Ordem:
-
-Depois gere o Checklist de provas neste formato:
-
-Documento/prova:
-Finalidade:
-Status sugerido:
-Observação:
-
-Depois gere Testemunhas/depoentes neste formato:
-
-Nome:
-Contato:
-Relação com o caso:
-O que pode confirmar:
-Pendência:
-
-Não invente datas, nomes, placas, RENAVAM, contrato, valores não informados ou testemunhas. Quando faltar informação, escreva “a confirmar”.
-
-Considere que a peça ainda não será protocolada e que todos os dados formais, comarca, valor da causa, pedidos finais e estratégia devem ser confirmados por advogado.`
-
 
 const ALL_BLOCKS_READY_MINUTA_PROMPT = `Gere todos os blocos principais da minuta preliminar deste caso em formato de texto pronto para copiar e colar no Editor/minuta.
 
@@ -102,20 +39,6 @@ Comarca, competência, rito, valor da causa, pedidos finais, tutela de urgência
 
 Comece direto pelo BLOCO 1.`
 
-
-const BLOCK_READY_MINUTA_PROMPT = `Reescreva somente o bloco [NOME DO BLOCO] deste caso em formato de texto pronto para minuta preliminar.
-
-Entregue apenas o texto final pronto para copiar e colar no bloco [NOME DO BLOCO] do Editor/minuta.
-
-Não traga checklist, linha do tempo, anexos, testemunhas, análise, próximos passos, alertas ou explicações.
-
-Não invente dados. Use linguagem prudente, como “o Autor relata”, “segundo informado”, “a confirmar”, “até o momento” e “sujeito à conferência documental”.
-
-Quando faltar informação, escreva “a confirmar”.
-
-Antes de gerar, considere os dados já existentes no caso em foco e mantenha coerência com os fatos, provas disponíveis, pendências e revisão obrigatória do advogado.
-
-Comece direto pelo texto do bloco.`
 
 
 type CaseOperationalAssistantPanelProps = {
@@ -366,45 +289,7 @@ export function CaseOperationalAssistantPanel({ token, caseId, caseLabel, onDest
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [response, setResponse] = useState<CaseOperationalAssistantResponse | null>(null)
-  const [standardPromptCopied, setStandardPromptCopied] = useState(false)
-  const [blockReadyPromptCopied, setBlockReadyPromptCopied] = useState(false)
   const [allBlocksReadyPromptCopied, setAllBlocksReadyPromptCopied] = useState(false)
-
-  async function handleCopyStandardPrompt() {
-    try {
-      await navigator.clipboard.writeText(STANDARD_OPERATIONAL_ANALYSIS_PROMPT)
-      setStandardPromptCopied(true)
-      window.setTimeout(() => setStandardPromptCopied(false), 2200)
-    } catch {
-      setMessage(STANDARD_OPERATIONAL_ANALYSIS_PROMPT)
-      setStandardPromptCopied(true)
-      window.setTimeout(() => setStandardPromptCopied(false), 2200)
-    }
-  }
-
-  function handleUseStandardPrompt() {
-    setMessage(STANDARD_OPERATIONAL_ANALYSIS_PROMPT)
-    setResponse(null)
-    setError('')
-  }
-
-  async function handleCopyBlockReadyPrompt() {
-    try {
-      await navigator.clipboard.writeText(BLOCK_READY_MINUTA_PROMPT)
-      setBlockReadyPromptCopied(true)
-      window.setTimeout(() => setBlockReadyPromptCopied(false), 2200)
-    } catch {
-      setMessage(BLOCK_READY_MINUTA_PROMPT)
-      setBlockReadyPromptCopied(true)
-      window.setTimeout(() => setBlockReadyPromptCopied(false), 2200)
-    }
-  }
-
-  function handleUseBlockReadyPrompt() {
-    setMessage(BLOCK_READY_MINUTA_PROMPT)
-    setResponse(null)
-    setError('')
-  }
 
   async function handleCopyAllBlocksReadyPrompt() {
     try {
@@ -578,121 +463,9 @@ ${initialDescription}`,
         >
           <div style={{ alignItems: 'center', display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'space-between' }}>
             <div>
-              <strong>Prompt padrão para análise operacional</strong>
+              <strong>Prompt principal para todos os blocos da minuta</strong>
               <p style={{ margin: '4px 0 0 0', color: 'var(--muted-text)' }}>
-                Use para receber análise, resumo operacional para o advogado e campos prontos para preencher os módulos.
-              </p>
-            </div>
-
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-              <button
-                type="button"
-                onClick={() => {
-                  void handleCopyStandardPrompt()
-                }}
-                className="case-card__action case-card__action--summary"
-                style={{ padding: '9px 12px' }}
-              >
-                {standardPromptCopied ? 'Prompt copiado' : 'Copiar prompt'}
-              </button>
-
-              <button
-                type="button"
-                onClick={handleUseStandardPrompt}
-                className="case-card__action case-card__action--analysis"
-                style={{ padding: '9px 12px' }}
-              >
-                Usar no campo
-              </button>
-            </div>
-          </div>
-
-          <pre
-            style={{
-              margin: '10px 0 0 0',
-              maxHeight: '155px',
-              overflow: 'auto',
-              whiteSpace: 'pre-wrap',
-              fontFamily: 'inherit',
-              fontSize: '0.88rem',
-              lineHeight: 1.45,
-              color: 'var(--muted-text)',
-            }}
-          >
-            {STANDARD_OPERATIONAL_ANALYSIS_PROMPT}
-          </pre>
-        </div>
-
-        <div
-          style={{
-            border: '1px solid rgba(59,130,246,0.24)',
-            borderRadius: '16px',
-            margin: '12px 0',
-            padding: '12px',
-            background: 'rgba(37,99,235,0.08)',
-          }}
-        >
-          <div style={{ alignItems: 'center', display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'space-between' }}>
-            <div>
-              <strong>Prompt para bloco pronto da minuta</strong>
-              <p style={{ margin: '4px 0 0 0', color: 'var(--muted-text)' }}>
-                Use para pedir somente o texto final de um bloco, como Resumo Fático, Fundamentação ou Pedidos.
-              </p>
-            </div>
-
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-              <button
-                type="button"
-                onClick={() => {
-                  void handleCopyBlockReadyPrompt()
-                }}
-                className="case-card__action case-card__action--summary"
-                style={{ padding: '9px 12px' }}
-              >
-                {blockReadyPromptCopied ? 'Prompt copiado' : 'Copiar prompt'}
-              </button>
-
-              <button
-                type="button"
-                onClick={handleUseBlockReadyPrompt}
-                className="case-card__action case-card__action--analysis"
-                style={{ padding: '9px 12px' }}
-              >
-                Usar no campo
-              </button>
-            </div>
-          </div>
-
-          <pre
-            style={{
-              margin: '10px 0 0 0',
-              maxHeight: '135px',
-              overflow: 'auto',
-              whiteSpace: 'pre-wrap',
-              fontFamily: 'inherit',
-              fontSize: '0.88rem',
-              lineHeight: 1.45,
-              color: 'var(--muted-text)',
-            }}
-          >
-            {BLOCK_READY_MINUTA_PROMPT}
-          </pre>
-        </div>
-
-        <div
-          style={{
-            border: '1px solid rgba(34,197,94,0.24)',
-            borderRadius: '16px',
-            margin: '12px 0',
-            padding: '12px',
-            background: 'rgba(22,163,74,0.08)',
-          }}
-        >
-          <div style={{ alignItems: 'center', display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'space-between' }}>
-            <div>
-              <strong>Prompt para todos os blocos da minuta</strong>
-              <p style={{ margin: '4px 0 0 0', color: 'var(--muted-text)' }}>
-                Use para gerar Endereçamento, Qualificação, Resumo Fático, Fundamentação, Pedidos, Provas e Fechamento em uma única resposta.
+                Use como caminho principal para gerar Endereçamento, Qualificação, Resumo Fático, Fundamentação, Pedidos, Provas e Fechamento em uma única resposta.
               </p>
             </div>
 
