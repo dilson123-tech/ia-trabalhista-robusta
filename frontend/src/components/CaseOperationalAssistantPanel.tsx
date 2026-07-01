@@ -803,9 +803,27 @@ ${initialDescription}`,
             <p style={{ margin: '6px 0 0 0', opacity: 0.9 }}>{response.summary}</p>
 
             {response.rewritten_input ? (
-              <p style={{ margin: '8px 0 0 0', opacity: 0.86 }}>
-                <strong>Texto corrigido/sugerido:</strong> {response.rewritten_input}
-              </p>
+              <div style={{ margin: '10px 0 0 0' }}>
+                <strong>Texto corrigido/sugerido:</strong>
+                <pre
+                  style={{
+                    margin: '8px 0 0 0',
+                    padding: '12px',
+                    border: '1px solid rgba(148,163,184,0.22)',
+                    borderRadius: '12px',
+                    background: 'rgba(15,23,42,0.48)',
+                    color: 'var(--text-primary)',
+                    fontFamily: 'inherit',
+                    fontSize: '0.94rem',
+                    lineHeight: 1.6,
+                    maxHeight: '520px',
+                    overflow: 'auto',
+                    whiteSpace: 'pre-wrap',
+                  }}
+                >
+                  {response.rewritten_input}
+                </pre>
+              </div>
             ) : null}
           </div>
 
