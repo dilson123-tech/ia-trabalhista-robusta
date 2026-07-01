@@ -2044,6 +2044,133 @@ def _extract_editor_labeled_fragment(
     return _clean_text(raw[start_index:value_end], limit)
 
 
+
+def _cut_text_at_first_marker(text: str, markers: tuple[str, ...]) -> str:
+    raw = str(text or "")
+    lowered = raw.lower()
+
+    cut_index = len(raw)
+    for marker in markers:
+        index = lowered.find(marker.lower())
+        if index >= 0 and index < cut_index:
+            cut_index = index
+
+    return raw[:cut_index].strip()
+
+
+def _remove_text_fragment_between_markers(
+    text: str,
+    start_markers: tuple[str, ...],
+    stop_markers: tuple[str, ...],
+) -> str:
+    raw = str(text or "")
+    lowered = raw.lower()
+
+    start_index = -1
+    selected_marker = ""
+
+    for marker in start_markers:
+        index = lowered.find(marker.lower())
+        if index >= 0 and (start_index < 0 or index < start_index):
+            start_index = index
+            selected_marker = marker
+
+    if start_index < 0:
+        return raw
+
+    value_start = start_index + len(selected_marker)
+    stop_index = len(raw)
+
+    for marker in stop_markers:
+        index = lowered.find(marker.lower(), value_start)
+        if index >= 0 and index < stop_index:
+            stop_index = index
+
+    if stop_index <= start_index:
+        return raw
+
+    return f"{raw[:start_index].rstrip()} {raw[stop_index:].lstrip()}".strip()
+
+
+def _build_resumo_fatico_source_body(source_text: str) -> str:
+    raw = _clean_text(source_text, 6000)
+    if not raw:
+        return ""
+
+    cleaned = raw
+
+    cleaned = _remove_text_fragment_between_markers(
+        cleaned,
+        ("Parte autora:", "Autor:", "Autora:"),
+        (
+            "Parte ré:",
+            "Parte re:",
+            "Ré:",
+            "Re:",
+            "Requerida:",
+            "Requerido:",
+            "O autor relata",
+            "A autora relata",
+            "O cliente relata",
+            "A cliente relata",
+            "A parte autora relata",
+            "Segundo informado",
+            "Fatos:",
+            "Relato dos fatos:",
+        ),
+    )
+
+    cleaned = _remove_text_fragment_between_markers(
+        cleaned,
+        ("Parte ré:", "Parte re:", "Ré:", "Re:", "Requerida:", "Requerido:"),
+        (
+            "O autor relata",
+            "A autora relata",
+            "O cliente relata",
+            "A cliente relata",
+            "A parte autora relata",
+            "Segundo informado",
+            "Fatos:",
+            "Relato dos fatos:",
+            "Como entrada",
+            "Além da entrada",
+            "Após",
+            "No dia",
+            "Em ",
+        ),
+    )
+
+    cleaned = _cut_text_at_first_marker(
+        cleaned,
+        (
+            "Provas existentes",
+            "Provas existentes ou indicadas",
+            "Provas indicadas",
+            "Documentos existentes",
+            "Documentos pendentes",
+            "Documentos/provas",
+            "Checklist",
+            "Pontos a confirmar",
+            "Pendências",
+            "Testemunhas/depoentes",
+            "Testemunhas",
+            "Depoentes",
+            "Pedidos a avaliar",
+            "Pedidos possíveis",
+            "Pedidos:",
+            "Comarca provável",
+            "Vara competente",
+            "Rito",
+            "Valor da causa",
+            "Tutela de urgência",
+            "Estratégia jurídica",
+        ),
+    )
+
+    cleaned = _clean_text(cleaned, 6000)
+    return cleaned or raw
+
+
 def _editor_all_blocks_ready_response(
     case: Case,
     message: str,
@@ -2075,9 +2202,10 @@ def _editor_all_blocks_ready_response(
         context=editor_context,
         raw_message=raw_message,
     )
+    resumo_source_body = _build_resumo_fatico_source_body(source_body)
     _, resumo_fatico = _build_editor_block_revision(
         "Resumo Fático",
-        source_body,
+        resumo_source_body,
         context=editor_context,
         raw_message=raw_message,
     )
