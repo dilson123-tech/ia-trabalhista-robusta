@@ -868,3 +868,71 @@ Comece direto pelo texto do bloco.
     assert "Próximos passos" not in output
     assert "Alertas" not in output
     assert "Sugestões de aplicação" not in output
+
+
+
+def test_editor_all_blocks_ready_request_returns_all_blocks_not_single_enderecamento():
+    message = """
+Gere todos os blocos principais da minuta preliminar deste caso em formato de texto pronto para copiar e colar no Editor/minuta.
+
+Entregue somente os blocos finais, separados por títulos exatamente assim:
+
+BLOCO 1 — Endereçamento
+
+BLOCO 2 — Qualificação das partes
+
+BLOCO 3 — Resumo Fático
+
+BLOCO 4 — Fundamentação preliminar
+
+BLOCO 5 — Pedidos
+
+BLOCO 6 — Provas e requerimentos
+
+BLOCO 7 — Fechamento e conferência final
+
+Não traga checklist operacional, linha do tempo, anexos, testemunhas, análise, próximos passos, alertas ou explicações fora dos blocos.
+
+Comece direto pelo BLOCO 1.
+"""
+
+    response = _fallback_response(
+        case=_fake_case(
+            description=(
+                "Parte autora: Dilson Pereira, CPF a confirmar, residente em Itapoá/SC. "
+                "Parte ré: QUINTINO COMÉRCIO DE AUTOMÓVEIS LTDA, nome fantasia Quintino Automóveis. "
+                "O autor relata aquisição de veículo junto à revendedora, entrega de bens como entrada, "
+                "pagamento de 34 parcelas de R$ 1.180,00 via Pix e posterior recolhimento do veículo sob alegação de bloqueio."
+            )
+        ),
+        message=message,
+        context={},
+        timeline=[],
+    )
+
+    output = _joined_response_text(response)
+    rewritten = response["rewritten_input"]
+
+    assert response["assistant_mode"] == "editor_all_blocks_ready"
+    assert response["metadata"]["source"] == "case_operational_assistant_editor_all_blocks_ready_v1"
+    assert response["suggested_actions"] == []
+    assert response["next_steps"] == []
+    assert response["warnings"] == []
+    assert response["disclaimer"] == ""
+
+    for title in (
+        "BLOCO 1 — Endereçamento",
+        "BLOCO 2 — Qualificação das partes",
+        "BLOCO 3 — Resumo Fático",
+        "BLOCO 4 — Fundamentação preliminar",
+        "BLOCO 5 — Pedidos",
+        "BLOCO 6 — Provas e requerimentos",
+        "BLOCO 7 — Fechamento e conferência final",
+    ):
+        assert title in rewritten
+
+    assert "Quintino Automóveis" in rewritten
+    assert "34 parcelas" in rewritten or "R$ 1.180,00" in rewritten
+    assert "Texto pronto para colar no bloco Endereçamento" not in output
+    assert "Gere todos os blocos principais" not in rewritten
+    assert "Comece direto pelo BLOCO 1" not in rewritten
