@@ -902,7 +902,11 @@ Comece direto pelo BLOCO 1.
                 "Parte autora: Dilson Pereira, CPF a confirmar, residente em Itapoá/SC. "
                 "Parte ré: QUINTINO COMÉRCIO DE AUTOMÓVEIS LTDA, nome fantasia Quintino Automóveis. "
                 "O autor relata aquisição de veículo junto à revendedora, entrega de bens como entrada, "
-                "pagamento de 34 parcelas de R$ 1.180,00 via Pix e posterior recolhimento do veículo sob alegação de bloqueio."
+                "pagamento de 34 parcelas de R$ 1.180,00 via Pix e posterior recolhimento do veículo sob alegação de bloqueio. "
+                "Provas existentes ou indicadas: comprovantes Pix, conversas, consulta de restrição e documentos do veículo. "
+                "Pontos a confirmar: datas, contrato, endereço da ré, placa, RENAVAM e eventual ordem judicial. "
+                "Testemunhas/depoentes a confirmar: pessoas que presenciaram a negociação ou retirada do bem. "
+                "Pedidos a avaliar pelo advogado: exibição de documentos, restituição, indenização e tutela de urgência."
             )
         ),
         message=message,
@@ -931,8 +935,18 @@ Comece direto pelo BLOCO 1.
     ):
         assert title in rewritten
 
+    resumo = rewritten.split("BLOCO 3 — Resumo Fático", 1)[1].split("BLOCO 4 — Fundamentação preliminar", 1)[0]
+
     assert "Quintino Automóveis" in rewritten
     assert "34 parcelas" in rewritten or "R$ 1.180,00" in rewritten
+    assert "34 parcelas" in resumo or "R$ 1.180,00" in resumo
+    assert "Parte autora:" not in resumo
+    assert "Parte ré:" not in resumo
+    assert "Provas existentes" not in resumo
+    assert "Pontos a confirmar" not in resumo
+    assert "Testemunhas/depoentes" not in resumo
+    assert "Pedidos a avaliar" not in resumo
+    assert "Tutela de urgência" not in resumo
     assert "Texto pronto para colar no bloco Endereçamento" not in output
     assert "Gere todos os blocos principais" not in rewritten
     assert "Comece direto pelo BLOCO 1" not in rewritten
