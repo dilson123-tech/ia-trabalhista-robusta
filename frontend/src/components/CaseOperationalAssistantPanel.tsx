@@ -69,6 +69,40 @@ Não invente datas, nomes, placas, RENAVAM, contrato, valores não informados ou
 
 Considere que a peça ainda não será protocolada e que todos os dados formais, comarca, valor da causa, pedidos finais e estratégia devem ser confirmados por advogado.`
 
+
+const ALL_BLOCKS_READY_MINUTA_PROMPT = `Gere todos os blocos principais da minuta preliminar deste caso em formato de texto pronto para copiar e colar no Editor/minuta.
+
+Entregue somente os blocos finais, separados por títulos exatamente assim:
+
+BLOCO 1 — Endereçamento
+
+BLOCO 2 — Qualificação das partes
+
+BLOCO 3 — Resumo Fático
+
+BLOCO 4 — Fundamentação preliminar
+
+BLOCO 5 — Pedidos
+
+BLOCO 6 — Provas e requerimentos
+
+BLOCO 7 — Fechamento e conferência final
+
+Não traga checklist operacional, linha do tempo, anexos, testemunhas, análise, próximos passos, alertas ou explicações fora dos blocos.
+
+Não misture pedidos, provas, testemunhas ou pendências dentro do Resumo Fático. Coloque cada conteúdo no bloco próprio.
+
+Não invente dados. Use linguagem prudente, como “o Autor relata”, “segundo informado”, “a confirmar”, “até o momento” e “sujeito à conferência documental”.
+
+Quando faltar informação, escreva “a confirmar”.
+
+Antes de gerar, considere os dados já existentes no caso em foco e mantenha coerência com os fatos, provas disponíveis, pendências e revisão obrigatória do advogado.
+
+Comarca, competência, rito, valor da causa, pedidos finais, tutela de urgência e estratégia devem permanecer sujeitos à revisão do advogado.
+
+Comece direto pelo BLOCO 1.`
+
+
 const BLOCK_READY_MINUTA_PROMPT = `Reescreva somente o bloco [NOME DO BLOCO] deste caso em formato de texto pronto para minuta preliminar.
 
 Entregue apenas o texto final pronto para copiar e colar no bloco [NOME DO BLOCO] do Editor/minuta.
@@ -334,6 +368,7 @@ export function CaseOperationalAssistantPanel({ token, caseId, caseLabel, onDest
   const [response, setResponse] = useState<CaseOperationalAssistantResponse | null>(null)
   const [standardPromptCopied, setStandardPromptCopied] = useState(false)
   const [blockReadyPromptCopied, setBlockReadyPromptCopied] = useState(false)
+  const [allBlocksReadyPromptCopied, setAllBlocksReadyPromptCopied] = useState(false)
 
   async function handleCopyStandardPrompt() {
     try {
@@ -367,6 +402,24 @@ export function CaseOperationalAssistantPanel({ token, caseId, caseLabel, onDest
 
   function handleUseBlockReadyPrompt() {
     setMessage(BLOCK_READY_MINUTA_PROMPT)
+    setResponse(null)
+    setError('')
+  }
+
+  async function handleCopyAllBlocksReadyPrompt() {
+    try {
+      await navigator.clipboard.writeText(ALL_BLOCKS_READY_MINUTA_PROMPT)
+      setAllBlocksReadyPromptCopied(true)
+      window.setTimeout(() => setAllBlocksReadyPromptCopied(false), 2200)
+    } catch {
+      setMessage(ALL_BLOCKS_READY_MINUTA_PROMPT)
+      setAllBlocksReadyPromptCopied(true)
+      window.setTimeout(() => setAllBlocksReadyPromptCopied(false), 2200)
+    }
+  }
+
+  function handleUseAllBlocksReadyPrompt() {
+    setMessage(ALL_BLOCKS_READY_MINUTA_PROMPT)
     setResponse(null)
     setError('')
   }
@@ -623,6 +676,62 @@ ${initialDescription}`,
             }}
           >
             {BLOCK_READY_MINUTA_PROMPT}
+          </pre>
+        </div>
+
+        <div
+          style={{
+            border: '1px solid rgba(34,197,94,0.24)',
+            borderRadius: '16px',
+            margin: '12px 0',
+            padding: '12px',
+            background: 'rgba(22,163,74,0.08)',
+          }}
+        >
+          <div style={{ alignItems: 'center', display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'space-between' }}>
+            <div>
+              <strong>Prompt para todos os blocos da minuta</strong>
+              <p style={{ margin: '4px 0 0 0', color: 'var(--muted-text)' }}>
+                Use para gerar Endereçamento, Qualificação, Resumo Fático, Fundamentação, Pedidos, Provas e Fechamento em uma única resposta.
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  void handleCopyAllBlocksReadyPrompt()
+                }}
+                className="case-card__action case-card__action--summary"
+                style={{ padding: '9px 12px' }}
+              >
+                {allBlocksReadyPromptCopied ? 'Prompt copiado' : 'Copiar prompt'}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleUseAllBlocksReadyPrompt}
+                className="case-card__action case-card__action--analysis"
+                style={{ padding: '9px 12px' }}
+              >
+                Usar no campo
+              </button>
+            </div>
+          </div>
+
+          <pre
+            style={{
+              margin: '10px 0 0 0',
+              maxHeight: '145px',
+              overflow: 'auto',
+              whiteSpace: 'pre-wrap',
+              fontFamily: 'inherit',
+              fontSize: '0.88rem',
+              lineHeight: 1.45,
+              color: 'var(--muted-text)',
+            }}
+          >
+            {ALL_BLOCKS_READY_MINUTA_PROMPT}
           </pre>
         </div>
 
