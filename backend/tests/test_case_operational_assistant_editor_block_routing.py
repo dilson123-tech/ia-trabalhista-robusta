@@ -1045,3 +1045,63 @@ Comece direto pelo BLOCO 1.
     assert "Testemunhas/depoentes" not in resumo
     assert "Pedidos a avaliar" not in resumo
 
+
+def test_frontend_all_blocks_ready_prompt_still_triggers_backend_all_blocks_mode():
+    import re
+    from pathlib import Path
+
+    repo_root = Path(__file__).resolve().parents[2]
+    component_path = repo_root / "frontend/src/components/CaseOperationalAssistantPanel.tsx"
+    component_text = component_path.read_text()
+
+    match = re.search(
+        r"const ALL_BLOCKS_READY_MINUTA_PROMPT = `(?P<prompt>.*?)`\n",
+        component_text,
+        re.DOTALL,
+    )
+
+    assert match is not None
+
+    frontend_prompt = match.group("prompt")
+
+    response = _fallback_response(
+        case=_fake_case(
+            case_number="CONTRATO-FRONTEND-PROMPT-SYNC-001",
+            description=(
+                "Parte autora: cliente a confirmar. "
+                "Parte ré: empresa fornecedora a confirmar. "
+                "O autor relata contrato de prestação de serviços, pagamento realizado "
+                "e possível descumprimento contratual pendente de conferência documental."
+            ),
+        ),
+        message=frontend_prompt,
+        context={},
+        timeline=[],
+    )
+
+    expected_titles = [
+        "BLOCO 1 — Endereçamento",
+        "BLOCO 2 — Qualificação das partes",
+        "BLOCO 3 — Resumo Fático",
+        "BLOCO 4 — Fundamentação preliminar",
+        "BLOCO 5 — Pedidos",
+        "BLOCO 6 — Provas e requerimentos",
+        "BLOCO 7 — Fechamento e conferência final",
+    ]
+
+    rewritten = response["rewritten_input"]
+
+    assert response["assistant_mode"] == "editor_all_blocks_ready"
+    assert response["metadata"]["source"] == "case_operational_assistant_editor_all_blocks_ready_v1"
+    assert response["metadata"]["blocks"] == expected_titles
+    assert response["suggested_actions"] == []
+    assert response["next_steps"] == []
+    assert response["warnings"] == []
+    assert response["disclaimer"] == ""
+
+    assert rewritten.startswith("BLOCO 1 — Endereçamento")
+    assert rewritten.count("BLOCO ") == 7
+
+    for title in expected_titles:
+        assert title in rewritten
+
