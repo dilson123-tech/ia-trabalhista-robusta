@@ -1161,3 +1161,77 @@ def test_frontend_all_blocks_ready_prompt_keeps_legal_safety_clauses():
     for clause in required_safety_clauses:
         assert clause in normalized_prompt
 
+
+def test_editor_all_blocks_ready_output_keeps_legal_caution_clauses():
+    message = """
+Gere todos os blocos principais da minuta preliminar deste caso em formato de texto pronto para copiar e colar no Editor/minuta.
+
+Entregue somente os blocos finais, separados por títulos exatamente assim:
+
+BLOCO 1 — Endereçamento
+BLOCO 2 — Qualificação das partes
+BLOCO 3 — Resumo Fático
+BLOCO 4 — Fundamentação preliminar
+BLOCO 5 — Pedidos
+BLOCO 6 — Provas e requerimentos
+BLOCO 7 — Fechamento e conferência final
+
+Não invente dados. Use linguagem prudente, como “o Autor relata”, “segundo informado”, “a confirmar”, “até o momento” e “sujeito à conferência documental”.
+
+Comarca, competência, rito, valor da causa, pedidos finais, tutela de urgência e estratégia devem permanecer sujeitos à revisão do advogado.
+
+Comece direto pelo BLOCO 1.
+"""
+
+    response = _fallback_response(
+        case=_fake_case(
+            case_number="CONTRATO-OUTPUT-CAUTION-001",
+            description=(
+                "Parte autora: cliente a confirmar por documentos pessoais. "
+                "Parte ré: empresa fornecedora a confirmar por contrato e cadastro público. "
+                "O autor relata contrato de prestação de serviços, pagamento realizado, "
+                "mensagens pendentes de conferência e possível descumprimento contratual. "
+                "Provas indicadas: contrato, comprovantes de pagamento e mensagens. "
+                "Pontos a confirmar: datas, endereço da parte ré, valor da causa e documentos essenciais."
+            ),
+        ),
+        message=message,
+        context={},
+        timeline=[],
+    )
+
+    rewritten = response["rewritten_input"]
+    normalized_rewritten = " ".join(rewritten.split()).lower()
+
+    assert response["assistant_mode"] == "editor_all_blocks_ready"
+    assert response["suggested_actions"] == []
+    assert response["next_steps"] == []
+    assert response["warnings"] == []
+    assert response["disclaimer"] == ""
+
+    required_output_cautions = (
+        "minuta é preliminar",
+        "revisada pelo advogado responsável",
+        "a confirmar",
+        "conferência",
+        "análise documental",
+        "competência",
+        "rito",
+        "valor da causa",
+        "urgência",
+        "sujeitos à revisão profissional",
+    )
+
+    for caution in required_output_cautions:
+        assert caution in normalized_rewritten
+
+    fechamento = rewritten.split("BLOCO 7 — Fechamento e conferência final", 1)[1]
+
+    assert "A presente minuta é preliminar" in fechamento
+    assert "advogado responsável" in fechamento
+    assert "competência" in fechamento
+    assert "rito" in fechamento
+    assert "valor da causa" in fechamento
+    assert "documentos essenciais" in fechamento
+    assert "a confirmar" in fechamento.lower()
+
