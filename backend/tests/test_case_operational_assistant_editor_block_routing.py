@@ -1105,3 +1105,59 @@ def test_frontend_all_blocks_ready_prompt_still_triggers_backend_all_blocks_mode
     for title in expected_titles:
         assert title in rewritten
 
+
+def test_frontend_all_blocks_ready_prompt_keeps_legal_safety_clauses():
+    import re
+    from pathlib import Path
+
+    repo_root = Path(__file__).resolve().parents[2]
+    component_path = repo_root / "frontend/src/components/CaseOperationalAssistantPanel.tsx"
+    component_text = component_path.read_text()
+
+    match = re.search(
+        r"const ALL_BLOCKS_READY_MINUTA_PROMPT = `(?P<prompt>.*?)`\n",
+        component_text,
+        re.DOTALL,
+    )
+
+    assert match is not None
+
+    frontend_prompt = match.group("prompt")
+    normalized_prompt = " ".join(frontend_prompt.split()).lower()
+
+    expected_block_titles = (
+        "BLOCO 1 — Endereçamento",
+        "BLOCO 2 — Qualificação das partes",
+        "BLOCO 3 — Resumo Fático",
+        "BLOCO 4 — Fundamentação preliminar",
+        "BLOCO 5 — Pedidos",
+        "BLOCO 6 — Provas e requerimentos",
+        "BLOCO 7 — Fechamento e conferência final",
+    )
+
+    for title in expected_block_titles:
+        assert title in frontend_prompt
+
+    required_safety_clauses = (
+        "não traga checklist operacional",
+        "linha do tempo",
+        "anexos",
+        "testemunhas",
+        "próximos passos",
+        "alertas",
+        "não misture pedidos, provas, testemunhas ou pendências dentro do resumo fático",
+        "não invente dados",
+        "linguagem prudente",
+        "a confirmar",
+        "sujeito à conferência documental",
+        "revisão obrigatória do advogado",
+        "competência",
+        "rito",
+        "valor da causa",
+        "tutela de urgência",
+        "comece direto pelo bloco 1",
+    )
+
+    for clause in required_safety_clauses:
+        assert clause in normalized_prompt
+
