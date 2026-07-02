@@ -950,3 +950,98 @@ Comece direto pelo BLOCO 1.
     assert "Texto pronto para colar no bloco Endereçamento" not in output
     assert "Gere todos os blocos principais" not in rewritten
     assert "Comece direto pelo BLOCO 1" not in rewritten
+
+
+def test_editor_all_blocks_ready_quality_gate_keeps_exact_sections_and_no_operational_output():
+    message = """
+Gere todos os blocos principais da minuta preliminar deste caso em formato de texto pronto para copiar e colar no Editor/minuta.
+
+Entregue somente os blocos finais, separados por títulos exatamente assim:
+
+BLOCO 1 — Endereçamento
+BLOCO 2 — Qualificação das partes
+BLOCO 3 — Resumo Fático
+BLOCO 4 — Fundamentação preliminar
+BLOCO 5 — Pedidos
+BLOCO 6 — Provas e requerimentos
+BLOCO 7 — Fechamento e conferência final
+
+Não traga checklist operacional, linha do tempo, anexos, testemunhas, análise, próximos passos, alertas ou explicações fora dos blocos.
+
+Comece direto pelo BLOCO 1.
+"""
+
+    response = _fallback_response(
+        case=_fake_case(
+            case_number="CONTRATO-GENERICO-QUALITY-001",
+            description=(
+                "Parte autora: cliente a confirmar por documentos pessoais. "
+                "Parte ré: fornecedora de serviço a confirmar por contrato e cadastro público. "
+                "O autor relata contrato de prestação de serviços, pagamento realizado, "
+                "mensagens pendentes de conferência e possível descumprimento contratual. "
+                "Provas existentes ou indicadas: contrato, comprovantes de pagamento e mensagens. "
+                "Pontos a confirmar: datas, valor da causa, endereço da parte ré e documentos essenciais. "
+                "Testemunhas/depoentes a confirmar: pessoas que acompanharam a negociação. "
+                "Pedidos a avaliar pelo advogado: exibição de documentos, devolução de valores e indenização se comprovada."
+            ),
+        ),
+        message=message,
+        context={},
+        timeline=[],
+    )
+
+    expected_titles = [
+        "BLOCO 1 — Endereçamento",
+        "BLOCO 2 — Qualificação das partes",
+        "BLOCO 3 — Resumo Fático",
+        "BLOCO 4 — Fundamentação preliminar",
+        "BLOCO 5 — Pedidos",
+        "BLOCO 6 — Provas e requerimentos",
+        "BLOCO 7 — Fechamento e conferência final",
+    ]
+
+    rewritten = response["rewritten_input"]
+
+    assert response["assistant_mode"] == "editor_all_blocks_ready"
+    assert response["metadata"]["source"] == "case_operational_assistant_editor_all_blocks_ready_v1"
+    assert response["metadata"]["blocks"] == expected_titles
+    assert response["suggested_actions"] == []
+    assert response["next_steps"] == []
+    assert response["warnings"] == []
+    assert response["disclaimer"] == ""
+
+    assert rewritten.startswith("BLOCO 1 — Endereçamento")
+    assert rewritten.count("BLOCO ") == 7
+
+    positions = [rewritten.index(title) for title in expected_titles]
+    assert positions == sorted(positions)
+
+    for title in expected_titles:
+        assert rewritten.count(title) == 1
+
+    forbidden_operational_markers = (
+        "Linha do Tempo",
+        "Checklist operacional",
+        "Anexos/provas",
+        "Testemunhas/depoentes",
+        "Próximos passos",
+        "Alertas",
+        "Sugestões de aplicação",
+        "Texto sugerido para substituir:",
+        "Ação agora:",
+    )
+
+    for marker in forbidden_operational_markers:
+        assert marker not in rewritten
+
+    resumo = rewritten.split("BLOCO 3 — Resumo Fático", 1)[1].split(
+        "BLOCO 4 — Fundamentação preliminar", 1
+    )[0]
+
+    assert "contrato de prestação de serviços" in resumo
+    assert "pagamento realizado" in resumo
+    assert "Provas existentes ou indicadas" not in resumo
+    assert "Pontos a confirmar" not in resumo
+    assert "Testemunhas/depoentes" not in resumo
+    assert "Pedidos a avaliar" not in resumo
+
