@@ -1235,3 +1235,79 @@ Comece direto pelo BLOCO 1.
     assert "documentos essenciais" in fechamento
     assert "a confirmar" in fechamento.lower()
 
+
+def test_editor_all_blocks_ready_qualification_block_does_not_absorb_case_sections():
+    message = """
+Gere todos os blocos principais da minuta preliminar deste caso em formato de texto pronto para copiar e colar no Editor/minuta.
+
+Entregue somente os blocos finais, separados por títulos exatamente assim:
+
+BLOCO 1 — Endereçamento
+BLOCO 2 — Qualificação das partes
+BLOCO 3 — Resumo Fático
+BLOCO 4 — Fundamentação preliminar
+BLOCO 5 — Pedidos
+BLOCO 6 — Provas e requerimentos
+BLOCO 7 — Fechamento e conferência final
+
+Não traga checklist operacional, linha do tempo, anexos, testemunhas, análise, próximos passos, alertas ou explicações fora dos blocos.
+
+Não misture pedidos, provas, testemunhas ou pendências dentro do Resumo Fático. Coloque cada conteúdo no bloco próprio.
+
+Não invente dados. Use linguagem prudente.
+
+Comece direto pelo BLOCO 1.
+"""
+
+    response = _fallback_response(
+        case=_fake_case(
+            case_number="QUALIFICACAO-BOUNDARY-001",
+            description=(
+                "Parte autora: Maria de Souza, CPF a confirmar, residente em Joinville/SC. "
+                "Parte ré: Empresa Alfa Serviços LTDA, CNPJ a confirmar, endereço a confirmar. "
+                "O autor relata contrato de prestação de serviços, pagamento realizado e possível descumprimento contratual. "
+                "Provas existentes ou indicadas: contrato, comprovantes de pagamento e mensagens. "
+                "Pontos a confirmar: datas, valor da causa, endereço completo da parte ré e documentos essenciais. "
+                "Testemunhas/depoentes a confirmar: pessoas que acompanharam a negociação. "
+                "Pedidos a avaliar pelo advogado: exibição de documentos, devolução de valores, indenização e tutela de urgência se comprovada. "
+                "Análise estratégica: avaliar risco probatório antes do protocolo."
+            ),
+        ),
+        message=message,
+        context={},
+        timeline=[],
+    )
+
+    rewritten = response["rewritten_input"]
+
+    assert response["assistant_mode"] == "editor_all_blocks_ready"
+
+    qualificacao = rewritten.split("BLOCO 2 — Qualificação das partes", 1)[1].split(
+        "BLOCO 3 — Resumo Fático", 1
+    )[0]
+
+    assert "Parte autora:" in qualificacao
+    assert "Maria de Souza" in qualificacao
+    assert "Parte ré:" in qualificacao
+    assert "Empresa Alfa Serviços LTDA" in qualificacao
+
+    forbidden_qualification_markers = (
+        "O autor relata",
+        "contrato de prestação de serviços",
+        "pagamento realizado",
+        "possível descumprimento contratual",
+        "Provas existentes",
+        "comprovantes de pagamento",
+        "Pontos a confirmar",
+        "Testemunhas/depoentes",
+        "Pedidos a avaliar",
+        "devolução de valores",
+        "indenização",
+        "tutela de urgência",
+        "Análise estratégica",
+        "risco probatório",
+    )
+
+    for marker in forbidden_qualification_markers:
+        assert marker not in qualificacao
+
