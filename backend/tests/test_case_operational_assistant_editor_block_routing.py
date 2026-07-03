@@ -1311,3 +1311,80 @@ Comece direto pelo BLOCO 1.
     for marker in forbidden_qualification_markers:
         assert marker not in qualificacao
 
+
+def test_editor_all_blocks_ready_fundamentacao_block_keeps_preliminary_legal_boundary():
+    message = """
+Gere todos os blocos principais da minuta preliminar deste caso em formato de texto pronto para copiar e colar no Editor/minuta.
+
+Entregue somente os blocos finais, separados por títulos exatamente assim:
+
+BLOCO 1 — Endereçamento
+BLOCO 2 — Qualificação das partes
+BLOCO 3 — Resumo Fático
+BLOCO 4 — Fundamentação preliminar
+BLOCO 5 — Pedidos
+BLOCO 6 — Provas e requerimentos
+BLOCO 7 — Fechamento e conferência final
+
+Não traga checklist operacional, linha do tempo, anexos, testemunhas, análise, próximos passos, alertas ou explicações fora dos blocos.
+
+Não invente dados. Use linguagem prudente.
+
+Comece direto pelo BLOCO 1.
+"""
+
+    response = _fallback_response(
+        case=_fake_case(
+            case_number="FUNDAMENTACAO-BOUNDARY-001",
+            description=(
+                "Parte autora: cliente a confirmar por documentos pessoais. "
+                "Parte ré: empresa fornecedora a confirmar por contrato e cadastro público. "
+                "O autor relata contrato de prestação de serviços, pagamento realizado e possível descumprimento contratual. "
+                "Provas existentes ou indicadas: contrato, comprovantes de pagamento e mensagens. "
+                "Pontos a confirmar: datas, valor da causa, endereço completo da parte ré e documentos essenciais. "
+                "Testemunhas/depoentes a confirmar: pessoas que acompanharam a negociação. "
+                "Pedidos a avaliar pelo advogado: exibição de documentos, devolução de valores, indenização e tutela de urgência se comprovada. "
+                "Análise estratégica: avaliar risco probatório antes do protocolo."
+            ),
+        ),
+        message=message,
+        context={},
+        timeline=[],
+    )
+
+    rewritten = response["rewritten_input"]
+
+    assert response["assistant_mode"] == "editor_all_blocks_ready"
+
+    fundamentacao = rewritten.split("BLOCO 4 — Fundamentação preliminar", 1)[1].split(
+        "BLOCO 5 — Pedidos", 1
+    )[0]
+    normalized_fundamentacao = " ".join(fundamentacao.split()).lower()
+
+    assert "advogado responsável" in normalized_fundamentacao
+    assert "fatos relatados" in normalized_fundamentacao
+    assert "documentos disponíveis" in normalized_fundamentacao
+    assert "sujeitos à revisão profissional" in normalized_fundamentacao
+
+    forbidden_fundamentacao_markers = (
+        "requer-se",
+        "pede-se",
+        "julgar procedente",
+        "condenação",
+        "tutela de urgência",
+        "protesta-se pela produção",
+        "provas existentes",
+        "testemunhas/depoentes",
+        "pontos a confirmar",
+        "checklist",
+        "próximos passos",
+        "análise estratégica",
+        "risco probatório",
+        "restou comprovado",
+        "ficou demonstrado",
+        "é incontroverso",
+    )
+
+    for marker in forbidden_fundamentacao_markers:
+        assert marker not in normalized_fundamentacao
+
