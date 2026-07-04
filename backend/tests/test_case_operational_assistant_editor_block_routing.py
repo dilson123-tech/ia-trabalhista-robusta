@@ -1550,3 +1550,92 @@ Comece direto pelo BLOCO 1.
     for marker in forbidden_provas_markers:
         assert marker not in normalized_provas
 
+
+def test_editor_all_blocks_ready_fechamento_block_keeps_final_caution_boundary():
+    message = """
+Gere todos os blocos principais da minuta preliminar deste caso em formato de texto pronto para copiar e colar no Editor/minuta.
+
+Entregue somente os blocos finais, separados por títulos exatamente assim:
+
+BLOCO 1 — Endereçamento
+BLOCO 2 — Qualificação das partes
+BLOCO 3 — Resumo Fático
+BLOCO 4 — Fundamentação preliminar
+BLOCO 5 — Pedidos
+BLOCO 6 — Provas e requerimentos
+BLOCO 7 — Fechamento e conferência final
+
+Não traga checklist operacional, linha do tempo, anexos, testemunhas, análise, próximos passos, alertas ou explicações fora dos blocos.
+
+Não invente dados. Use linguagem prudente.
+
+Comece direto pelo BLOCO 1.
+"""
+
+    response = _fallback_response(
+        case=_fake_case(
+            case_number="FECHAMENTO-BOUNDARY-001",
+            description=(
+                "Parte autora: cliente a confirmar por documentos pessoais. "
+                "Parte ré: empresa fornecedora a confirmar por contrato e cadastro público. "
+                "Resumo fático: o autor relata contrato de prestação de serviços, pagamento realizado e possível descumprimento contratual. "
+                "Fundamentação preliminar: avaliar deveres de informação, boa-fé, transparência e responsabilidade civil. "
+                "Pedidos a avaliar pelo advogado: exibição de documentos, devolução de valores, indenização e tutela de urgência se comprovada. "
+                "Provas existentes ou indicadas: contrato, comprovantes de pagamento, mensagens, prints, áudios e protocolos. "
+                "Pontos a confirmar: datas, valor da causa, endereço completo da parte ré e documentos essenciais. "
+                "Testemunhas/depoentes a confirmar: pessoas que acompanharam a negociação. "
+                "Análise estratégica: avaliar risco probatório antes do protocolo."
+            ),
+        ),
+        message=message,
+        context={},
+        timeline=[],
+    )
+
+    rewritten = response["rewritten_input"]
+
+    assert response["assistant_mode"] == "editor_all_blocks_ready"
+
+    fechamento = rewritten.split("BLOCO 7 — Fechamento e conferência final", 1)[1]
+    normalized_fechamento = " ".join(fechamento.split()).lower()
+
+    assert "minuta é preliminar" in normalized_fechamento
+    assert "advogado responsável" in normalized_fechamento
+    assert "competência" in normalized_fechamento
+    assert "rito" in normalized_fechamento
+    assert "valor da causa" in normalized_fechamento
+    assert "documentos essenciais" in normalized_fechamento
+    assert "a confirmar" in normalized_fechamento
+
+    forbidden_fechamento_markers = (
+        "parte autora:",
+        "parte ré:",
+        "o autor relata contrato",
+        "prestação de serviços",
+        "pagamento realizado",
+        "descumprimento contratual",
+        "fundamentação preliminar",
+        "deveres de informação",
+        "boa-fé",
+        "transparência",
+        "responsabilidade civil",
+        "requer-se",
+        "procedência dos pedidos",
+        "devolução de valores",
+        "indenização",
+        "protesta-se",
+        "meios de prova",
+        "comprovantes de pagamento",
+        "mensagens, prints",
+        "testemunhas/depoentes",
+        "risco probatório",
+        "checklist",
+        "próximos passos",
+        "restou comprovado",
+        "ficou demonstrado",
+        "é incontroverso",
+    )
+
+    for marker in forbidden_fechamento_markers:
+        assert marker not in normalized_fechamento
+
