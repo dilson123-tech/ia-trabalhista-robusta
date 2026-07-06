@@ -1639,3 +1639,95 @@ Comece direto pelo BLOCO 1.
     for marker in forbidden_fechamento_markers:
         assert marker not in normalized_fechamento
 
+
+def test_editor_all_blocks_ready_structural_regression_suite_keeps_seven_clean_blocks():
+    message = """
+Gere todos os blocos principais da minuta preliminar deste caso em formato de texto pronto para copiar e colar no Editor/minuta.
+
+Entregue somente os blocos finais, separados por títulos exatamente assim:
+
+BLOCO 1 — Endereçamento
+BLOCO 2 — Qualificação das partes
+BLOCO 3 — Resumo Fático
+BLOCO 4 — Fundamentação preliminar
+BLOCO 5 — Pedidos
+BLOCO 6 — Provas e requerimentos
+BLOCO 7 — Fechamento e conferência final
+
+Não traga checklist operacional, linha do tempo, anexos, testemunhas, análise, próximos passos, alertas ou explicações fora dos blocos.
+
+Não invente dados. Use linguagem prudente.
+
+Comece direto pelo BLOCO 1.
+"""
+
+    response = _fallback_response(
+        case=_fake_case(
+            case_number="STRUCTURAL-REGRESSION-001",
+            description=(
+                "Parte autora: cliente a confirmar por documentos pessoais. "
+                "Parte ré: empresa fornecedora a confirmar por contrato e cadastro público. "
+                "Resumo fático: o autor relata contrato de prestação de serviços, pagamento realizado e possível descumprimento contratual. "
+                "Fundamentação preliminar: avaliar deveres de informação, boa-fé, transparência e responsabilidade civil. "
+                "Pedidos a avaliar pelo advogado: exibição de documentos, devolução de valores, indenização e tutela de urgência se comprovada. "
+                "Provas existentes ou indicadas: contrato, comprovantes de pagamento, mensagens, prints, áudios e protocolos. "
+                "Pontos a confirmar: datas, valor da causa, endereço completo da parte ré e documentos essenciais. "
+                "Testemunhas/depoentes a confirmar: pessoas que acompanharam a negociação. "
+                "Análise estratégica: avaliar risco probatório antes do protocolo."
+            ),
+        ),
+        message=message,
+        context={},
+        timeline=[],
+    )
+
+    rewritten = response["rewritten_input"]
+
+    assert response["assistant_mode"] == "editor_all_blocks_ready"
+    assert response["metadata"]["source"] == "case_operational_assistant_editor_all_blocks_ready_v1"
+
+    expected_titles = [
+        "BLOCO 1 — Endereçamento",
+        "BLOCO 2 — Qualificação das partes",
+        "BLOCO 3 — Resumo Fático",
+        "BLOCO 4 — Fundamentação preliminar",
+        "BLOCO 5 — Pedidos",
+        "BLOCO 6 — Provas e requerimentos",
+        "BLOCO 7 — Fechamento e conferência final",
+    ]
+
+    assert rewritten.startswith(expected_titles[0])
+
+    positions = [rewritten.index(title) for title in expected_titles]
+    assert positions == sorted(positions)
+
+    for title in expected_titles:
+        assert rewritten.count(title) == 1
+
+    for current_title, next_title in zip(expected_titles, expected_titles[1:]):
+        section = rewritten.split(current_title, 1)[1].split(next_title, 1)[0]
+        assert len(section.strip()) > 40
+        for other_title in expected_titles:
+            assert other_title not in section
+
+    final_section = rewritten.split(expected_titles[-1], 1)[1]
+    assert len(final_section.strip()) > 40
+
+    forbidden_global_markers = (
+        "suggested_actions",
+        "next_steps",
+        "warnings",
+        "disclaimer",
+        "Texto sugerido para substituir",
+        "Ação agora",
+        "Checklist operacional",
+        "Linha do Tempo",
+        "Anexos/provas",
+        "Próximos passos",
+        "Alertas",
+        "Comece direto pelo BLOCO 1",
+    )
+
+    for marker in forbidden_global_markers:
+        assert marker not in rewritten
+
