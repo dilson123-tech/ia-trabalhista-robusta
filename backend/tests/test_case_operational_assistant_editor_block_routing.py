@@ -1731,3 +1731,117 @@ Comece direto pelo BLOCO 1.
     for marker in forbidden_global_markers:
         assert marker not in rewritten
 
+
+def test_editor_all_blocks_ready_golden_fixture_keeps_representative_block_signatures():
+    message = """
+Gere todos os blocos principais da minuta preliminar deste caso em formato de texto pronto para copiar e colar no Editor/minuta.
+
+Entregue somente os blocos finais, separados por títulos exatamente assim:
+
+BLOCO 1 — Endereçamento
+BLOCO 2 — Qualificação das partes
+BLOCO 3 — Resumo Fático
+BLOCO 4 — Fundamentação preliminar
+BLOCO 5 — Pedidos
+BLOCO 6 — Provas e requerimentos
+BLOCO 7 — Fechamento e conferência final
+
+Não traga checklist operacional, linha do tempo, anexos, testemunhas, análise, próximos passos, alertas ou explicações fora dos blocos.
+
+Não invente dados. Use linguagem prudente.
+
+Comece direto pelo BLOCO 1.
+"""
+
+    response = _fallback_response(
+        case=_fake_case(
+            case_number="GOLDEN-ALL-BLOCKS-001",
+            description=(
+                "Parte autora: consumidor a confirmar por documentos pessoais. "
+                "Parte ré: empresa fornecedora a confirmar por contrato e cadastro público. "
+                "O autor relata contratação de serviço, pagamento realizado, falha na prestação e ausência de solução administrativa. "
+                "Fundamentação preliminar: avaliar relação de consumo, dever de informação, boa-fé, responsabilidade civil e falha na prestação do serviço. "
+                "Pedidos a avaliar pelo advogado: obrigação de fazer, restituição de valores, indenização e tutela de urgência se houver prova suficiente. "
+                "Provas existentes ou indicadas: contrato, comprovantes de pagamento, mensagens, prints, protocolos de atendimento e notificações. "
+                "Pontos a confirmar: datas, valor da causa, endereço completo da parte ré, documentos essenciais e estratégia processual. "
+                "Testemunhas/depoentes a confirmar: pessoas que acompanharam a contratação e as tentativas de solução."
+            ),
+        ),
+        message=message,
+        context={},
+        timeline=[],
+    )
+
+    rewritten = response["rewritten_input"]
+
+    assert response["assistant_mode"] == "editor_all_blocks_ready"
+    assert response["metadata"]["source"] == "case_operational_assistant_editor_all_blocks_ready_v1"
+
+    expected_titles = [
+        "BLOCO 1 — Endereçamento",
+        "BLOCO 2 — Qualificação das partes",
+        "BLOCO 3 — Resumo Fático",
+        "BLOCO 4 — Fundamentação preliminar",
+        "BLOCO 5 — Pedidos",
+        "BLOCO 6 — Provas e requerimentos",
+        "BLOCO 7 — Fechamento e conferência final",
+    ]
+
+    sections = {}
+    for current_title, next_title in zip(expected_titles, expected_titles[1:]):
+        sections[current_title] = rewritten.split(current_title, 1)[1].split(next_title, 1)[0]
+
+    sections[expected_titles[-1]] = rewritten.split(expected_titles[-1], 1)[1]
+
+    golden_signatures = {
+        "BLOCO 1 — Endereçamento": (
+            "juízo",
+            "competente",
+        ),
+        "BLOCO 2 — Qualificação das partes": (
+            "parte autora",
+            "parte ré",
+            "a confirmar",
+        ),
+        "BLOCO 3 — Resumo Fático": (
+            "relata",
+            "pagamento",
+            "serviço",
+        ),
+        "BLOCO 4 — Fundamentação preliminar": (
+            "fundamentação",
+            "preliminar",
+            "documentos",
+            "advogado",
+        ),
+        "BLOCO 5 — Pedidos": (
+            "requer-se",
+            "pedidos finais",
+            "advogado",
+            "documentos essenciais",
+        ),
+        "BLOCO 6 — Provas e requerimentos": (
+            "protesta-se",
+            "meios de prova",
+            "documentos",
+            "juntada",
+        ),
+        "BLOCO 7 — Fechamento e conferência final": (
+            "minuta é preliminar",
+            "advogado responsável",
+            "competência",
+            "valor da causa",
+            "a confirmar",
+        ),
+    }
+
+    for title, expected_fragments in golden_signatures.items():
+        normalized_section = " ".join(sections[title].split()).lower()
+        for fragment in expected_fragments:
+            assert fragment in normalized_section
+
+    assert "suggested_actions" not in rewritten
+    assert "next_steps" not in rewritten
+    assert "warnings" not in rewritten
+    assert "disclaimer" not in rewritten
+
