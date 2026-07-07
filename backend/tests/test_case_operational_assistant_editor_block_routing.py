@@ -1845,3 +1845,138 @@ Comece direto pelo BLOCO 1.
     assert "warnings" not in rewritten
     assert "disclaimer" not in rewritten
 
+
+def test_editor_all_blocks_ready_frontend_prompt_stays_synced_with_golden_contract():
+    import re
+    from pathlib import Path
+
+    frontend_source = Path("frontend/src/components/CaseOperationalAssistantPanel.tsx").read_text()
+
+    match = re.search(
+        r"const ALL_BLOCKS_READY_MINUTA_PROMPT\s*=\s*`(?P<prompt>.*?)`\n",
+        frontend_source,
+        flags=re.S,
+    )
+    assert match is not None
+
+    prompt = match.group("prompt")
+
+    expected_titles = [
+        "BLOCO 1 — Endereçamento",
+        "BLOCO 2 — Qualificação das partes",
+        "BLOCO 3 — Resumo Fático",
+        "BLOCO 4 — Fundamentação preliminar",
+        "BLOCO 5 — Pedidos",
+        "BLOCO 6 — Provas e requerimentos",
+        "BLOCO 7 — Fechamento e conferência final",
+    ]
+
+    assert "Gere todos os blocos principais da minuta preliminar" in prompt
+    assert "Entregue somente os blocos finais" in prompt
+    assert "Não invente dados" in prompt
+    assert "Use linguagem prudente" in prompt
+    assert "Comece direto pelo BLOCO 1" in prompt
+
+    for title in expected_titles:
+        assert prompt.count(title) == 1
+
+    response = _fallback_response(
+        case=_fake_case(
+            case_number="FRONTEND-PROMPT-GOLDEN-SYNC-001",
+            description=(
+                "Parte autora: consumidor a confirmar por documentos pessoais. "
+                "Parte ré: empresa fornecedora a confirmar por contrato e cadastro público. "
+                "O autor relata contratação de serviço, pagamento realizado, falha na prestação e ausência de solução administrativa. "
+                "Fundamentação preliminar: avaliar relação de consumo, dever de informação, boa-fé, responsabilidade civil e falha na prestação do serviço. "
+                "Pedidos a avaliar pelo advogado: obrigação de fazer, restituição de valores, indenização e tutela de urgência se houver prova suficiente. "
+                "Provas existentes ou indicadas: contrato, comprovantes de pagamento, mensagens, prints, protocolos de atendimento e notificações. "
+                "Pontos a confirmar: datas, valor da causa, endereço completo da parte ré, documentos essenciais e estratégia processual. "
+                "Testemunhas/depoentes a confirmar: pessoas que acompanharam a contratação e as tentativas de solução."
+            ),
+        ),
+        message=prompt,
+        context={},
+        timeline=[],
+    )
+
+    rewritten = response["rewritten_input"]
+
+    assert response["assistant_mode"] == "editor_all_blocks_ready"
+    assert response["metadata"]["source"] == "case_operational_assistant_editor_all_blocks_ready_v1"
+    assert response["metadata"]["blocks"] == expected_titles
+
+    assert rewritten.startswith(expected_titles[0])
+
+    for title in expected_titles:
+        assert rewritten.count(title) == 1
+
+    sections = {}
+    for current_title, next_title in zip(expected_titles, expected_titles[1:]):
+        sections[current_title] = rewritten.split(current_title, 1)[1].split(next_title, 1)[0]
+
+    sections[expected_titles[-1]] = rewritten.split(expected_titles[-1], 1)[1]
+
+    golden_signatures = {
+        "BLOCO 1 — Endereçamento": (
+            "juízo",
+            "competente",
+        ),
+        "BLOCO 2 — Qualificação das partes": (
+            "parte autora",
+            "parte ré",
+            "a confirmar",
+        ),
+        "BLOCO 3 — Resumo Fático": (
+            "relata",
+            "pagamento",
+            "serviço",
+        ),
+        "BLOCO 4 — Fundamentação preliminar": (
+            "fundamentação",
+            "preliminar",
+            "documentos",
+            "advogado",
+        ),
+        "BLOCO 5 — Pedidos": (
+            "requer-se",
+            "pedidos finais",
+            "advogado",
+            "documentos essenciais",
+        ),
+        "BLOCO 6 — Provas e requerimentos": (
+            "protesta-se",
+            "meios de prova",
+            "documentos",
+            "juntada",
+        ),
+        "BLOCO 7 — Fechamento e conferência final": (
+            "minuta é preliminar",
+            "advogado responsável",
+            "competência",
+            "valor da causa",
+            "a confirmar",
+        ),
+    }
+
+    for title, expected_fragments in golden_signatures.items():
+        normalized_section = " ".join(sections[title].split()).lower()
+        for fragment in expected_fragments:
+            assert fragment in normalized_section
+
+    forbidden_operational_markers = (
+        "suggested_actions",
+        "next_steps",
+        "warnings",
+        "disclaimer",
+        "Texto sugerido para substituir",
+        "Ação agora",
+        "Checklist operacional",
+        "Linha do Tempo",
+        "Anexos/provas",
+        "Próximos passos",
+        "Alertas",
+    )
+
+    for marker in forbidden_operational_markers:
+        assert marker not in rewritten
+
