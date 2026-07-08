@@ -1980,3 +1980,102 @@ def test_editor_all_blocks_ready_frontend_prompt_stays_synced_with_golden_contra
     for marker in forbidden_operational_markers:
         assert marker not in rewritten
 
+
+def test_editor_all_blocks_ready_cobranca_contratual_without_moral_damage_keeps_specific_requests():
+    message = """
+Gere todos os blocos principais da minuta preliminar deste caso em formato de texto pronto para copiar e colar no Editor/minuta.
+
+Entregue somente os blocos finais, separados por títulos exatamente assim:
+
+BLOCO 1 — Endereçamento
+BLOCO 2 — Qualificação das partes
+BLOCO 3 — Resumo Fático
+BLOCO 4 — Fundamentação preliminar
+BLOCO 5 — Pedidos
+BLOCO 6 — Provas e requerimentos
+BLOCO 7 — Fechamento e conferência final
+
+Não traga checklist operacional, linha do tempo, anexos, testemunhas, análise, próximos passos, alertas ou explicações fora dos blocos.
+
+Não invente dados. Use linguagem prudente.
+
+Comece direto pelo BLOCO 1.
+"""
+
+    response = _fallback_response(
+        case=_fake_case(
+            case_number="COBRANCA-CONTRATUAL-001",
+            title="Cobrança contratual de saldo de manutenção elétrica",
+            legal_area="cível",
+            action_type="ação de cobrança contratual",
+            description=(
+                "A empresa DLP Manutenção e Serviços Ltda. foi contratada pela empresa Restaurante Mar Azul Ltda. "
+                "para realizar serviços de manutenção elétrica. "
+                "O valor total contratado foi de R$ 18.500,00. "
+                "Houve pagamento parcial de R$ 6.500,00. "
+                "Permaneceu saldo contratual inadimplido de R$ 12.000,00. "
+                "Os serviços foram executados conforme combinado. "
+                "Pedido pretendido: propor ação de cobrança contratual, sem pedido de dano moral. "
+                "Observação estratégica: a prova documental é considerada forte. "
+                "Provas existentes ou indicadas: contrato, proposta, comprovantes de pagamento, notas, mensagens e planilha de cálculo."
+            ),
+        ),
+        message=message,
+        context={},
+        timeline=[],
+    )
+
+    rewritten = response["rewritten_input"]
+
+    assert response["assistant_mode"] == "editor_all_blocks_ready"
+
+    for title in (
+        "BLOCO 1 — Endereçamento",
+        "BLOCO 2 — Qualificação das partes",
+        "BLOCO 3 — Resumo Fático",
+        "BLOCO 4 — Fundamentação preliminar",
+        "BLOCO 5 — Pedidos",
+        "BLOCO 6 — Provas e requerimentos",
+        "BLOCO 7 — Fechamento e conferência final",
+    ):
+        assert title in rewritten
+
+    qualificacao = rewritten.split("BLOCO 2 — Qualificação das partes", 1)[1].split(
+        "BLOCO 3 — Resumo Fático", 1
+    )[0]
+    resumo = rewritten.split("BLOCO 3 — Resumo Fático", 1)[1].split(
+        "BLOCO 4 — Fundamentação preliminar", 1
+    )[0]
+    fundamentacao = rewritten.split("BLOCO 4 — Fundamentação preliminar", 1)[1].split(
+        "BLOCO 5 — Pedidos", 1
+    )[0]
+    pedidos = rewritten.split("BLOCO 5 — Pedidos", 1)[1].split(
+        "BLOCO 6 — Provas e requerimentos", 1
+    )[0]
+
+    normalized_fundamentacao = " ".join(fundamentacao.split()).lower()
+    normalized_pedidos = " ".join(pedidos.split()).lower()
+
+    assert "DLP Manutenção e Serviços" in qualificacao
+    assert "Restaurante Mar Azul" in qualificacao
+
+    assert "Pedido pretendido" not in resumo
+    assert "Observação estratégica" not in resumo
+    assert "Observacao estrategica" not in resumo
+
+    assert "cobrança contratual" in normalized_fundamentacao
+    assert "inadimplemento" in normalized_fundamentacao
+    assert "saldo contratual" in normalized_fundamentacao
+
+    assert "saldo contratual inadimplido" in normalized_pedidos
+    assert "correção monetária" in normalized_pedidos
+    assert "juros" in normalized_pedidos
+
+    forbidden_positive_request_markers = (
+        "eventual indenização por danos materiais e/ou morais",
+        "obrigação de fazer ou não fazer",
+        "tutela de urgência, valor da causa",
+    )
+    for marker in forbidden_positive_request_markers:
+        assert marker not in normalized_pedidos
+
