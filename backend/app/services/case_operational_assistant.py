@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 import json
 from typing import Any
 
@@ -2157,6 +2159,9 @@ def _build_resumo_fatico_source_body(source_text: str) -> str:
             "Depoentes",
             "Pedidos a avaliar",
             "Pedidos possíveis",
+            "Pedido pretendido",
+            "Observação estratégica",
+            "Observacao estrategica",
             "Pedidos:",
             "Comarca provável",
             "Vara competente",
@@ -2169,6 +2174,88 @@ def _build_resumo_fatico_source_body(source_text: str) -> str:
 
     cleaned = _clean_text(cleaned, 6000)
     return cleaned or raw
+
+
+def _normalize_editor_detection_text(*values: Any) -> str:
+    return " ".join(" ".join(str(value or "").lower().split()) for value in values)
+
+
+def _is_cobranca_contratual_without_moral_damage(
+    source_text: str,
+    context: dict[str, Any] | None = None,
+) -> bool:
+    context = context or {}
+    case_context = context.get("case_context") if isinstance(context, dict) else {}
+    case_context = case_context if isinstance(case_context, dict) else {}
+
+    normalized = _normalize_editor_detection_text(
+        source_text,
+        *(case_context.values()),
+    )
+
+    collection_markers = (
+        "ação de cobrança",
+        "acao de cobranca",
+        "cobrança contratual",
+        "cobranca contratual",
+        "saldo contratual",
+        "saldo devedor",
+        "saldo inadimplido",
+        "inadimplemento",
+        "parcelas restantes",
+        "dívida principal",
+        "divida principal",
+        "não foram pagas",
+        "nao foram pagas",
+    )
+    no_moral_damage_markers = (
+        "sem pedido de dano moral",
+        "sem pedido de danos morais",
+        "sem dano moral",
+        "sem danos morais",
+        "não pede dano moral",
+        "nao pede dano moral",
+        "não pleiteia dano moral",
+        "nao pleiteia dano moral",
+    )
+
+    return any(marker in normalized for marker in collection_markers) and any(
+        marker in normalized for marker in no_moral_damage_markers
+    )
+
+
+def _strip_editor_business_party_name(value: str) -> str:
+    cleaned = _clean_text(value, 220)
+    cleaned = re.sub(r"^(a|o)\s+empresa\s+", "", cleaned, flags=re.IGNORECASE).strip()
+    cleaned = re.sub(r"\s+", " ", cleaned)
+    return cleaned.strip(" .,:;-")
+
+
+def _extract_editor_business_parties_from_contract(source_text: str) -> tuple[str, str]:
+    text = _clean_text(source_text, 6000)
+    if not text:
+        return "", ""
+
+    patterns = (
+        r"\bA empresa\s+(?P<author>.+?)\s+foi contratada pela empresa\s+(?P<defendant>.+?)\s+para\b",
+        r"\bA empresa\s+(?P<author>.+?)\s+prestou serviços(?:\s+contratados)?\s+(?:para|à|a)\s+(?:empresa\s+)?(?P<defendant>.+?)(?:\.|,|\s+e\s+)",
+    )
+
+    for pattern in patterns:
+        match = re.search(pattern, text, flags=re.IGNORECASE | re.DOTALL)
+        if not match:
+            continue
+
+        author = _strip_editor_business_party_name(match.group("author"))
+        defendant = _strip_editor_business_party_name(match.group("defendant"))
+
+        if author and defendant:
+            return (
+                f"Parte autora: {author}, qualificação completa, CNPJ, endereço, representante legal, contrato social e procuração a confirmar pelo advogado.",
+                f"Parte ré: {defendant}, qualificação completa, CNPJ, endereço, representante legal, contrato social, dados cadastrais e documentos da relação contratual a confirmar pelo advogado.",
+            )
+
+    return "", ""
 
 
 def _editor_all_blocks_ready_response(
@@ -2195,6 +2282,11 @@ def _editor_all_blocks_ready_response(
             "action_type": getattr(case, "action_type", ""),
         },
     }
+
+    is_cobranca_contratual_without_moral_damage = (
+        _is_cobranca_contratual_without_moral_damage(source_body, editor_context)
+    )
+    business_parte_autora, business_parte_re = _extract_editor_business_parties_from_contract(source_body)
 
     _, enderecamento = _build_editor_block_revision(
         "Endereçamento",
@@ -2224,27 +2316,46 @@ def _editor_all_blocks_ready_response(
     qualificacao = "\n\n".join(
         item
         for item in (
-            parte_autora or "Parte autora: a confirmar, conforme documentos pessoais, comprovante de endereço, procuração e cadastro do caso.",
-            parte_re or "Parte ré: a confirmar, conforme contrato, comprovantes, cadastro público, documentos da relação jurídica e revisão do advogado.",
+            parte_autora or business_parte_autora or "Parte autora: a confirmar, conforme documentos pessoais, comprovante de endereço, procuração e cadastro do caso.",
+            parte_re or business_parte_re or "Parte ré: a confirmar, conforme contrato, comprovantes, cadastro público, documentos da relação jurídica e revisão do advogado.",
         )
         if item
     )
 
-    fundamentacao = (
-        "A fundamentação preliminar deverá ser avaliada pelo advogado responsável à luz dos fatos relatados, "
-        "dos documentos disponíveis, da natureza da relação jurídica, dos deveres de informação, boa-fé, "
-        "transparência, cumprimento contratual, prestação de contas e eventual responsabilidade civil ou restituitória, "
-        "conforme o enquadramento jurídico confirmado após análise documental. "
-        "As teses jurídicas, a base legal específica, o rito, a competência, a urgência e a extensão dos pedidos permanecem sujeitos à revisão profissional."
-    )
+    if is_cobranca_contratual_without_moral_damage:
+        fundamentacao = (
+            "A fundamentação preliminar deve se concentrar na cobrança contratual do saldo em aberto, "
+            "considerando o inadimplemento da parte contratante, a execução integral ou substancial dos serviços, "
+            "o pagamento parcial já realizado, o saldo contratual ainda em aberto e a necessidade de apuração do valor principal. "
+            "Devem ser avaliados contrato, proposta, ordem de serviço, notas, comprovantes de pagamento, mensagens, planilha de cálculo, "
+            "correção monetária, juros e multa contratual se prevista. "
+            "A base legal específica, competência, rito, valor da causa e extensão final dos pedidos permanecem sujeitos à revisão profissional."
+        )
 
-    pedidos = (
-        "Diante do exposto, e sem prejuízo de adequação pelo advogado responsável, requer-se a citação da parte ré, "
-        "a exibição dos documentos essenciais da relação jurídica, a prestação de contas ou esclarecimentos formais sobre os fatos controvertidos, "
-        "a apuração dos valores envolvidos, a preservação e juntada das provas disponíveis, e a adoção das medidas necessárias para recompor o direito alegado pelo Autor, "
-        "inclusive restituição, obrigação de fazer ou não fazer e eventual indenização por danos materiais e/ou morais, caso haja lastro documental suficiente. "
-        "Os pedidos finais, tutela de urgência, valor da causa, correção monetária, juros, custas, honorários e demais requerimentos devem ser definidos pelo advogado."
-    )
+        pedidos = (
+            "Diante do exposto, e sem prejuízo de adequação pelo advogado responsável, requer-se a citação da parte ré, "
+            "a condenação ao pagamento do saldo contratual inadimplido, com apuração do valor principal, correção monetária, juros, "
+            "multa contratual se prevista, custas, honorários e demais encargos admitidos. "
+            "Requer-se ainda a preservação e juntada das provas documentais disponíveis, especialmente contrato, proposta, ordem de serviço, "
+            "notas, recibos, comprovantes de pagamento, mensagens e planilha de cálculo. "
+            "Os pedidos finais, valor da causa, índice de correção, termo inicial dos juros e demais requerimentos devem ser definidos pelo advogado."
+        )
+    else:
+        fundamentacao = (
+            "A fundamentação preliminar deverá ser avaliada pelo advogado responsável à luz dos fatos relatados, "
+            "dos documentos disponíveis, da natureza da relação jurídica, dos deveres de informação, boa-fé, "
+            "transparência, cumprimento contratual, prestação de contas e eventual responsabilidade civil ou restituitória, "
+            "conforme o enquadramento jurídico confirmado após análise documental. "
+            "As teses jurídicas, a base legal específica, o rito, a competência, a urgência e a extensão dos pedidos permanecem sujeitos à revisão profissional."
+        )
+
+        pedidos = (
+            "Diante do exposto, e sem prejuízo de adequação pelo advogado responsável, requer-se a citação da parte ré, "
+            "a exibição dos documentos essenciais da relação jurídica, a prestação de contas ou esclarecimentos formais sobre os fatos controvertidos, "
+            "a apuração dos valores envolvidos, a preservação e juntada das provas disponíveis, e a adoção das medidas necessárias para recompor o direito alegado pelo Autor, "
+            "inclusive restituição, obrigação de fazer ou não fazer e eventual indenização por danos materiais e/ou morais, caso haja lastro documental suficiente. "
+            "Os pedidos finais, tutela de urgência, valor da causa, correção monetária, juros, custas, honorários e demais requerimentos devem ser definidos pelo advogado."
+        )
 
     provas = (
         "Protesta-se pela produção de todos os meios de prova em direito admitidos, especialmente documentos já disponíveis, comprovantes de pagamento, contratos, recibos, mensagens, prints, áudios, vídeos, consultas oficiais, registros administrativos, depoimento pessoal da parte ré, oitiva de testemunhas a confirmar e demais provas que se mostrarem necessárias. "
