@@ -2079,3 +2079,78 @@ Comece direto pelo BLOCO 1.
     for marker in forbidden_positive_request_markers:
         assert marker not in normalized_pedidos
 
+
+def test_editor_all_blocks_ready_universal_action_specialization_router_keeps_consumer_vehicle_requests_specific():
+    message = """
+Gere todos os blocos principais da minuta preliminar deste caso em formato de texto pronto para copiar e colar no Editor/minuta.
+
+Entregue somente os blocos finais, separados por títulos exatamente assim:
+
+BLOCO 1 — Endereçamento
+BLOCO 2 — Qualificação das partes
+BLOCO 3 — Resumo Fático
+BLOCO 4 — Fundamentação preliminar
+BLOCO 5 — Pedidos
+BLOCO 6 — Provas e requerimentos
+BLOCO 7 — Fechamento e conferência final
+
+Não traga checklist operacional, linha do tempo, anexos, testemunhas, análise, próximos passos, alertas ou explicações fora dos blocos.
+
+Não invente dados. Use linguagem prudente.
+
+Comece direto pelo BLOCO 1.
+"""
+
+    response = _fallback_response(
+        case=_fake_case(
+            case_number="VEICULO-QUINTINO-PIX-001",
+            title="Retomada de veículo por revendedora após pagamento parcelado via Pix",
+            legal_area="consumidor",
+            action_type="exibição de contrato, restituição de veículo ou indenização",
+            description=(
+                "Parte autora: Dilson Pereira, CPF a confirmar, residente em Itapoá/SC. "
+                "Parte ré: QUINTINO COMÉRCIO DE AUTOMÓVEIS LTDA, nome fantasia Quintino Automóveis. "
+                "O autor relata aquisição de veículo junto à revendedora, entrega de bens como entrada, "
+                "pagamento de 34 parcelas de R$ 1.180,00 via Pix e posterior recolhimento do veículo sob alegação de bloqueio. "
+                "A parte ré não apresentou, até o momento, ordem judicial, cópia do contrato ou justificativa completa para a retirada do veículo. "
+                "Provas existentes ou indicadas: comprovantes Pix, conversas, consulta de restrição e documentos do veículo. "
+                "Pedido pretendido: exibição do contrato e documentos, restituição do veículo ou indenização material conforme revisão do advogado."
+            ),
+        ),
+        message=message,
+        context={},
+        timeline=[],
+    )
+
+    rewritten = response["rewritten_input"]
+
+    assert response["assistant_mode"] == "editor_all_blocks_ready"
+    assert response["metadata"]["action_specialization_kind"] == "consumer_vehicle_contract_display_restitution"
+
+    fundamentacao = rewritten.split("BLOCO 4 — Fundamentação preliminar", 1)[1].split(
+        "BLOCO 5 — Pedidos", 1
+    )[0]
+    pedidos = rewritten.split("BLOCO 5 — Pedidos", 1)[1].split(
+        "BLOCO 6 — Provas e requerimentos", 1
+    )[0]
+
+    normalized_fundamentacao = " ".join(fundamentacao.split()).lower()
+    normalized_pedidos = " ".join(pedidos.split()).lower()
+
+    assert "aquisição de veículo" in normalized_fundamentacao
+    assert "exibição de documentos" in normalized_fundamentacao
+    assert "restituição do veículo" in normalized_fundamentacao
+
+    assert "exibição do contrato" in normalized_pedidos
+    assert "restituição do veículo" in normalized_pedidos
+    assert "comprovantes pix" in normalized_pedidos
+
+    forbidden_wrong_family_markers = (
+        "saldo contratual inadimplido",
+        "multa contratual se prevista",
+        "eventual indenização por danos materiais e/ou morais",
+        "prestação de contas ou esclarecimentos formais sobre os fatos controvertidos",
+    )
+    for marker in forbidden_wrong_family_markers:
+        assert marker not in normalized_pedidos
+

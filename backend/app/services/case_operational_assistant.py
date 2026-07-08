@@ -2257,6 +2257,172 @@ def _extract_editor_business_parties_from_contract(source_text: str) -> tuple[st
 
     return "", ""
 
+def _editor_text_has_any(normalized_text: str, markers: tuple[str, ...]) -> bool:
+    return any(marker in normalized_text for marker in markers)
+
+
+def _build_editor_all_blocks_action_specialization(
+    source_text: str,
+    context: dict[str, Any] | None = None,
+) -> tuple[str, str, str]:
+    context = context or {}
+    case_context = context.get("case_context") if isinstance(context, dict) else {}
+    case_context = case_context if isinstance(case_context, dict) else {}
+
+    normalized = _normalize_editor_detection_text(
+        source_text,
+        *(case_context.values()),
+    )
+
+    if _is_cobranca_contratual_without_moral_damage(source_text, context):
+        return (
+            "cobranca_contratual_without_moral_damage",
+            (
+                "A fundamentação preliminar deve se concentrar na cobrança contratual do saldo em aberto, "
+                "considerando o inadimplemento da parte contratante, a execução integral ou substancial dos serviços, "
+                "o pagamento parcial já realizado, o saldo contratual ainda em aberto e a necessidade de apuração do valor principal. "
+                "Devem ser avaliados contrato, proposta, ordem de serviço, notas, comprovantes de pagamento, mensagens, planilha de cálculo, "
+                "correção monetária, juros e multa contratual se prevista. "
+                "A base legal específica, competência, rito, valor da causa e extensão final dos pedidos permanecem sujeitos à revisão profissional."
+            ),
+            (
+                "Diante do exposto, e sem prejuízo de adequação pelo advogado responsável, requer-se a citação da parte ré, "
+                "a condenação ao pagamento do saldo contratual inadimplido, com apuração do valor principal, correção monetária, juros, "
+                "multa contratual se prevista, custas, honorários e demais encargos admitidos. "
+                "Requer-se ainda a preservação e juntada das provas documentais disponíveis, especialmente contrato, proposta, ordem de serviço, "
+                "notas, recibos, comprovantes de pagamento, mensagens e planilha de cálculo. "
+                "Os pedidos finais, valor da causa, índice de correção, termo inicial dos juros e demais requerimentos devem ser definidos pelo advogado."
+            ),
+        )
+
+    vehicle_markers = (
+        "veículo",
+        "veiculo",
+        "automóvel",
+        "automovel",
+        "revendedora",
+        "automóveis",
+        "automoveis",
+        "renavam",
+        "placa",
+    )
+    vehicle_dispute_markers = (
+        "recolheu",
+        "retomou",
+        "retomada",
+        "tomou",
+        "bloqueio",
+        "restrição",
+        "restricao",
+        "exibição de contrato",
+        "exibicao de contrato",
+        "comprovantes pix",
+        "parcelas",
+    )
+    if _editor_text_has_any(normalized, vehicle_markers) and _editor_text_has_any(
+        normalized, vehicle_dispute_markers
+    ):
+        return (
+            "consumer_vehicle_contract_display_restitution",
+            (
+                "A fundamentação preliminar deve se concentrar na relação contratual e de consumo envolvendo aquisição de veículo, "
+                "pagamentos realizados, documentos contratuais pendentes, eventual restrição ou bloqueio informado e possível recolhimento ou retenção do bem. "
+                "Devem ser avaliados comprovantes de pagamento, contrato, recibos, conversas, documentos do veículo, placa, RENAVAM, consulta de restrição, "
+                "eventual ordem judicial, justificativa apresentada pela parte ré e a viabilidade de exibição de documentos, restituição do veículo, "
+                "regularização da situação ou perdas e danos. "
+                "A base legal específica, competência, rito, urgência e extensão dos pedidos permanecem sujeitos à revisão profissional."
+            ),
+            (
+                "Diante do exposto, e sem prejuízo de adequação pelo advogado responsável, requer-se a citação da parte ré, "
+                "a exibição do contrato, recibos, documentos do veículo, justificativa do bloqueio ou restrição e demais documentos essenciais da negociação. "
+                "Requer-se também a análise da restituição do veículo, regularização da situação do bem ou indenização material equivalente, conforme a prova documental e a estratégia confirmada. "
+                "Devem ser juntados e preservados comprovantes Pix, mensagens, consultas oficiais, documentos do veículo e demais registros disponíveis. "
+                "Tutela de urgência, busca do bem, obrigação específica, perdas e danos, valor da causa, custas e honorários devem ser definidos pelo advogado apenas se houver suporte documental suficiente."
+            ),
+        )
+
+    obligation_markers = (
+        "obrigação de fazer",
+        "obrigacao de fazer",
+        "obrigação de não fazer",
+        "obrigacao de nao fazer",
+        "cumprimento de obrigação",
+        "cumprimento de obrigacao",
+        "regularização",
+        "regularizacao",
+    )
+    if _editor_text_has_any(normalized, obligation_markers):
+        return (
+            "obligation_to_do_or_not_do",
+            (
+                "A fundamentação preliminar deve se concentrar na obrigação específica indicada no caso, no vínculo jurídico que a sustenta, "
+                "no descumprimento atribuído à parte ré, na utilidade prática do provimento pretendido e na necessidade de prazo razoável para cumprimento. "
+                "Devem ser avaliados documentos que comprovem a obrigação, comunicações prévias, tentativas de solução, urgência concreta, risco de dano e eventual cabimento de multa diária. "
+                "A base legal específica, competência, rito e extensão final dos pedidos permanecem sujeitos à revisão profissional."
+            ),
+            (
+                "Diante do exposto, e sem prejuízo de adequação pelo advogado responsável, requer-se a citação da parte ré, "
+                "a determinação de cumprimento da obrigação específica indicada no caso, em prazo a ser definido pelo juízo, "
+                "com eventual fixação de multa diária se houver suporte fático e jurídico. "
+                "Requer-se a juntada e preservação dos documentos, mensagens, notificações, protocolos e demais provas do descumprimento. "
+                "Pedidos de indenização, tutela de urgência, astreintes, perdas e danos, custas e honorários devem ser definidos pelo advogado conforme a prova disponível."
+            ),
+        )
+
+    damage_markers = (
+        "dano moral",
+        "danos morais",
+        "dano material",
+        "danos materiais",
+        "indenização",
+        "indenizacao",
+        "ato ilícito",
+        "ato ilicito",
+    )
+    no_moral_damage_markers = (
+        "sem pedido de dano moral",
+        "sem pedido de danos morais",
+        "sem dano moral",
+        "sem danos morais",
+    )
+    if _editor_text_has_any(normalized, damage_markers) and not _editor_text_has_any(
+        normalized, no_moral_damage_markers
+    ):
+        return (
+            "civil_damages_claim",
+            (
+                "A fundamentação preliminar deve se concentrar na conduta atribuída à parte ré, no dano alegado, "
+                "no nexo entre os fatos e o prejuízo, na extensão dos danos materiais ou morais indicados e na prova mínima disponível. "
+                "Devem ser avaliados documentos, comunicações, comprovantes, registros administrativos, eventuais perdas mensuráveis e circunstâncias concretas que sustentem a indenização. "
+                "A base legal específica, competência, rito, quantificação e extensão final dos pedidos permanecem sujeitos à revisão profissional."
+            ),
+            (
+                "Diante do exposto, e sem prejuízo de adequação pelo advogado responsável, requer-se a citação da parte ré, "
+                "a apuração da responsabilidade pelos fatos narrados e a condenação ao pagamento de indenização por danos materiais e/ou morais, "
+                "somente nos limites comprovados pelos documentos e pela estratégia definida pelo advogado. "
+                "Requer-se a preservação e juntada das provas disponíveis, incluindo comprovantes, mensagens, registros, laudos, recibos e demais documentos pertinentes. "
+                "Valor da causa, quantificação do dano, correção monetária, juros, custas, honorários e eventual tutela devem ser definidos pelo advogado."
+            ),
+        )
+
+    return (
+        "generic_prudent",
+        (
+            "A fundamentação preliminar deverá ser avaliada pelo advogado responsável à luz dos fatos relatados, "
+            "dos documentos disponíveis, da natureza da relação jurídica, dos deveres de informação, boa-fé, "
+            "transparência, cumprimento contratual, prestação de contas e eventual responsabilidade civil ou restituitória, "
+            "conforme o enquadramento jurídico confirmado após análise documental. "
+            "As teses jurídicas, a base legal específica, o rito, a competência, a urgência e a extensão dos pedidos permanecem sujeitos à revisão profissional."
+        ),
+        (
+            "Diante do exposto, e sem prejuízo de adequação pelo advogado responsável, requer-se a citação da parte ré, "
+            "a exibição dos documentos essenciais da relação jurídica, a prestação de contas ou esclarecimentos formais sobre os fatos controvertidos, "
+            "a apuração dos valores envolvidos, a preservação e juntada das provas disponíveis, e a adoção das medidas necessárias para recompor o direito alegado pelo Autor, "
+            "inclusive restituição, obrigação de fazer ou não fazer e eventual indenização por danos materiais e/ou morais, caso haja lastro documental suficiente. "
+            "Os pedidos finais, tutela de urgência, valor da causa, correção monetária, juros, custas, honorários e demais requerimentos devem ser definidos pelo advogado."
+        ),
+    )
+
 
 def _editor_all_blocks_ready_response(
     case: Case,
@@ -2283,9 +2449,6 @@ def _editor_all_blocks_ready_response(
         },
     }
 
-    is_cobranca_contratual_without_moral_damage = (
-        _is_cobranca_contratual_without_moral_damage(source_body, editor_context)
-    )
     business_parte_autora, business_parte_re = _extract_editor_business_parties_from_contract(source_body)
 
     _, enderecamento = _build_editor_block_revision(
@@ -2322,39 +2485,35 @@ def _editor_all_blocks_ready_response(
         if item
     )
 
-    if is_cobranca_contratual_without_moral_damage:
+    action_specialization_kind, fundamentacao, pedidos = _build_editor_all_blocks_action_specialization(
+        source_body,
+        editor_context,
+    )
+
+    if "advogado responsável" not in fundamentacao.lower():
         fundamentacao = (
-            "A fundamentação preliminar deve se concentrar na cobrança contratual do saldo em aberto, "
-            "considerando o inadimplemento da parte contratante, a execução integral ou substancial dos serviços, "
-            "o pagamento parcial já realizado, o saldo contratual ainda em aberto e a necessidade de apuração do valor principal. "
-            "Devem ser avaliados contrato, proposta, ordem de serviço, notas, comprovantes de pagamento, mensagens, planilha de cálculo, "
-            "correção monetária, juros e multa contratual se prevista. "
-            "A base legal específica, competência, rito, valor da causa e extensão final dos pedidos permanecem sujeitos à revisão profissional."
+            fundamentacao.rstrip()
+            + " O advogado responsável deverá confirmar o enquadramento jurídico, a base legal específica, "
+            "o rito, a competência e a extensão dos pedidos antes do protocolo."
         )
 
-        pedidos = (
-            "Diante do exposto, e sem prejuízo de adequação pelo advogado responsável, requer-se a citação da parte ré, "
-            "a condenação ao pagamento do saldo contratual inadimplido, com apuração do valor principal, correção monetária, juros, "
-            "multa contratual se prevista, custas, honorários e demais encargos admitidos. "
-            "Requer-se ainda a preservação e juntada das provas documentais disponíveis, especialmente contrato, proposta, ordem de serviço, "
-            "notas, recibos, comprovantes de pagamento, mensagens e planilha de cálculo. "
-            "Os pedidos finais, valor da causa, índice de correção, termo inicial dos juros e demais requerimentos devem ser definidos pelo advogado."
-        )
-    else:
+    if "fatos relatados" not in fundamentacao.lower():
         fundamentacao = (
-            "A fundamentação preliminar deverá ser avaliada pelo advogado responsável à luz dos fatos relatados, "
-            "dos documentos disponíveis, da natureza da relação jurídica, dos deveres de informação, boa-fé, "
-            "transparência, cumprimento contratual, prestação de contas e eventual responsabilidade civil ou restituitória, "
-            "conforme o enquadramento jurídico confirmado após análise documental. "
-            "As teses jurídicas, a base legal específica, o rito, a competência, a urgência e a extensão dos pedidos permanecem sujeitos à revisão profissional."
+            fundamentacao.rstrip()
+            + " A análise deve permanecer vinculada aos fatos relatados e aos documentos disponíveis no caso."
         )
 
+    if "documentos essenciais" not in pedidos.lower():
         pedidos = (
-            "Diante do exposto, e sem prejuízo de adequação pelo advogado responsável, requer-se a citação da parte ré, "
-            "a exibição dos documentos essenciais da relação jurídica, a prestação de contas ou esclarecimentos formais sobre os fatos controvertidos, "
-            "a apuração dos valores envolvidos, a preservação e juntada das provas disponíveis, e a adoção das medidas necessárias para recompor o direito alegado pelo Autor, "
-            "inclusive restituição, obrigação de fazer ou não fazer e eventual indenização por danos materiais e/ou morais, caso haja lastro documental suficiente. "
-            "Os pedidos finais, tutela de urgência, valor da causa, correção monetária, juros, custas, honorários e demais requerimentos devem ser definidos pelo advogado."
+            pedidos.rstrip()
+            + " Requer-se também a exibição, preservação ou juntada dos documentos essenciais da relação jurídica discutida."
+        )
+
+    if "pedidos finais" not in pedidos.lower():
+        pedidos = (
+            pedidos.rstrip()
+            + " Os pedidos finais, valor da causa, custas, honorários, eventual urgência e demais requerimentos "
+            "devem ser definidos pelo advogado responsável."
         )
 
     provas = (
@@ -2394,6 +2553,7 @@ def _editor_all_blocks_ready_response(
         "disclaimer": "",
         "metadata": {
             "source": "case_operational_assistant_editor_all_blocks_ready_v1",
+            "action_specialization_kind": action_specialization_kind,
             "provider": "fallback",
             "case_number": _clean_text(getattr(case, "case_number", "")),
             "timeline_items_considered": len(timeline),
