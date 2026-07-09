@@ -2305,25 +2305,85 @@ def _build_editor_all_blocks_action_specialization(
         "clt",
         "contrato de trabalho",
     )
+    labor_health_risk_markers = (
+        "insalubridade",
+        "periculosidade",
+        "calor intenso",
+        "metal em fusão",
+        "metal em fusao",
+        "setor de fusão",
+        "setor de fusao",
+        "agente insalubre",
+        "agentes insalubres",
+        "exposição a calor",
+        "exposicao a calor",
+        "adicional de insalubridade",
+        "adicional de periculosidade",
+    )
+    labor_health_evidence_markers = (
+        "ppp",
+        "ltcat",
+        "pgr",
+        "pcmso",
+        "ficha de epi",
+        "fichas de epi",
+        "epi",
+        "perícia técnica",
+        "pericia tecnica",
+        "laudo pericial",
+        "medições ambientais",
+        "medicoes ambientais",
+        "engenheiro de segurança",
+        "engenheiro de seguranca",
+        "médico do trabalho",
+        "medico do trabalho",
+    )
+    if _editor_text_has_any(normalized, labor_markers) and _editor_text_has_any(
+        normalized, labor_health_risk_markers
+    ):
+        return (
+            "labor_health_risk_premium_claim",
+            (
+                "A fundamentação preliminar deve se concentrar na reclamação trabalhista voltada ao adicional de insalubridade por exposição a calor "
+                "em ambiente de trabalho, especialmente quando houver relato de setor de fusão, metal em fusão ou calor intenso. "
+                "Deve ser avaliado, de forma subsidiária e prudente, eventual adicional de periculosidade apenas se os fatos e a prova técnica indicarem risco legalmente enquadrável. "
+                "A análise depende de prova técnica, perícia, medições ambientais, PPP, LTCAT, PGR, PCMSO, ficha de EPI, registros de entrega, treinamento e uso de EPI, "
+                "folhas de pagamento, documentos rescisórios e prova testemunhal. "
+                "Devem ser avaliados grau de insalubridade, eficácia dos EPIs, habitualidade da exposição, período contratual, reflexos em férias acrescidas de um terço, "
+                "13º salário, FGTS e verbas rescisórias, além de prescrição bienal e quinquenal. "
+                "A base legal específica, competência da Justiça do Trabalho, rito, perícia, quesitos, liquidação e extensão final dos pedidos permanecem sujeitos à revisão do advogado responsável."
+            ),
+            (
+                "Diante do exposto, e sem prejuízo de adequação pelo advogado responsável, requer-se a notificação da reclamada, "
+                "a condenação ao pagamento de adicional de insalubridade por exposição a calor, no grau apurado por perícia técnica, "
+                "e, subsidiariamente, a análise de adicional de periculosidade apenas se a prova técnica e documental confirmar hipótese legal aplicável. "
+                "Requer-se a produção de prova pericial por profissional habilitado, com avaliação do ambiente de trabalho, agente calor, medições ou análise técnica retroativa, "
+                "eficácia dos EPIs, habitualidade da exposição e formulação de quesitos pelo advogado. "
+                "Requer-se também a exibição, preservação ou juntada dos documentos essenciais da relação de emprego e de saúde e segurança do trabalho, especialmente PPP, LTCAT, PGR, PCMSO, "
+                "ficha de EPI, registros de entrega e treinamento de EPI, folhas de pagamento, contrato ou CTPS, TRCT e documentos rescisórios. "
+                "Requer-se, se comprovado o direito, o pagamento dos reflexos cabíveis em férias acrescidas de um terço, 13º salário, FGTS e verbas rescisórias. "
+                "Os pedidos finais, grau do adicional, base de cálculo, reflexos, critérios de cálculo, honorários, justiça gratuita se cabível, perícia e demais requerimentos devem ser definidos pelo advogado responsável."
+            ),
+        )
+
     labor_hours_markers = (
-        "jornada",
         "jornada superior",
+        "jornada superior à registrada",
+        "jornada superior a registrada",
         "horas extras",
         "hora extra",
+        "diferenças de horas extras",
+        "diferencas de horas extras",
         "intervalo intrajornada",
         "supressão parcial de intervalo",
         "supressao parcial de intervalo",
-        "dsr",
-        "descanso semanal remunerado",
-        "fgts",
-        "trct",
-        "holerites",
+        "supressão total de intervalo",
+        "supressao total de intervalo",
         "controle de ponto",
         "controles de ponto",
         "cartões de ponto",
         "cartoes de ponto",
-        "verbas rescisórias",
-        "verbas rescisorias",
+        "registros de jornada",
     )
     if _editor_text_has_any(normalized, labor_markers) and _editor_text_has_any(
         normalized, labor_hours_markers

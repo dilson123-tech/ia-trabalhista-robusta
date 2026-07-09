@@ -2236,3 +2236,98 @@ Comece direto pelo BLOCO 1.
     for marker in forbidden_civil_generic_markers:
         assert marker not in normalized_pedidos
 
+
+def test_editor_all_blocks_ready_labor_health_risk_router_keeps_insalubridade_requests_specific():
+    message = """
+Gere todos os blocos principais da minuta preliminar deste caso em formato de texto pronto para copiar e colar no Editor/minuta.
+
+Entregue somente os blocos finais, separados por títulos exatamente assim:
+
+BLOCO 1 — Endereçamento
+BLOCO 2 — Qualificação das partes
+BLOCO 3 — Resumo Fático
+BLOCO 4 — Fundamentação preliminar
+BLOCO 5 — Pedidos
+BLOCO 6 — Provas e requerimentos
+BLOCO 7 — Fechamento e conferência final
+
+Não traga checklist operacional, linha do tempo, anexos, testemunhas, análise, próximos passos, alertas ou explicações fora dos blocos.
+
+Não invente dados. Use linguagem prudente.
+
+Comece direto pelo BLOCO 1.
+"""
+
+    response = _fallback_response(
+        case=_fake_case(
+            case_number="TRAB-INSALUBRIDADE-CALOR-001",
+            title="Adicional de insalubridade por calor em setor de fusão",
+            legal_area="Trabalhista",
+            action_type="reclamação trabalhista",
+            description=(
+                "Resumo técnico: Reclamante trabalhou em setor de fusão da Tupy S.A. em Joinville/SC, "
+                "de fevereiro de 2024 a julho de 2024, com salário de R$ 2.200,00. "
+                "Alega direito a adicional de insalubridade por exposição a calor intenso, com metal em fusão, "
+                "e, subsidiariamente, periculosidade. "
+                "A pretensão depende de prova técnica, perícia e medições, além de PPP, LTCAT, PGR, PCMSO, "
+                "fichas de EPI, registros de fornecimento e uso de EPI, folhas de pagamento e prova testemunhal. "
+                "Há necessidade de cálculos para reflexos em férias, 13º salário e FGTS. "
+                "Risco prescricional bienal deve ser verificado pela data exata da rescisão em julho de 2024."
+            ),
+        ),
+        message=message,
+        context={},
+        timeline=[],
+    )
+
+    rewritten = response["rewritten_input"]
+
+    assert response["assistant_mode"] == "editor_all_blocks_ready"
+    assert response["metadata"]["action_specialization_kind"] == "labor_health_risk_premium_claim"
+
+    fundamentacao = rewritten.split("BLOCO 4 — Fundamentação preliminar", 1)[1].split(
+        "BLOCO 5 — Pedidos", 1
+    )[0]
+    pedidos = rewritten.split("BLOCO 5 — Pedidos", 1)[1].split(
+        "BLOCO 6 — Provas e requerimentos", 1
+    )[0]
+
+    normalized_fundamentacao = " ".join(fundamentacao.split()).lower()
+    normalized_pedidos = " ".join(pedidos.split()).lower()
+
+    assert "adicional de insalubridade" in normalized_fundamentacao
+    assert "exposição a calor" in normalized_fundamentacao
+    assert "metal em fusão" in normalized_fundamentacao
+    assert "periculosidade" in normalized_fundamentacao
+    assert "prova técnica" in normalized_fundamentacao
+    assert "ppp" in normalized_fundamentacao
+    assert "ltcat" in normalized_fundamentacao
+    assert "pgr" in normalized_fundamentacao
+    assert "pcmso" in normalized_fundamentacao
+    assert "epi" in normalized_fundamentacao
+
+    assert "adicional de insalubridade" in normalized_pedidos
+    assert "periculosidade" in normalized_pedidos
+    assert "prova pericial" in normalized_pedidos
+    assert "ppp" in normalized_pedidos
+    assert "ltcat" in normalized_pedidos
+    assert "pgr" in normalized_pedidos
+    assert "pcmso" in normalized_pedidos
+    assert "ficha de epi" in normalized_pedidos
+    assert "férias" in normalized_pedidos
+    assert "13º salário" in normalized_pedidos
+    assert "fgts" in normalized_pedidos
+
+    forbidden_wrong_labor_family_markers = (
+        "horas extras",
+        "intervalo intrajornada",
+        "diferenças de jornada",
+        "controles de ponto",
+        "dsr",
+        "saldo contratual inadimplido",
+        "exibição do contrato, recibos, documentos do veículo",
+        "eventual indenização por danos materiais e/ou morais",
+    )
+    for marker in forbidden_wrong_labor_family_markers:
+        assert marker not in normalized_pedidos
+
