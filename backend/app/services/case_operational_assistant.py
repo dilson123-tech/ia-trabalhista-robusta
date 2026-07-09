@@ -2633,10 +2633,23 @@ def _editor_all_blocks_ready_response(
             "devem ser definidos pelo advogado responsável."
         )
 
-    provas = (
-        "Protesta-se pela produção de todos os meios de prova em direito admitidos, especialmente documentos já disponíveis, comprovantes de pagamento, contratos, recibos, mensagens, prints, áudios, vídeos, consultas oficiais, registros administrativos, depoimento pessoal da parte ré, oitiva de testemunhas a confirmar e demais provas que se mostrarem necessárias. "
-        "Requer-se, se pertinente e após revisão do advogado, a expedição de ofícios, a exibição de documentos e a juntada posterior de novos elementos que confirmem os fatos narrados."
-    )
+    if action_specialization_kind == "labor_health_risk_premium_claim":
+        provas = (
+            "Protesta-se pela produção de prova técnica pericial por profissional habilitado em saúde e segurança do trabalho, "
+            "com avaliação do ambiente laboral, setor de fusão, exposição a calor, metal em fusão, medições ambientais, "
+            "critérios técnicos aplicáveis, grau de insalubridade, eventual risco enquadrável como periculosidade e eficácia dos EPIs. "
+            "Requer-se a formulação de quesitos periciais pelo advogado responsável, a possibilidade de assistente técnico, "
+            "a inspeção do local de trabalho ou análise técnica retroativa quando cabível, e a manifestação expressa sobre habitualidade, intensidade e neutralização do agente de risco. "
+            "Requer-se também a exibição, preservação e juntada de PPP, LTCAT, PGR, PCMSO, laudos ambientais, ficha de EPI, registros de entrega e treinamento de EPI, "
+            "folhas de pagamento, contrato ou CTPS, TRCT, documentos rescisórios, descrição de função e demais documentos de saúde e segurança do trabalho. "
+            "Protesta-se ainda pela prova testemunhal de colegas do setor de fusão, supervisores ou demais pessoas que possam descrever rotina, tempo de exposição, calor, uso e eficácia dos EPIs, "
+            "sem prejuízo de depoimento pessoal da reclamada, juntada posterior de novos documentos e expedição de ofícios quando necessário."
+        )
+    else:
+        provas = (
+            "Protesta-se pela produção de todos os meios de prova em direito admitidos, especialmente documentos já disponíveis, comprovantes de pagamento, contratos, recibos, mensagens, prints, áudios, vídeos, consultas oficiais, registros administrativos, depoimento pessoal da parte ré, oitiva de testemunhas a confirmar e demais provas que se mostrarem necessárias. "
+            "Requer-se, se pertinente e após revisão do advogado, a expedição de ofícios, a exibição de documentos e a juntada posterior de novos elementos que confirmem os fatos narrados."
+        )
 
     fechamento = (
         "A presente minuta é preliminar e deve ser revisada pelo advogado responsável antes de qualquer protocolo. "

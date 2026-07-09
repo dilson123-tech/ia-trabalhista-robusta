@@ -2331,3 +2331,86 @@ Comece direto pelo BLOCO 1.
     for marker in forbidden_wrong_labor_family_markers:
         assert marker not in normalized_pedidos
 
+
+def test_editor_all_blocks_ready_labor_health_risk_evidence_block_keeps_technical_proof_specific():
+    message = """
+Gere todos os blocos principais da minuta preliminar deste caso em formato de texto pronto para copiar e colar no Editor/minuta.
+
+Entregue somente os blocos finais, separados por títulos exatamente assim:
+
+BLOCO 1 — Endereçamento
+BLOCO 2 — Qualificação das partes
+BLOCO 3 — Resumo Fático
+BLOCO 4 — Fundamentação preliminar
+BLOCO 5 — Pedidos
+BLOCO 6 — Provas e requerimentos
+BLOCO 7 — Fechamento e conferência final
+
+Não traga checklist operacional, linha do tempo, anexos, testemunhas, análise, próximos passos, alertas ou explicações fora dos blocos.
+
+Não invente dados. Use linguagem prudente.
+
+Comece direto pelo BLOCO 1.
+"""
+
+    response = _fallback_response(
+        case=_fake_case(
+            case_number="TRAB-INSALUBRIDADE-PROVAS-001",
+            title="Provas de insalubridade por calor em setor de fusão",
+            legal_area="Trabalhista",
+            action_type="reclamação trabalhista",
+            description=(
+                "Resumo técnico: Reclamante trabalhou em setor de fusão da Tupy S.A. em Joinville/SC, "
+                "com processo produtivo envolvendo metal em fusão e exposição a calor intenso. "
+                "Alega adicional de insalubridade por calor e, subsidiariamente, periculosidade. "
+                "A pretensão depende de prova técnica, perícia, medições ambientais, PPP, LTCAT, PGR, PCMSO, "
+                "ficha de EPI, registros de entrega e treinamento de EPI, folhas de pagamento, CTPS, TRCT e testemunhas do setor de fusão."
+            ),
+        ),
+        message=message,
+        context={},
+        timeline=[],
+    )
+
+    rewritten = response["rewritten_input"]
+
+    assert response["assistant_mode"] == "editor_all_blocks_ready"
+    assert response["metadata"]["action_specialization_kind"] == "labor_health_risk_premium_claim"
+
+    provas = rewritten.split("BLOCO 6 — Provas e requerimentos", 1)[1].split(
+        "BLOCO 7 — Fechamento e conferência final", 1
+    )[0]
+    normalized_provas = " ".join(provas.split()).lower()
+
+    assert "prova técnica pericial" in normalized_provas
+    assert "saúde e segurança do trabalho" in normalized_provas
+    assert "setor de fusão" in normalized_provas
+    assert "exposição a calor" in normalized_provas
+    assert "metal em fusão" in normalized_provas
+    assert "medições ambientais" in normalized_provas
+    assert "grau de insalubridade" in normalized_provas
+    assert "periculosidade" in normalized_provas
+    assert "eficácia dos epis" in normalized_provas
+    assert "quesitos periciais" in normalized_provas
+    assert "assistente técnico" in normalized_provas
+    assert "ppp" in normalized_provas
+    assert "ltcat" in normalized_provas
+    assert "pgr" in normalized_provas
+    assert "pcmso" in normalized_provas
+    assert "ficha de epi" in normalized_provas
+    assert "registros de entrega e treinamento de epi" in normalized_provas
+    assert "folhas de pagamento" in normalized_provas
+    assert "ctps" in normalized_provas
+    assert "trct" in normalized_provas
+    assert "testemunhal de colegas do setor de fusão" in normalized_provas
+
+    forbidden_generic_evidence_markers = (
+        "áudios, vídeos, consultas oficiais",
+        "comprovantes de pagamento, contratos, recibos, mensagens, prints",
+        "documentos do veículo",
+        "comprovantes pix",
+        "controles de ponto",
+    )
+    for marker in forbidden_generic_evidence_markers:
+        assert marker not in normalized_provas
+
