@@ -1542,6 +1542,7 @@ Antes do protocolo definitivo, o advogado deverá revisar a coerência entre ped
 def _has_vehicle_editor_context(text: str) -> bool:
     corpus = str(text or "").lower()
 
+
     vehicle_markers = (
         "veículo",
         "veiculo",
@@ -2294,6 +2295,62 @@ def _build_editor_all_blocks_action_specialization(
                 "Os pedidos finais, valor da causa, índice de correção, termo inicial dos juros e demais requerimentos devem ser definidos pelo advogado."
             ),
         )
+
+    labor_markers = (
+        "trabalhista",
+        "reclamação trabalhista",
+        "reclamacao trabalhista",
+        "reclamante",
+        "reclamada",
+        "clt",
+        "contrato de trabalho",
+    )
+    labor_hours_markers = (
+        "jornada",
+        "jornada superior",
+        "horas extras",
+        "hora extra",
+        "intervalo intrajornada",
+        "supressão parcial de intervalo",
+        "supressao parcial de intervalo",
+        "dsr",
+        "descanso semanal remunerado",
+        "fgts",
+        "trct",
+        "holerites",
+        "controle de ponto",
+        "controles de ponto",
+        "cartões de ponto",
+        "cartoes de ponto",
+        "verbas rescisórias",
+        "verbas rescisorias",
+    )
+    if _editor_text_has_any(normalized, labor_markers) and _editor_text_has_any(
+        normalized, labor_hours_markers
+    ):
+        return (
+            "labor_hours_interval_claim",
+            (
+                "A fundamentação preliminar deve se concentrar na reclamação trabalhista relacionada à jornada de trabalho, "
+                "horas extras, eventual divergência entre jornada efetiva e registros formais, supressão total ou parcial do intervalo intrajornada "
+                "e reflexos trabalhistas decorrentes. "
+                "Devem ser avaliados controles de ponto, holerites, TRCT, extrato analítico do FGTS, mensagens com gestor, documentos rescisórios, "
+                "eventuais normas coletivas, depoimento do reclamante, preposto da empresa e testemunhas. "
+                "A análise deve considerar diferenças de horas extras, adicional aplicável, reflexos em DSR, férias acrescidas de um terço, 13º salário, FGTS, "
+                "verbas rescisórias e demais parcelas estritamente compatíveis com os fatos relatados e os documentos disponíveis. "
+                "A base legal específica, competência da Justiça do Trabalho, rito, prescrição, liquidação e extensão final dos pedidos permanecem sujeitos à revisão do advogado responsável."
+            ),
+            (
+                "Diante do exposto, e sem prejuízo de adequação pelo advogado responsável, requer-se a notificação da reclamada, "
+                "o reconhecimento das diferenças de jornada comprovadas, a condenação ao pagamento de horas extras e do intervalo intrajornada suprimido, "
+                "com adicional legal, contratual ou normativo aplicável, conforme apuração em liquidação. "
+                "Requer-se também o pagamento dos reflexos cabíveis em DSR, férias acrescidas de um terço, 13º salário, FGTS e verbas rescisórias, "
+                "além da juntada e preservação dos documentos essenciais da relação de emprego, especialmente controles de ponto, holerites, TRCT, extrato analítico do FGTS, "
+                "mensagens com gestor e demais registros de jornada. "
+                "Os pedidos finais, valores, reflexos, critérios de cálculo, honorários, justiça gratuita se cabível e demais requerimentos devem ser definidos pelo advogado responsável."
+            ),
+        )
+
 
     vehicle_markers = (
         "veículo",
