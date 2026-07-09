@@ -2154,3 +2154,85 @@ Comece direto pelo BLOCO 1.
     for marker in forbidden_wrong_family_markers:
         assert marker not in normalized_pedidos
 
+
+def test_editor_all_blocks_ready_labor_hours_interval_router_keeps_labor_requests_specific():
+    message = """
+Gere todos os blocos principais da minuta preliminar deste caso em formato de texto pronto para copiar e colar no Editor/minuta.
+
+Entregue somente os blocos finais, separados por títulos exatamente assim:
+
+BLOCO 1 — Endereçamento
+BLOCO 2 — Qualificação das partes
+BLOCO 3 — Resumo Fático
+BLOCO 4 — Fundamentação preliminar
+BLOCO 5 — Pedidos
+BLOCO 6 — Provas e requerimentos
+BLOCO 7 — Fechamento e conferência final
+
+Não traga checklist operacional, linha do tempo, anexos, testemunhas, análise, próximos passos, alertas ou explicações fora dos blocos.
+
+Não invente dados. Use linguagem prudente.
+
+Comece direto pelo BLOCO 1.
+"""
+
+    response = _fallback_response(
+        case=_fake_case(
+            case_number="TRAB-HORAS-INTERVALO-001",
+            title="Reclamação trabalhista por horas extras e intervalo intrajornada",
+            legal_area="Trabalhista",
+            action_type="reclamação trabalhista",
+            description=(
+                "Área jurídica: Trabalhista. "
+                "Reclamante ajuíza reclamação trabalhista contra reclamada alegando jornada superior à registrada, "
+                "supressão parcial de intervalo intrajornada, diferenças de horas extras, reflexos em DSR, férias, "
+                "13º salário, FGTS e verbas rescisórias. "
+                "O caso envolve controles de ponto, holerites, TRCT, extrato analítico do FGTS, mensagens com gestor, "
+                "preposto da empresa e testemunhas a confirmar."
+            ),
+        ),
+        message=message,
+        context={},
+        timeline=[],
+    )
+
+    rewritten = response["rewritten_input"]
+
+    assert response["assistant_mode"] == "editor_all_blocks_ready"
+    assert response["metadata"]["action_specialization_kind"] == "labor_hours_interval_claim"
+
+    fundamentacao = rewritten.split("BLOCO 4 — Fundamentação preliminar", 1)[1].split(
+        "BLOCO 5 — Pedidos", 1
+    )[0]
+    pedidos = rewritten.split("BLOCO 5 — Pedidos", 1)[1].split(
+        "BLOCO 6 — Provas e requerimentos", 1
+    )[0]
+
+    normalized_fundamentacao = " ".join(fundamentacao.split()).lower()
+    normalized_pedidos = " ".join(pedidos.split()).lower()
+
+    assert "reclamação trabalhista" in normalized_fundamentacao
+    assert "jornada de trabalho" in normalized_fundamentacao
+    assert "intervalo intrajornada" in normalized_fundamentacao
+    assert "controles de ponto" in normalized_fundamentacao
+    assert "fgts" in normalized_fundamentacao
+
+    assert "notificação da reclamada" in normalized_pedidos
+    assert "horas extras" in normalized_pedidos
+    assert "intervalo intrajornada" in normalized_pedidos
+    assert "dsr" in normalized_pedidos
+    assert "férias" in normalized_pedidos
+    assert "13º salário" in normalized_pedidos
+    assert "fgts" in normalized_pedidos
+    assert "verbas rescisórias" in normalized_pedidos
+
+    forbidden_civil_generic_markers = (
+        "restituição, obrigação de fazer ou não fazer",
+        "eventual indenização por danos materiais e/ou morais",
+        "prestação de contas ou esclarecimentos formais sobre os fatos controvertidos",
+        "saldo contratual inadimplido",
+        "exibição do contrato, recibos, documentos do veículo",
+    )
+    for marker in forbidden_civil_generic_markers:
+        assert marker not in normalized_pedidos
+
