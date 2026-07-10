@@ -2607,6 +2607,52 @@ def _editor_all_blocks_ready_response(
         editor_context,
     )
 
+    labor_action_specialization_kinds = {
+        "labor_health_risk_premium_claim",
+        "labor_hours_interval_claim",
+    }
+    if action_specialization_kind in labor_action_specialization_kinds:
+        enderecamento = (
+            "EXCELENTÍSSIMO(A) SENHOR(A) DOUTOR(A) JUIZ(A) DA VARA DO TRABALHO DE [LOCALIDADE A CONFIRMAR PELO ADVOGADO].\n\n"
+            "O advogado responsável deverá confirmar, antes do protocolo, a competência territorial da Justiça do Trabalho, "
+            "a Vara do Trabalho competente, eventual prevenção, o rito trabalhista aplicável, o local da prestação de serviços, "
+            "o domicílio das partes e a adequação do endereçamento conforme os documentos e a estratégia processual do caso."
+        )
+
+        def _labor_party_label(
+            fragment: str | None,
+            source_labels: tuple[str, ...],
+            target_label: str,
+            fallback: str,
+        ) -> str:
+            if not fragment:
+                return fallback
+            cleaned = fragment.strip()
+            lowered = cleaned.lower()
+            for source_label in source_labels:
+                if lowered.startswith(source_label.lower()):
+                    return f"{target_label}:{cleaned[len(source_label):]}"
+            return f"{target_label}: {cleaned}"
+
+        qualificacao = "\n\n".join(
+            item
+            for item in (
+                _labor_party_label(
+                    parte_autora or business_parte_autora,
+                    ("Parte autora:", "Autor:", "Autora:"),
+                    "Reclamante",
+                    "Reclamante: a confirmar, conforme documentos pessoais, comprovante de endereço, CTPS, contrato de trabalho, procuração e cadastro do caso.",
+                ),
+                _labor_party_label(
+                    parte_re or business_parte_re,
+                    ("Parte ré:", "Parte re:", "Ré:", "Re:", "Requerida:", "Requerido:"),
+                    "Reclamada",
+                    "Reclamada: a confirmar, conforme contrato de trabalho, CTPS, TRCT, folhas de pagamento, documentos da relação de emprego, cadastro público e revisão do advogado.",
+                ),
+            )
+            if item
+        )
+
     if "advogado responsável" not in fundamentacao.lower():
         fundamentacao = (
             fundamentacao.rstrip()
