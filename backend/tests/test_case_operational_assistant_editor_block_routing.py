@@ -2414,3 +2414,80 @@ Comece direto pelo BLOCO 1.
     for marker in forbidden_generic_evidence_markers:
         assert marker not in normalized_provas
 
+
+def test_editor_all_blocks_ready_labor_health_risk_uses_labor_court_heading_and_parties():
+    message = """
+Gere todos os blocos principais da minuta preliminar deste caso em formato de texto pronto para copiar e colar no Editor/minuta.
+
+Entregue somente os blocos finais, separados por títulos exatamente assim:
+
+BLOCO 1 — Endereçamento
+BLOCO 2 — Qualificação das partes
+BLOCO 3 — Resumo Fático
+BLOCO 4 — Fundamentação preliminar
+BLOCO 5 — Pedidos
+BLOCO 6 — Provas e requerimentos
+BLOCO 7 — Fechamento e conferência final
+
+Não traga checklist operacional, linha do tempo, anexos, testemunhas, análise, próximos passos, alertas ou explicações fora dos blocos.
+
+Não invente dados. Use linguagem prudente.
+
+Comece direto pelo BLOCO 1.
+"""
+
+    response = _fallback_response(
+        case=_fake_case(
+            case_number="TRAB-ENDERECAMENTO-VT-001",
+            title="Endereçamento trabalhista em adicional de insalubridade",
+            legal_area="Trabalhista",
+            action_type="reclamação trabalhista",
+            description=(
+                "Resumo técnico: Reclamante trabalhou em setor de fusão da Tupy S.A. em Joinville/SC, "
+                "com exposição a calor intenso e metal em fusão. "
+                "Alega adicional de insalubridade por calor e, subsidiariamente, periculosidade, "
+                "dependendo de perícia técnica, PPP, LTCAT, PGR, PCMSO e fichas de EPI."
+            ),
+        ),
+        message=message,
+        context={},
+        timeline=[],
+    )
+
+    rewritten = response["rewritten_input"]
+
+    assert response["assistant_mode"] == "editor_all_blocks_ready"
+    assert response["metadata"]["action_specialization_kind"] == "labor_health_risk_premium_claim"
+
+    enderecamento = rewritten.split("BLOCO 1 — Endereçamento", 1)[1].split(
+        "BLOCO 2 — Qualificação das partes", 1
+    )[0]
+    qualificacao = rewritten.split("BLOCO 2 — Qualificação das partes", 1)[1].split(
+        "BLOCO 3 — Resumo Fático", 1
+    )[0]
+
+    normalized_enderecamento = " ".join(enderecamento.split()).lower()
+    normalized_qualificacao = " ".join(qualificacao.split()).lower()
+
+    assert "juiz(a) da vara do trabalho" in normalized_enderecamento
+    assert "justiça do trabalho" in normalized_enderecamento
+    assert "vara do trabalho competente" in normalized_enderecamento
+    assert "rito trabalhista" in normalized_enderecamento
+    assert "local da prestação de serviços" in normalized_enderecamento
+
+    assert "reclamante:" in normalized_qualificacao
+    assert "reclamada:" in normalized_qualificacao
+    assert "ctps" in normalized_qualificacao
+    assert "contrato de trabalho" in normalized_qualificacao
+
+    forbidden_civil_heading_markers = (
+        "juiz(a) de direito",
+        "comarca de [comarca",
+        "parte autora:",
+        "parte ré:",
+        "parte re:",
+    )
+    combined = f"{normalized_enderecamento} {normalized_qualificacao}"
+    for marker in forbidden_civil_heading_markers:
+        assert marker not in combined
+
