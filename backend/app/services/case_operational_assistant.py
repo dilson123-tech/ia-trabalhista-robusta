@@ -2412,6 +2412,84 @@ def _build_editor_all_blocks_action_specialization(
         )
 
 
+    family_markers = (
+        "família",
+        "familia",
+        "vara de família",
+        "vara de familia",
+        "ação de alimentos",
+        "acao de alimentos",
+        "alimentos",
+        "pensão alimentícia",
+        "pensao alimenticia",
+        "guarda",
+        "convivência",
+        "convivencia",
+        "visitas",
+        "regulamentação de visitas",
+        "regulamentacao de visitas",
+        "menor",
+        "criança",
+        "crianca",
+        "adolescente",
+        "genitor",
+        "genitora",
+        "melhor interesse do menor",
+        "certidão de nascimento",
+        "certidao de nascimento",
+    )
+    family_support_guardianship_markers = (
+        "alimentos",
+        "pensão alimentícia",
+        "pensao alimenticia",
+        "despesas do menor",
+        "despesas da criança",
+        "despesas da crianca",
+        "renda do genitor",
+        "renda da genitora",
+        "renda dos genitores",
+        "guarda",
+        "convivência",
+        "convivencia",
+        "visitas",
+        "regulamentação de visitas",
+        "regulamentacao de visitas",
+        "melhor interesse do menor",
+        "documentos da criança",
+        "documentos da crianca",
+        "informações escolares",
+        "informacoes escolares",
+        "saúde da criança",
+        "saude da crianca",
+    )
+    if _editor_text_has_any(normalized, family_markers) and _editor_text_has_any(
+        normalized, family_support_guardianship_markers
+    ):
+        return (
+            "family_support_guardianship_claim",
+            (
+                "A fundamentação preliminar deve se concentrar na demanda de Família relacionada a alimentos, guarda, convivência familiar ou regulamentação de visitas, "
+                "sempre com foco no melhor interesse da criança ou adolescente e na proteção integral. "
+                "Devem ser avaliados certidão de nascimento, documentos pessoais dos responsáveis, comprovante de residência, "
+                "despesas ordinárias e extraordinárias do menor, necessidades de saúde, educação, alimentação, moradia, transporte e rotina de cuidados. "
+                "Também devem ser examinadas a capacidade econômica dos genitores, renda formal ou informal, participação de cada responsável nos cuidados, "
+                "histórico de convivência, eventuais acordos prévios, mensagens, comprovantes de pagamento e documentos escolares ou médicos. "
+                "A guarda, convivência, valor dos alimentos, regime de visitas, urgência, intervenção do Ministério Público, competência da Vara de Família e estratégia final "
+                "devem ser definidos pelo advogado responsável conforme os documentos e a situação concreta."
+            ),
+            (
+                "Diante do exposto, e sem prejuízo de adequação pelo advogado responsável, requer-se a citação ou intimação da parte requerida, "
+                "a análise da fixação, revisão ou adequação de alimentos conforme as necessidades do menor e a possibilidade econômica dos responsáveis, "
+                "bem como a definição ou regularização da guarda e do regime de convivência familiar quando compatível com os fatos narrados. "
+                "Requer-se a preservação e juntada dos documentos essenciais, especialmente certidão de nascimento, documentos pessoais, comprovante de residência, "
+                "comprovantes de despesas do menor, documentos escolares, documentos médicos, comprovantes de renda, mensagens, recibos "
+                "e demais elementos que demonstrem a rotina de cuidados. "
+                "Pedidos de alimentos provisórios, guarda provisória, regulamentação de visitas, estudo psicossocial, ofícios, segredo de justiça, "
+                "intervenção do Ministério Público, valor da causa e demais requerimentos devem ser definidos pelo advogado responsável, "
+                "observando o melhor interesse da criança ou adolescente."
+            ),
+        )
+
     vehicle_markers = (
         "veículo",
         "veiculo",
@@ -2606,6 +2684,26 @@ def _editor_all_blocks_ready_response(
         source_body,
         editor_context,
     )
+
+    family_action_specialization_kinds = {
+        "family_support_guardianship_claim",
+    }
+    if action_specialization_kind in family_action_specialization_kinds:
+        enderecamento = (
+            "EXCELENTÍSSIMO(A) SENHOR(A) DOUTOR(A) JUIZ(A) DA VARA DE FAMÍLIA DE [LOCALIDADE A CONFIRMAR PELO ADVOGADO].\n\n"
+            "O advogado responsável deverá confirmar, antes do protocolo, a competência da Vara de Família, "
+            "a localidade competente, eventual prevenção, o segredo de justiça, a participação do Ministério Público quando cabível "
+            "e a adequação do rito conforme os documentos e a estratégia processual do caso."
+        )
+        qualificacao = "\n\n".join(
+            item
+            for item in (
+                "Requerente: a confirmar, conforme documentos pessoais, comprovante de endereço, procuração e cadastro do caso.",
+                "Requerido(a): a confirmar, conforme documentos pessoais, endereço conhecido, vínculo familiar, capacidade econômica e revisão do advogado.",
+                "Criança/adolescente: a confirmar, conforme certidão de nascimento, documentos escolares, documentos de saúde e demais elementos do caso.",
+            )
+            if item
+        )
 
     labor_action_specialization_kinds = {
         "labor_health_risk_premium_claim",

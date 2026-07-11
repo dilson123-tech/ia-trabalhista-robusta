@@ -2491,3 +2491,162 @@ Comece direto pelo BLOCO 1.
     for marker in forbidden_civil_heading_markers:
         assert marker not in combined
 
+
+def test_editor_all_blocks_ready_family_support_guardianship_router_keeps_family_requests_specific():
+    message = """
+Gere todos os blocos principais da minuta preliminar deste caso em formato de texto pronto para copiar e colar no Editor/minuta.
+
+Entregue somente os blocos finais, separados por títulos exatamente assim:
+
+BLOCO 1 — Endereçamento
+BLOCO 2 — Qualificação das partes
+BLOCO 3 — Resumo Fático
+BLOCO 4 — Fundamentação preliminar
+BLOCO 5 — Pedidos
+BLOCO 6 — Provas e requerimentos
+BLOCO 7 — Fechamento e conferência final
+
+Não traga checklist operacional, linha do tempo, anexos, testemunhas, análise, próximos passos, alertas ou explicações fora dos blocos.
+
+Não invente dados. Use linguagem prudente.
+
+Comece direto pelo BLOCO 1.
+"""
+
+    response = _fallback_response(
+        case=_fake_case(
+            case_number="FAM-ALIMENTOS-GUARDA-001",
+            title="Alimentos, guarda e convivência de menor",
+            legal_area="Família",
+            action_type="ação de alimentos, guarda e regulamentação de convivência",
+            description=(
+                "Representante legal pretende fixação de alimentos, guarda e regulamentação de convivência em favor de menor. "
+                "Há certidão de nascimento, comprovantes de despesas do menor, informações escolares, documentos de saúde, "
+                "comprovante de residência, mensagens entre os genitores e informações sobre renda aproximada do genitor. "
+                "A análise deve observar o melhor interesse do menor, rotina de cuidados, capacidade econômica dos genitores "
+                "e necessidade de visitas adequadas."
+            ),
+        ),
+        message=message,
+        context={},
+        timeline=[],
+    )
+
+    rewritten = response["rewritten_input"]
+
+    assert response["assistant_mode"] == "editor_all_blocks_ready"
+    assert response["metadata"]["action_specialization_kind"] == "family_support_guardianship_claim"
+
+    enderecamento = rewritten.split("BLOCO 1 — Endereçamento", 1)[1].split(
+        "BLOCO 2 — Qualificação das partes", 1
+    )[0]
+    qualificacao = rewritten.split("BLOCO 2 — Qualificação das partes", 1)[1].split(
+        "BLOCO 3 — Resumo Fático", 1
+    )[0]
+    fundamentacao = rewritten.split("BLOCO 4 — Fundamentação preliminar", 1)[1].split(
+        "BLOCO 5 — Pedidos", 1
+    )[0]
+    pedidos = rewritten.split("BLOCO 5 — Pedidos", 1)[1].split(
+        "BLOCO 6 — Provas e requerimentos", 1
+    )[0]
+
+    normalized_enderecamento = " ".join(enderecamento.split()).lower()
+    normalized_qualificacao = " ".join(qualificacao.split()).lower()
+    normalized_fundamentacao = " ".join(fundamentacao.split()).lower()
+    normalized_pedidos = " ".join(pedidos.split()).lower()
+
+    assert "vara de família" in normalized_enderecamento
+    assert "segredo de justiça" in normalized_enderecamento
+    assert "ministério público" in normalized_enderecamento
+
+    assert "requerente:" in normalized_qualificacao
+    assert "requerido(a):" in normalized_qualificacao
+    assert "criança/adolescente:" in normalized_qualificacao
+    assert "certidão de nascimento" in normalized_qualificacao
+
+    assert "demanda de família" in normalized_fundamentacao
+    assert "alimentos" in normalized_fundamentacao
+    assert "guarda" in normalized_fundamentacao
+    assert "convivência familiar" in normalized_fundamentacao
+    assert "melhor interesse da criança" in normalized_fundamentacao
+    assert "despesas" in normalized_fundamentacao
+    assert "capacidade econômica dos genitores" in normalized_fundamentacao
+
+    assert "fixação" in normalized_pedidos
+    assert "alimentos" in normalized_pedidos
+    assert "guarda" in normalized_pedidos
+    assert "regime de convivência familiar" in normalized_pedidos
+    assert "certidão de nascimento" in normalized_pedidos
+    assert "documentos escolares" in normalized_pedidos
+    assert "documentos médicos" in normalized_pedidos
+    assert "comprovantes de renda" in normalized_pedidos
+    assert "alimentos provisórios" in normalized_pedidos
+    assert "ministério público" in normalized_pedidos
+    assert "melhor interesse da criança" in normalized_pedidos
+
+    forbidden_generic_civil_markers = (
+        "prestação de contas ou esclarecimentos formais",
+        "restituição, obrigação de fazer ou não fazer",
+        "saldo contratual inadimplido",
+        "horas extras",
+        "intervalo intrajornada",
+        "adicional de insalubridade",
+        "documentos do veículo",
+    )
+    combined = f"{normalized_fundamentacao} {normalized_pedidos}"
+    for marker in forbidden_generic_civil_markers:
+        assert marker not in combined
+
+
+def test_editor_all_blocks_ready_family_guardianship_router_handles_visitation_without_support_word():
+    message = """
+Gere todos os blocos principais da minuta preliminar deste caso em formato de texto pronto para copiar e colar no Editor/minuta.
+
+Entregue somente os blocos finais, separados por títulos exatamente assim:
+
+BLOCO 1 — Endereçamento
+BLOCO 2 — Qualificação das partes
+BLOCO 3 — Resumo Fático
+BLOCO 4 — Fundamentação preliminar
+BLOCO 5 — Pedidos
+BLOCO 6 — Provas e requerimentos
+BLOCO 7 — Fechamento e conferência final
+
+Não invente dados. Use linguagem prudente.
+
+Comece direto pelo BLOCO 1.
+"""
+
+    response = _fallback_response(
+        case=_fake_case(
+            case_number="FAM-GUARDA-VISITAS-001",
+            title="Guarda e regulamentação de visitas",
+            legal_area="Família",
+            action_type="ação de guarda e regulamentação de convivência",
+            description=(
+                "Genitora pretende regularizar guarda e convivência de filho menor, com histórico de cuidados diários, "
+                "escola, saúde e divergência sobre visitas. Há necessidade de documentos da criança, comprovante de residência, "
+                "informações escolares, documentos de saúde e análise do melhor interesse do menor."
+            ),
+        ),
+        message=message,
+        context={},
+        timeline=[],
+    )
+
+    rewritten = response["rewritten_input"]
+
+    assert response["assistant_mode"] == "editor_all_blocks_ready"
+    assert response["metadata"]["action_specialization_kind"] == "family_support_guardianship_claim"
+
+    normalized = " ".join(rewritten.split()).lower()
+
+    assert "vara de família" in normalized
+    assert "requerente:" in normalized
+    assert "requerido(a):" in normalized
+    assert "guarda" in normalized
+    assert "convivência" in normalized
+    assert "visitas" in normalized
+    assert "melhor interesse" in normalized
+    assert "prestação de contas ou esclarecimentos formais" not in normalized
+
