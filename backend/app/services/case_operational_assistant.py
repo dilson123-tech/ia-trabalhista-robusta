@@ -2777,7 +2777,21 @@ def _editor_all_blocks_ready_response(
             "devem ser definidos pelo advogado responsável."
         )
 
-    if action_specialization_kind == "labor_health_risk_premium_claim":
+    if action_specialization_kind == "family_support_guardianship_claim":
+        provas = (
+            "Protesta-se pela produção dos meios de prova pertinentes à demanda de Família, especialmente certidão de nascimento, "
+            "documentos pessoais dos responsáveis, comprovante de residência, comprovantes das despesas da criança ou adolescente, "
+            "comprovantes de renda formal ou informal dos genitores, documentos escolares, boletins, matrículas, laudos, receitas, "
+            "atestados e demais documentos médicos. "
+            "Requer-se também a preservação e juntada de mensagens entre os responsáveis, comprovantes de pagamentos de alimentos, "
+            "recibos relacionados à rotina de cuidados, documentos de convivência familiar e demais elementos que demonstrem "
+            "as necessidades da criança ou adolescente, a capacidade econômica dos responsáveis e a participação de cada genitor nos cuidados. "
+            "Quando cabível, requer-se estudo psicossocial, avaliação interdisciplinar, oitiva das partes, prova testemunhal sobre a rotina familiar, "
+            "expedição de ofícios para obtenção de informações escolares, médicas ou de renda, exibição de documentos e juntada posterior de novos elementos. "
+            "Devem ser preservados o segredo de justiça, a intervenção do Ministério Público nas hipóteses legais "
+            "e o melhor interesse da criança ou adolescente."
+        )
+    elif action_specialization_kind == "labor_health_risk_premium_claim":
         provas = (
             "Protesta-se pela produção de prova técnica pericial por profissional habilitado em saúde e segurança do trabalho, "
             "com avaliação do ambiente laboral, setor de fusão, exposição a calor, metal em fusão, medições ambientais, "
