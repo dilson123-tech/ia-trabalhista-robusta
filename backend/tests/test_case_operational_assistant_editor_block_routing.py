@@ -2898,3 +2898,153 @@ Comece direto pelo BLOCO 1.
     assert "guarda unilateral" not in normalized
     assert "guarda compartilhada" not in normalized
 
+
+def _consumer_scope_ready_response(case_number, title, action_type, description):
+    message = """
+Gere todos os blocos principais da minuta preliminar deste caso em formato de texto pronto para copiar e colar no Editor/minuta.
+
+Entregue somente os blocos finais, separados por títulos exatamente assim:
+
+BLOCO 1 — Endereçamento
+BLOCO 2 — Qualificação das partes
+BLOCO 3 — Resumo Fático
+BLOCO 4 — Fundamentação preliminar
+BLOCO 5 — Pedidos
+BLOCO 6 — Provas e requerimentos
+BLOCO 7 — Fechamento e conferência final
+
+Não invente dados. Use linguagem prudente.
+
+Comece direto pelo BLOCO 1.
+"""
+    return _fallback_response(
+        case=_fake_case(
+            case_number=case_number,
+            title=title,
+            legal_area="Consumidor",
+            action_type=action_type,
+            description=description,
+        ),
+        message=message,
+        context={},
+        timeline=[],
+    )
+
+
+def _consumer_scope_block(response, start, end):
+    rewritten = response["rewritten_input"]
+    value = rewritten.split(start, 1)[1].split(end, 1)[0]
+    return " ".join(value.split()).lower()
+
+
+def test_editor_all_blocks_ready_consumer_universal_scope_combines_bank_charge_and_negative_listing():
+    response = _consumer_scope_ready_response(
+        "CONS-BANCO-001",
+        "Fraude Pix, cobrança e negativação",
+        "ação declaratória consumerista",
+        (
+            "Consumidor sofreu fraude bancária com Pix não reconhecido, contestou a transação e mesmo assim recebeu cobrança indevida. "
+            "Posteriormente houve negativação indevida no Serasa. Há extratos, boletim de ocorrência, protocolos, mensagens e comprovantes."
+        ),
+    )
+
+    assert response["metadata"]["action_specialization_kind"] == "consumer_universal_action_scope_claim"
+    pedidos = _consumer_scope_block(response, "BLOCO 5 — Pedidos", "BLOCO 6 — Provas e requerimentos")
+
+    assert "transações impugnadas" in pedidos
+    assert "logs" in pedidos
+    assert "inexistência ou inexigibilidade da cobrança" in pedidos
+    assert "retirada ou suspensão da anotação indevida" in pedidos
+    assert "documentos que originaram a inscrição" in pedidos
+    assert "reparo, a substituição do produto" not in pedidos
+    assert "cobertura do procedimento" not in pedidos
+
+
+def test_editor_all_blocks_ready_consumer_universal_scope_keeps_defective_product_specific():
+    response = _consumer_scope_ready_response(
+        "CONS-PRODUTO-001",
+        "Produto defeituoso",
+        "ação consumerista por vício do produto",
+        (
+            "Consumidora comprou eletrodoméstico com defeito, apresentou nota fiscal e acionou a garantia e a assistência técnica, "
+            "mas o produto continuou impróprio para uso. Pretende solução compatível com o vício do produto."
+        ),
+    )
+
+    assert response["metadata"]["action_specialization_kind"] == "consumer_universal_action_scope_claim"
+    pedidos = _consumer_scope_block(response, "BLOCO 5 — Pedidos", "BLOCO 6 — Provas e requerimentos")
+
+    assert "reparo, a substituição do produto" in pedidos
+    assert "restituição do preço" in pedidos
+    assert "nota fiscal" in pedidos
+    assert "logs, ips, dispositivos" not in pedidos
+    assert "retirada ou suspensão da anotação" not in pedidos
+    assert "cobertura do procedimento" not in pedidos
+
+
+def test_editor_all_blocks_ready_consumer_universal_scope_keeps_defective_service_specific():
+    response = _consumer_scope_ready_response(
+        "CONS-SERVICO-001",
+        "Falha na prestação de serviço",
+        "ação consumerista por serviço defeituoso",
+        (
+            "Consumidor contratou serviço que foi prestado de forma incompleta e defeituosa. "
+            "Há contrato, oferta, comprovantes de pagamento, protocolos e mensagens solicitando correção."
+        ),
+    )
+
+    assert response["metadata"]["action_specialization_kind"] == "consumer_universal_action_scope_claim"
+    pedidos = _consumer_scope_block(response, "BLOCO 5 — Pedidos", "BLOCO 6 — Provas e requerimentos")
+
+    assert "refazimento adequado do serviço" in pedidos
+    assert "correção da falha" in pedidos
+    assert "restituição dos valores" in pedidos
+    assert "substituição do produto" not in pedidos
+    assert "transações impugnadas" not in pedidos
+    assert "cobertura do procedimento" not in pedidos
+
+
+def test_editor_all_blocks_ready_consumer_universal_scope_keeps_health_plan_specific():
+    response = _consumer_scope_ready_response(
+        "CONS-SAUDE-001",
+        "Negativa de cobertura médica",
+        "obrigação de fazer contra plano de saúde",
+        (
+            "Consumidora teve procedimento médico e cirurgia negados pelo plano de saúde, apesar de relatório e prescrição médica. "
+            "Há risco de agravamento, contrato, protocolos e justificativa de negativa de cobertura."
+        ),
+    )
+
+    assert response["metadata"]["action_specialization_kind"] == "consumer_universal_action_scope_claim"
+    pedidos = _consumer_scope_block(response, "BLOCO 5 — Pedidos", "BLOCO 6 — Provas e requerimentos")
+
+    assert "autorização ou cobertura do procedimento" in pedidos
+    assert "tutela de urgência" in pedidos
+    assert "relatório médico" in pedidos
+    assert "justificativa formal da negativa" in pedidos
+    assert "substituição do produto" not in pedidos
+    assert "retirada ou suspensão da anotação" not in pedidos
+
+
+def test_editor_all_blocks_ready_consumer_universal_scope_keeps_general_contract_fallback_prudent():
+    response = _consumer_scope_ready_response(
+        "CONS-GERAL-001",
+        "Descumprimento de oferta",
+        "ação consumerista contratual",
+        (
+            "Consumidor realizou compra após oferta anunciada pelo fornecedor, efetuou pagamento, mas a entrega não ocorreu. "
+            "Há pedido, publicidade, comprovantes, protocolos de atendimento e solicitação de cancelamento e reembolso."
+        ),
+    )
+
+    assert response["metadata"]["action_specialization_kind"] == "consumer_universal_action_scope_claim"
+    pedidos = _consumer_scope_block(response, "BLOCO 5 — Pedidos", "BLOCO 6 — Provas e requerimentos")
+
+    assert "documentos essenciais da contratação" in pedidos
+    assert "cumprimento da oferta" in pedidos
+    assert "cancelamento" in pedidos
+    assert "restituição" in pedidos
+    assert "transações impugnadas" not in pedidos
+    assert "substituição do produto" not in pedidos
+    assert "cobertura do procedimento" not in pedidos
+
