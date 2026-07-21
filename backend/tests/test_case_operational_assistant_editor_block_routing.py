@@ -2650,3 +2650,82 @@ Comece direto pelo BLOCO 1.
     assert "melhor interesse" in normalized
     assert "prestação de contas ou esclarecimentos formais" not in normalized
 
+
+def test_editor_all_blocks_ready_family_evidence_block_keeps_family_proof_specific():
+    message = """
+Gere todos os blocos principais da minuta preliminar deste caso em formato de texto pronto para copiar e colar no Editor/minuta.
+
+Entregue somente os blocos finais, separados por títulos exatamente assim:
+
+BLOCO 1 — Endereçamento
+BLOCO 2 — Qualificação das partes
+BLOCO 3 — Resumo Fático
+BLOCO 4 — Fundamentação preliminar
+BLOCO 5 — Pedidos
+BLOCO 6 — Provas e requerimentos
+BLOCO 7 — Fechamento e conferência final
+
+Não invente dados. Use linguagem prudente.
+
+Comece direto pelo BLOCO 1.
+"""
+
+    response = _fallback_response(
+        case=_fake_case(
+            case_number="FAM-ALIMENTOS-PROVAS-001",
+            title="Provas em ação de alimentos",
+            legal_area="Família",
+            action_type="ação de alimentos",
+            description=(
+                "Representante legal pretende fixação de alimentos em favor de criança. "
+                "Há certidão de nascimento, comprovante de residência, comprovantes das despesas da criança, "
+                "documentos escolares, laudos e receitas médicas, mensagens entre os genitores, comprovantes de pagamentos esporádicos "
+                "e informações sobre renda formal ou informal do genitor. "
+                "Pode ser necessário estudo psicossocial, prova testemunhal, segredo de justiça e intervenção do Ministério Público."
+            ),
+        ),
+        message=message,
+        context={},
+        timeline=[],
+    )
+
+    rewritten = response["rewritten_input"]
+
+    assert response["assistant_mode"] == "editor_all_blocks_ready"
+    assert response["metadata"]["action_specialization_kind"] == "family_support_guardianship_claim"
+
+    provas = rewritten.split("BLOCO 6 — Provas e requerimentos", 1)[1].split(
+        "BLOCO 7 — Fechamento e conferência final", 1
+    )[0]
+    normalized_provas = " ".join(provas.split()).lower()
+
+    assert "certidão de nascimento" in normalized_provas
+    assert "comprovantes das despesas da criança" in normalized_provas
+    assert "comprovantes de renda" in normalized_provas
+    assert "documentos escolares" in normalized_provas
+    assert "documentos médicos" in normalized_provas
+    assert "mensagens entre os responsáveis" in normalized_provas
+    assert "comprovantes de pagamentos de alimentos" in normalized_provas
+    assert "estudo psicossocial" in normalized_provas
+    assert "avaliação interdisciplinar" in normalized_provas
+    assert "prova testemunhal" in normalized_provas
+    assert "segredo de justiça" in normalized_provas
+    assert "ministério público" in normalized_provas
+    assert "melhor interesse da criança" in normalized_provas
+
+    forbidden_wrong_evidence_markers = (
+        "ppp",
+        "ltcat",
+        "pcmso",
+        "ficha de epi",
+        "ctps",
+        "trct",
+        "horas extras",
+        "intervalo intrajornada",
+        "insalubridade",
+        "documentos do veículo",
+        "comprovantes pix",
+    )
+    for marker in forbidden_wrong_evidence_markers:
+        assert marker not in normalized_provas
+
