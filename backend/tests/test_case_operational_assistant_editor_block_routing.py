@@ -2729,3 +2729,172 @@ Comece direto pelo BLOCO 1.
     for marker in forbidden_wrong_evidence_markers:
         assert marker not in normalized_provas
 
+
+def test_editor_all_blocks_ready_family_request_scope_keeps_support_only():
+    message = """
+Gere todos os blocos principais da minuta preliminar deste caso em formato de texto pronto para copiar e colar no Editor/minuta.
+
+Entregue somente os blocos finais, separados por títulos exatamente assim:
+
+BLOCO 1 — Endereçamento
+BLOCO 2 — Qualificação das partes
+BLOCO 3 — Resumo Fático
+BLOCO 4 — Fundamentação preliminar
+BLOCO 5 — Pedidos
+BLOCO 6 — Provas e requerimentos
+BLOCO 7 — Fechamento e conferência final
+
+Não invente dados. Use linguagem prudente.
+
+Comece direto pelo BLOCO 1.
+"""
+
+    response = _fallback_response(
+        case=_fake_case(
+            case_number="FAM-ALIMENTOS-ESCOPO-001",
+            title="Ação de alimentos",
+            legal_area="Família",
+            action_type="ação de alimentos",
+            description=(
+                "Representante legal pretende a fixação de alimentos provisórios e definitivos em favor de criança. "
+                "Há certidão de nascimento, despesas escolares e médicas, comprovantes de residência, mensagens "
+                "e informações sobre a renda do genitor."
+            ),
+        ),
+        message=message,
+        context={},
+        timeline=[],
+    )
+
+    rewritten = response["rewritten_input"]
+    assert response["metadata"]["action_specialization_kind"] == "family_support_guardianship_claim"
+
+    pedidos = rewritten.split("BLOCO 5 — Pedidos", 1)[1].split(
+        "BLOCO 6 — Provas e requerimentos", 1
+    )[0]
+    normalized = " ".join(pedidos.split()).lower()
+
+    assert "alimentos provisórios e definitivos" in normalized
+    assert "necessidades da criança" in normalized
+    assert "capacidade econômica" in normalized
+
+    assert "regularização da guarda" not in normalized
+    assert "guarda unilateral" not in normalized
+    assert "guarda compartilhada" not in normalized
+    assert "regime de convivência familiar" not in normalized
+    assert "definição de visitas" not in normalized
+    assert "datas comemorativas" not in normalized
+
+
+def test_editor_all_blocks_ready_family_request_scope_keeps_guardianship_only():
+    message = """
+Gere todos os blocos principais da minuta preliminar deste caso em formato de texto pronto para copiar e colar no Editor/minuta.
+
+Entregue somente os blocos finais, separados por títulos exatamente assim:
+
+BLOCO 1 — Endereçamento
+BLOCO 2 — Qualificação das partes
+BLOCO 3 — Resumo Fático
+BLOCO 4 — Fundamentação preliminar
+BLOCO 5 — Pedidos
+BLOCO 6 — Provas e requerimentos
+BLOCO 7 — Fechamento e conferência final
+
+Não invente dados. Use linguagem prudente.
+
+Comece direto pelo BLOCO 1.
+"""
+
+    response = _fallback_response(
+        case=_fake_case(
+            case_number="FAM-GUARDA-ESCOPO-001",
+            title="Ação de guarda",
+            legal_area="Família",
+            action_type="ação de guarda",
+            description=(
+                "Genitora pretende regularização da guarda da criança conforme a rotina de cuidados já existente. "
+                "Há certidão de nascimento, comprovante de residência, documentos escolares, documentos médicos "
+                "e informações sobre a participação de cada responsável nos cuidados."
+            ),
+        ),
+        message=message,
+        context={},
+        timeline=[],
+    )
+
+    rewritten = response["rewritten_input"]
+    assert response["metadata"]["action_specialization_kind"] == "family_support_guardianship_claim"
+
+    pedidos = rewritten.split("BLOCO 5 — Pedidos", 1)[1].split(
+        "BLOCO 6 — Provas e requerimentos", 1
+    )[0]
+    normalized = " ".join(pedidos.split()).lower()
+
+    assert "regularização da guarda" in normalized
+    assert "unilateral ou compartilhada" in normalized
+    assert "rotina de cuidados" in normalized
+    assert "melhor interesse" in normalized
+
+    assert "alimentos provisórios" not in normalized
+    assert "alimentos definitivos" not in normalized
+    assert "regime de convivência familiar" not in normalized
+    assert "definição de visitas" not in normalized
+    assert "datas comemorativas" not in normalized
+
+
+def test_editor_all_blocks_ready_family_request_scope_keeps_visitation_only():
+    message = """
+Gere todos os blocos principais da minuta preliminar deste caso em formato de texto pronto para copiar e colar no Editor/minuta.
+
+Entregue somente os blocos finais, separados por títulos exatamente assim:
+
+BLOCO 1 — Endereçamento
+BLOCO 2 — Qualificação das partes
+BLOCO 3 — Resumo Fático
+BLOCO 4 — Fundamentação preliminar
+BLOCO 5 — Pedidos
+BLOCO 6 — Provas e requerimentos
+BLOCO 7 — Fechamento e conferência final
+
+Não invente dados. Use linguagem prudente.
+
+Comece direto pelo BLOCO 1.
+"""
+
+    response = _fallback_response(
+        case=_fake_case(
+            case_number="FAM-CONVIVENCIA-ESCOPO-001",
+            title="Regulamentação de convivência",
+            legal_area="Família",
+            action_type="regulamentação de convivência e visitas",
+            description=(
+                "Genitor pretende regulamentação da convivência com a criança, incluindo visitas, férias, "
+                "datas comemorativas e forma de comunicação entre os responsáveis. "
+                "Há mensagens, calendário anterior e informações sobre a rotina escolar."
+            ),
+        ),
+        message=message,
+        context={},
+        timeline=[],
+    )
+
+    rewritten = response["rewritten_input"]
+    assert response["metadata"]["action_specialization_kind"] == "family_support_guardianship_claim"
+
+    pedidos = rewritten.split("BLOCO 5 — Pedidos", 1)[1].split(
+        "BLOCO 6 — Provas e requerimentos", 1
+    )[0]
+    normalized = " ".join(pedidos.split()).lower()
+
+    assert "regime de convivência familiar" in normalized
+    assert "visitas" in normalized
+    assert "férias" in normalized
+    assert "datas comemorativas" in normalized
+    assert "comunicação entre os responsáveis" in normalized
+
+    assert "alimentos provisórios" not in normalized
+    assert "alimentos definitivos" not in normalized
+    assert "regularização da guarda" not in normalized
+    assert "guarda unilateral" not in normalized
+    assert "guarda compartilhada" not in normalized
+
