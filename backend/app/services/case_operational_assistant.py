@@ -2603,6 +2603,282 @@ def _build_editor_all_blocks_action_specialization(
             ),
         )
 
+    consumer_context_markers = (
+        "consumidor",
+        "consumidora",
+        "relação de consumo",
+        "relacao de consumo",
+        "fornecedor",
+        "fornecedora",
+        "código de defesa do consumidor",
+        "codigo de defesa do consumidor",
+        "cdc",
+        "banco",
+        "instituição financeira",
+        "instituicao financeira",
+        "cartão",
+        "cartao",
+        "pix",
+        "cobrança indevida",
+        "cobranca indevida",
+        "negativação",
+        "negativacao",
+        "serasa",
+        "spc",
+        "produto",
+        "serviço",
+        "servico",
+        "plano de saúde",
+        "plano de saude",
+        "operadora de saúde",
+        "operadora de saude",
+    )
+    if _editor_text_has_any(normalized, consumer_context_markers):
+        banking_fraud_markers = (
+            "fraude bancária",
+            "fraude bancaria",
+            "golpe bancário",
+            "golpe bancario",
+            "pix não reconhecido",
+            "pix nao reconhecido",
+            "transferência não reconhecida",
+            "transferencia nao reconhecida",
+            "transação não reconhecida",
+            "transacao nao reconhecida",
+            "acesso indevido",
+            "invasão de conta",
+            "invasao de conta",
+            "cartão clonado",
+            "cartao clonado",
+        )
+        wrongful_charge_markers = (
+            "cobrança indevida",
+            "cobranca indevida",
+            "débito indevido",
+            "debito indevido",
+            "desconto indevido",
+            "tarifa indevida",
+            "parcelas não contratadas",
+            "parcelas nao contratadas",
+            "serviço não contratado",
+            "servico nao contratado",
+        )
+        negative_listing_markers = (
+            "negativação indevida",
+            "negativacao indevida",
+            "inscrição indevida",
+            "inscricao indevida",
+            "serasa",
+            "spc",
+            "cadastro de inadimplentes",
+            "restrição de crédito",
+            "restricao de credito",
+        )
+        defective_product_markers = (
+            "produto defeituoso",
+            "produto com defeito",
+            "vício do produto",
+            "vicio do produto",
+            "produto impróprio",
+            "produto improprio",
+            "garantia",
+            "troca do produto",
+            "assistência técnica",
+            "assistencia tecnica",
+        )
+        defective_service_markers = (
+            "serviço defeituoso",
+            "servico defeituoso",
+            "falha na prestação do serviço",
+            "falha na prestacao do servico",
+            "serviço não prestado",
+            "servico nao prestado",
+            "serviço incompleto",
+            "servico incompleto",
+            "má prestação do serviço",
+            "ma prestacao do servico",
+        )
+        health_plan_markers = (
+            "plano de saúde",
+            "plano de saude",
+            "operadora de saúde",
+            "operadora de saude",
+            "negativa de cobertura",
+            "negou cobertura",
+            "procedimento médico",
+            "procedimento medico",
+            "tratamento médico",
+            "tratamento medico",
+            "autorização médica",
+            "autorizacao medica",
+            "internação",
+            "internacao",
+            "cirurgia",
+        )
+        general_contract_markers = (
+            "contrato de consumo",
+            "contrato",
+            "oferta",
+            "publicidade",
+            "compra",
+            "pedido",
+            "entrega",
+            "cancelamento",
+            "restituição",
+            "restituicao",
+            "reembolso",
+            "descumprimento contratual",
+        )
+        consumer_damage_markers = (
+            "dano material",
+            "danos materiais",
+            "dano moral",
+            "danos morais",
+            "indenização",
+            "indenizacao",
+            "prejuízo",
+            "prejuizo",
+        )
+        consumer_no_damage_markers = (
+            "sem pedido de dano moral",
+            "sem pedido de danos morais",
+            "sem indenização",
+            "sem indenizacao",
+        )
+
+        has_banking_fraud = _editor_text_has_any(normalized, banking_fraud_markers)
+        has_wrongful_charge = _editor_text_has_any(normalized, wrongful_charge_markers)
+        has_negative_listing = _editor_text_has_any(normalized, negative_listing_markers)
+        has_defective_product = _editor_text_has_any(normalized, defective_product_markers)
+        has_defective_service = _editor_text_has_any(normalized, defective_service_markers)
+        has_health_plan = _editor_text_has_any(normalized, health_plan_markers)
+        has_general_contract = _editor_text_has_any(normalized, general_contract_markers)
+        has_consumer_damage = (
+            _editor_text_has_any(normalized, consumer_damage_markers)
+            and not _editor_text_has_any(normalized, consumer_no_damage_markers)
+        )
+
+        foundation_parts = [
+            (
+                "A fundamentação preliminar deve se concentrar na relação de consumo identificada no caso, "
+                "nos deveres de informação, transparência, boa-fé, segurança, adequação e qualidade atribuídos ao fornecedor, "
+                "sempre vinculada aos fatos relatados, aos documentos disponíveis e à análise documental. "
+                "A base legal específica, a competência, o rito, a urgência e a extensão final dos pedidos permanecem sujeitos à revisão profissional."
+            )
+        ]
+        request_parts = [
+            (
+                "Diante do exposto, e sem prejuízo de adequação pelo advogado responsável, "
+                "requer-se a citação da parte fornecedora ou responsável."
+            )
+        ]
+
+        if has_banking_fraud:
+            foundation_parts.append(
+                "Devem ser avaliadas a segurança da operação bancária, a autenticidade das transações, "
+                "os mecanismos de autenticação, alertas, bloqueios, contestação administrativa e eventual falha na prevenção da fraude."
+            )
+            request_parts.append(
+                "Requer-se o reconhecimento ou declaração de não contratação das transações impugnadas, "
+                "o bloqueio de cobranças relacionadas, a recomposição dos valores comprovadamente subtraídos "
+                "e a preservação ou exibição de logs, IPs, dispositivos, autenticações, gravações e registros internos da operação."
+            )
+
+        if has_wrongful_charge:
+            foundation_parts.append(
+                "Devem ser examinadas a origem da cobrança, a existência de contratação válida, faturas, extratos, "
+                "autorizações, protocolos de contestação e pagamentos realizados."
+            )
+            request_parts.append(
+                "Requer-se a declaração de inexistência ou inexigibilidade da cobrança impugnada, "
+                "a interrupção de novos débitos e a restituição simples ou em dobro apenas conforme o enquadramento jurídico e a prova disponível."
+            )
+
+        if has_negative_listing:
+            foundation_parts.append(
+                "Devem ser avaliadas a origem do débito, a regularidade da inscrição, a comunicação prévia, "
+                "os registros dos órgãos de proteção ao crédito e os efeitos concretos da restrição."
+            )
+            request_parts.append(
+                "Requer-se a retirada ou suspensão da anotação indevida, a declaração de inexistência do débito quando cabível "
+                "e a exibição dos documentos que originaram a inscrição."
+            )
+
+        if has_defective_product:
+            foundation_parts.append(
+                "Devem ser examinados o vício ou defeito do produto, a nota fiscal, a oferta, a garantia, "
+                "as tentativas de reparo, os atendimentos da assistência técnica e a adequação do bem à finalidade anunciada."
+            )
+            request_parts.append(
+                "Requer-se, conforme a prova e a escolha juridicamente cabível, o reparo, a substituição do produto, "
+                "a restituição do preço ou o abatimento proporcional, com preservação da nota fiscal, garantia e registros de assistência técnica."
+            )
+
+        if has_defective_service:
+            foundation_parts.append(
+                "Devem ser examinados o serviço contratado, a oferta, o resultado prometido, os protocolos, "
+                "a extensão da falha, as tentativas de correção e os prejuízos diretamente demonstrados."
+            )
+            request_parts.append(
+                "Requer-se o cumprimento ou refazimento adequado do serviço, a correção da falha, "
+                "a restituição dos valores incompatíveis com o serviço efetivamente prestado ou outra medida compatível com o caso."
+            )
+
+        if has_health_plan:
+            foundation_parts.append(
+                "Devem ser avaliados contrato, cobertura assistencial, relatório e prescrição médica, "
+                "justificativa de negativa, urgência clínica, risco de agravamento e protocolos da operadora."
+            )
+            request_parts.append(
+                "Requer-se a autorização ou cobertura do procedimento, exame, internação ou tratamento indicado, "
+                "com tutela de urgência apenas quando sustentada por relatório médico e risco concreto, "
+                "além da exibição do contrato, diretrizes, protocolos e justificativa formal da negativa."
+            )
+
+        if has_general_contract or not any(
+            (
+                has_banking_fraud,
+                has_wrongful_charge,
+                has_negative_listing,
+                has_defective_product,
+                has_defective_service,
+                has_health_plan,
+            )
+        ):
+            foundation_parts.append(
+                "Devem ser avaliados contrato, oferta, publicidade, comprovantes de pagamento, entrega, cancelamento, "
+                "protocolos de atendimento e o cumprimento efetivo das obrigações assumidas."
+            )
+            request_parts.append(
+                "Requer-se a exibição dos documentos essenciais da contratação e a adoção apenas das medidas compatíveis com o caso, "
+                "como cumprimento da oferta, correção do serviço, cancelamento, restituição ou obrigação específica."
+            )
+
+        if has_consumer_damage:
+            foundation_parts.append(
+                "Eventuais danos materiais ou morais devem ser analisados de forma individualizada, "
+                "com demonstração da conduta, do nexo causal, da extensão do prejuízo e da prova mínima disponível."
+            )
+            request_parts.append(
+                "Requer-se a apuração e eventual indenização por danos materiais ou morais somente nos limites expressamente relatados, "
+                "documentados e confirmados pelo advogado responsável."
+            )
+
+        request_parts.append(
+            "Requer-se a preservação e juntada de contratos, faturas, extratos, notas fiscais, comprovantes, mensagens, "
+            "protocolos, gravações, telas, relatórios, contestações administrativas e demais provas específicas do conflito."
+        )
+        request_parts.append(
+            "Tutela de urgência, inversão do ônus da prova, restituição, multa, valor da causa, custas, honorários "
+            "e demais requerimentos devem ser definidos pelo advogado conforme os fatos e documentos disponíveis."
+        )
+
+        return (
+            "consumer_universal_action_scope_claim",
+            " ".join(foundation_parts),
+            " ".join(request_parts),
+        )
+
     obligation_markers = (
         "obrigação de fazer",
         "obrigacao de fazer",
