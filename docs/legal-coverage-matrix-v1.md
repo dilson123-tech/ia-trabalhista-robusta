@@ -282,22 +282,24 @@ A maturidade não é uniforme entre todos os tipos de ação.
 
 A `v0.2.34` criou o roteador universal de escopos consumeristas.
 
-A área possui forte especialização de fundamentação e pedidos, mas ainda não possui pacote completo de provas, endereçamento e qualificação para todos os escopos.
+A `v0.2.36` especializou o Bloco 6 — Provas e requerimentos para fraude bancária/Pix, cobrança indevida, negativação, produto, serviço, plano de saúde, veículo e contrato consumerista geral.
+
+A área possui forte especialização de fundamentação, pedidos e provas, mas ainda não possui endereçamento e qualificação próprios para todos os escopos.
 
 | Tipo de ação ou tema | Operacional / checklist | Editor especializado | Status geral | Entregas principais | Lacuna atual |
 |---|---:|---:|---:|---|---|
-| Veículo, contrato, retenção ou restituição do bem | ✅ | 🟡 | 🟡 | `v0.2.26`, preservado na `v0.2.34` | Especializar provas e partes |
-| Fraude bancária | ✅ | 🟡 | 🟡 | `v0.2.34` | Especializar provas digitais, bancárias e técnicas |
-| Pix não reconhecido | ✅ | 🟡 | 🟡 | `v0.2.34` | Criar bloco probatório próprio e teste real |
-| Cobrança indevida | ✅ | 🟡 | 🟡 | `v0.2.34` | Especializar provas e critérios de restituição |
-| Negativação indevida | ✅ | 🟡 | 🟡 | `v0.2.34` | Especializar documentos do débito e cadastro restritivo |
-| Fraude + cobrança + negativação | ✅ | 🟡 | 🟡 | `v0.2.34` | Especializar provas combinadas sem duplicação |
-| Produto defeituoso | ✅ | 🟡 | 🟡 | `v0.2.34` | Especializar nota fiscal, garantia, assistência e prova técnica |
-| Vício do produto | ✅ | 🟡 | 🟡 | `v0.2.34` | Criar distinção entre vício e defeito quando necessário |
-| Serviço defeituoso ou incompleto | ✅ | 🟡 | 🟡 | `v0.2.34` | Especializar contrato, oferta, protocolos e resultado |
-| Serviço não prestado | ✅ | 🟡 | 🟡 | Checklist e rota de serviço | Criar teste específico |
-| Plano de saúde e negativa de cobertura | ✅ | 🟡 | 🟡 | `v0.2.34` | Especializar prova médica, negativa e urgência |
-| Contrato consumerista geral | ✅ | 🟡 | 🟡 | `v0.2.34` | Reduzir generalidade por subtipos prioritários |
+| Veículo, contrato, retenção ou restituição do bem | ✅ | 🟡 | 🟡 | `v0.2.26`, `v0.2.36` | Provas específicas concluídas; especializar partes e endereçamento |
+| Fraude bancária | ✅ | 🟡 | 🟡 | `v0.2.34`, `v0.2.36` | Provas digitais e bancárias especializadas; faltam partes e endereçamento |
+| Pix não reconhecido | ✅ | 🟡 | 🟡 | `v0.2.34`, `v0.2.36` | Bloco probatório próprio e validação real combinada concluídos; faltam partes e endereçamento |
+| Cobrança indevida | ✅ | 🟡 | 🟡 | `v0.2.34`, `v0.2.36` | Provas específicas concluídas; critérios finais permanecem sob revisão profissional |
+| Negativação indevida | ✅ | 🟡 | 🟡 | `v0.2.34`, `v0.2.36` | Documentos do débito e cadastro restritivo especializados; faltam partes e endereçamento |
+| Fraude + cobrança + negativação | ✅ | 🟡 | 🟡 | `v0.2.34`, `v0.2.36` | Provas combinadas e teste real no navegador concluídos; faltam partes e endereçamento |
+| Produto defeituoso | ✅ | 🟡 | 🟡 | `v0.2.34`, `v0.2.36` | Nota fiscal, garantia, assistência e documentos técnicos especializados |
+| Vício do produto | ✅ | 🟡 | 🟡 | `v0.2.34`, `v0.2.36` | Provas específicas concluídas; aprofundar distinção jurídica quando caso real exigir |
+| Serviço defeituoso ou incompleto | ✅ | 🟡 | 🟡 | `v0.2.34`, `v0.2.36` | Contrato, oferta, ordem de serviço, protocolos e tentativas de correção especializados |
+| Serviço não prestado | ✅ | 🟡 | 🟡 | Checklist, `v0.2.34`, `v0.2.36` | Coberto pela rota probatória de serviço; criar caso real específico |
+| Plano de saúde e negativa de cobertura | ✅ | 🟡 | 🟡 | `v0.2.34`, `v0.2.36` | Prova médica, negativa formal e urgência clínica especializadas |
+| Contrato consumerista geral | ✅ | 🟡 | 🟡 | `v0.2.34`, `v0.2.36` | Provas contratuais especializadas; reduzir generalidade por subtipos prioritários |
 | Oferta ou publicidade | ✅ | 🟡 | 🟡 | Fallback contratual consumerista | Criar ação específica quando houver caso real |
 | Cancelamento não respeitado | ✅ | 🟡 | 🟡 | Checklist e contrato geral | Criar teste próprio |
 | Atraso na entrega | ✅ | 🟡 | 🟡 | Checklist e contrato geral | Criar teste próprio |
@@ -312,18 +314,13 @@ A área possui forte especialização de fundamentação e pedidos, mas ainda n�
 
 #### Próximo pacote recomendado
 
-Criar especialização do **Bloco 6 — Provas e requerimentos** por escopo consumerista:
+Criar especialização consumerista de:
 
-- fraude bancária e Pix;
-- cobrança;
-- negativação;
-- produto;
-- serviço;
-- plano de saúde;
-- veículo;
-- contrato geral.
+- **Bloco 1 — Endereçamento**;
+- **Bloco 2 — Qualificação das partes**;
+- testes reais adicionais no navegador para os demais escopos prioritários.
 
-Esse pacote é o principal requisito para transformar as rotas atuais de 🟡 parcial em ✅ prontas.
+A `v0.2.36` concluiu a especialização probatória e validou em navegador o cenário combinado de fraude por Pix, cobrança indevida e negativação. As rotas permanecem 🟡 porque ainda faltam partes, endereçamento e validações reais adicionais para alcançar cobertura completa.
 
 ---
 
@@ -668,6 +665,7 @@ A matriz antiga em `docs/LEGAL_MODULE_COVERAGE_MATRIX_V1.md` não deve ser apaga
 | Data | Versão | Alteração |
 |---|---|---|
 | 2026-07-21 | `v0.2.35` | Criação da matriz oficial de cobertura jurídica após a `v0.2.34` |
+| 2026-07-22 | `v0.2.36` | Especialização do Bloco 6 por escopo consumerista, com regressão e validação real de fraude Pix, cobrança e negativação |
 
 A cada nova tag jurídica:
 

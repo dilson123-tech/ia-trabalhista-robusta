@@ -3048,3 +3048,232 @@ def test_editor_all_blocks_ready_consumer_universal_scope_keeps_general_contract
     assert "substituição do produto" not in pedidos
     assert "cobertura do procedimento" not in pedidos
 
+
+
+def test_editor_all_blocks_ready_consumer_evidence_scope_combines_bank_charge_and_negative_listing():
+    response = _consumer_scope_ready_response(
+        "CONS-BANCO-PROVAS-001",
+        "Fraude Pix, cobrança e negativação",
+        "ação declaratória consumerista",
+        (
+            "Consumidor sofreu fraude bancária com Pix não reconhecido, recebeu cobrança indevida "
+            "e posteriormente foi negativado no Serasa. "
+            "Há extratos bancários, boletim de ocorrência, protocolos de contestação, mensagens "
+            "e comprovante de negativação."
+        ),
+    )
+
+    provas = _consumer_scope_block(
+        response,
+        "BLOCO 6 — Provas e requerimentos",
+        "BLOCO 7 — Fechamento e conferência final",
+    )
+
+    assert "extratos bancários" in provas
+    assert "boletim de ocorrência" in provas
+    assert "protocolos de contestação" in provas
+    assert "logs" in provas
+    assert "ips" in provas
+    assert "dispositivos" in provas
+    assert "comprovante de negativação" in provas
+    assert "órgãos de proteção ao crédito" in provas
+    assert "assistência técnica" not in provas
+    assert "prescrição médica" not in provas
+
+
+def test_editor_all_blocks_ready_consumer_evidence_scope_keeps_defective_product_specific():
+    response = _consumer_scope_ready_response(
+        "CONS-PRODUTO-PROVAS-001",
+        "Produto defeituoso",
+        "ação consumerista por vício do produto",
+        (
+            "Consumidora comprou eletrodoméstico com defeito. "
+            "Há nota fiscal, certificado de garantia, fotografias, vídeos, ordens de serviço "
+            "e registros da assistência técnica."
+        ),
+    )
+
+    provas = _consumer_scope_block(
+        response,
+        "BLOCO 6 — Provas e requerimentos",
+        "BLOCO 7 — Fechamento e conferência final",
+    )
+
+    assert "nota fiscal" in provas
+    assert "certificado de garantia" in provas
+    assert "fotografias" in provas
+    assert "vídeos" in provas
+    assert "ordens de serviço" in provas
+    assert "assistência técnica" in provas
+    assert "logs, ips" not in provas
+    assert "prescrição médica" not in provas
+
+
+def test_editor_all_blocks_ready_consumer_evidence_scope_keeps_defective_service_specific():
+    response = _consumer_scope_ready_response(
+        "CONS-SERVICO-PROVAS-001",
+        "Falha na prestação de serviço",
+        "ação consumerista por serviço defeituoso",
+        (
+            "Consumidor contratou serviço prestado de forma incompleta. "
+            "Há contrato, oferta, ordem de serviço, comprovantes de pagamento, protocolos, "
+            "mensagens e registros das tentativas de correção."
+        ),
+    )
+
+    provas = _consumer_scope_block(
+        response,
+        "BLOCO 6 — Provas e requerimentos",
+        "BLOCO 7 — Fechamento e conferência final",
+    )
+
+    assert "contrato" in provas
+    assert "oferta" in provas
+    assert "ordem de serviço" in provas
+    assert "comprovantes de pagamento" in provas
+    assert "protocolos" in provas
+    assert "tentativas de correção" in provas
+    assert "documentos do veículo" not in provas
+    assert "relatório médico" not in provas
+
+
+def test_editor_all_blocks_ready_consumer_evidence_scope_keeps_health_plan_specific():
+    response = _consumer_scope_ready_response(
+        "CONS-SAUDE-PROVAS-001",
+        "Negativa de cobertura médica",
+        "obrigação de fazer contra plano de saúde",
+        (
+            "Consumidora teve cirurgia negada pelo plano de saúde. "
+            "Há contrato do plano, relatório médico, prescrição médica, exames, prontuário, "
+            "protocolos e negativa formal da operadora."
+        ),
+    )
+
+    provas = _consumer_scope_block(
+        response,
+        "BLOCO 6 — Provas e requerimentos",
+        "BLOCO 7 — Fechamento e conferência final",
+    )
+
+    assert "contrato do plano" in provas
+    assert "relatório médico" in provas
+    assert "prescrição médica" in provas
+    assert "exames" in provas
+    assert "prontuário" in provas
+    assert "negativa formal" in provas
+    assert "urgência clínica" in provas
+    assert "assistência técnica" not in provas
+    assert "órgãos de proteção ao crédito" not in provas
+
+
+def test_editor_all_blocks_ready_consumer_evidence_scope_keeps_general_contract_prudent():
+    response = _consumer_scope_ready_response(
+        "CONS-GERAL-PROVAS-001",
+        "Descumprimento de oferta",
+        "ação consumerista contratual",
+        (
+            "Consumidor realizou compra após oferta anunciada, mas a entrega não ocorreu. "
+            "Há publicidade, pedido, comprovante de pagamento, rastreamento, protocolos, "
+            "mensagens, solicitação de cancelamento e pedido de reembolso."
+        ),
+    )
+
+    provas = _consumer_scope_block(
+        response,
+        "BLOCO 6 — Provas e requerimentos",
+        "BLOCO 7 — Fechamento e conferência final",
+    )
+
+    assert "oferta" in provas
+    assert "publicidade" in provas
+    assert "pedido" in provas
+    assert "comprovante de pagamento" in provas
+    assert "rastreamento" in provas
+    assert "cancelamento" in provas
+    assert "reembolso" in provas
+    assert "logs, ips" not in provas
+    assert "prescrição médica" not in provas
+
+
+def test_editor_all_blocks_ready_consumer_vehicle_evidence_scope_keeps_vehicle_documents_specific():
+    response = _consumer_scope_ready_response(
+        "CONS-VEICULO-PROVAS-001",
+        "Retenção de veículo e exibição contratual",
+        "ação consumerista envolvendo veículo",
+        (
+            "Consumidor adquiriu veículo de revendedora, realizou pagamentos por Pix e depois o bem foi retomado. "
+            "Há contrato, recibos, comprovantes Pix, documentos do veículo, placa, RENAVAM, "
+            "consulta de restrição, mensagens e dúvida sobre eventual ordem judicial."
+        ),
+    )
+
+    provas = _consumer_scope_block(
+        response,
+        "BLOCO 6 — Provas e requerimentos",
+        "BLOCO 7 — Fechamento e conferência final",
+    )
+
+    assert response["metadata"]["action_specialization_kind"] == (
+        "consumer_vehicle_contract_display_restitution"
+    )
+    assert "contrato" in provas
+    assert "recibos" in provas
+    assert "comprovantes pix" in provas
+    assert "documentos do veículo" in provas
+    assert "placa" in provas
+    assert "renavam" in provas
+    assert "consulta de restrição" in provas
+    assert "ordem judicial" in provas
+    assert "prescrição médica" not in provas
+
+
+def test_editor_all_blocks_ready_consumer_browser_regression_detects_plain_negative_listing_without_general_contract_noise():
+    response = _consumer_scope_ready_response(
+        "TESTE-CONSUMIDOR-PIX-NEGATIVACAO-001",
+        "Fraude bancária por Pix, cobrança indevida e negativação",
+        "Ação consumerista por fraude bancária, cobrança indevida e negativação",
+        (
+            "O consumidor identificou uma transferência via Pix que afirma não ter realizado nem autorizado. "
+            "Comunicou imediatamente a instituição financeira, contestou a operação e solicitou o bloqueio e a restituição do valor, "
+            "mas o banco manteve a cobrança. Posteriormente, houve inscrição do nome do consumidor em cadastro restritivo "
+            "por débito relacionado à operação contestada. O consumidor possui extratos bancários, comprovante da transação, "
+            "protocolos de atendimento e documento da negativação."
+        ),
+    )
+
+    assert response["metadata"]["action_specialization_kind"] == (
+        "consumer_universal_action_scope_claim"
+    )
+
+    fundamentacao = _consumer_scope_block(
+        response,
+        "BLOCO 4 — Fundamentação preliminar",
+        "BLOCO 5 — Pedidos",
+    )
+    pedidos = _consumer_scope_block(
+        response,
+        "BLOCO 5 — Pedidos",
+        "BLOCO 6 — Provas e requerimentos",
+    )
+    provas = _consumer_scope_block(
+        response,
+        "BLOCO 6 — Provas e requerimentos",
+        "BLOCO 7 — Fechamento e conferência final",
+    )
+
+    assert "segurança da operação bancária" in fundamentacao
+    assert "origem da cobrança" in fundamentacao
+    assert "regularidade da inscrição" in fundamentacao
+    assert "cumprimento efetivo das obrigações assumidas" not in fundamentacao
+
+    assert "transações impugnadas" in pedidos
+    assert "inexistência ou inexigibilidade da cobrança" in pedidos
+    assert "retirada ou suspensão da anotação indevida" in pedidos
+    assert "documentos essenciais da contratação" not in pedidos
+
+    assert "extratos bancários" in provas
+    assert "histórico dos débitos" in provas
+    assert "comprovante de negativação" in provas
+    assert "órgãos de proteção ao crédito" in provas
+    assert "contrato consumerista geral" not in provas
+

@@ -2262,6 +2262,188 @@ def _editor_text_has_any(normalized_text: str, markers: tuple[str, ...]) -> bool
     return any(marker in normalized_text for marker in markers)
 
 
+def _detect_consumer_editor_scopes(normalized_text: str) -> dict[str, bool]:
+    consumer_context_markers = (
+        "consumidor",
+        "consumidora",
+        "relação de consumo",
+        "relacao de consumo",
+        "fornecedor",
+        "fornecedora",
+        "código de defesa do consumidor",
+        "codigo de defesa do consumidor",
+        "cdc",
+        "banco",
+        "instituição financeira",
+        "instituicao financeira",
+        "cartão",
+        "cartao",
+        "pix",
+        "cobrança indevida",
+        "cobranca indevida",
+        "negativação",
+        "negativacao",
+        "serasa",
+        "spc",
+        "produto",
+        "serviço",
+        "servico",
+        "plano de saúde",
+        "plano de saude",
+        "operadora de saúde",
+        "operadora de saude",
+    )
+    banking_fraud_markers = (
+        "fraude bancária",
+        "fraude bancaria",
+        "golpe bancário",
+        "golpe bancario",
+        "pix não reconhecido",
+        "pix nao reconhecido",
+        "transferência não reconhecida",
+        "transferencia nao reconhecida",
+        "transação não reconhecida",
+        "transacao nao reconhecida",
+        "acesso indevido",
+        "invasão de conta",
+        "invasao de conta",
+        "cartão clonado",
+        "cartao clonado",
+    )
+    wrongful_charge_markers = (
+        "cobrança indevida",
+        "cobranca indevida",
+        "débito indevido",
+        "debito indevido",
+        "desconto indevido",
+        "tarifa indevida",
+        "parcelas não contratadas",
+        "parcelas nao contratadas",
+        "serviço não contratado",
+        "servico nao contratado",
+    )
+    negative_listing_markers = (
+        "negativação indevida",
+        "negativacao indevida",
+        "negativação",
+        "negativacao",
+        "nome negativado",
+        "nome negativada",
+        "foi negativado",
+        "foi negativada",
+        "inscrição indevida",
+        "inscricao indevida",
+        "inscrição do nome",
+        "inscricao do nome",
+        "cadastro restritivo",
+        "serasa",
+        "spc",
+        "cadastro de inadimplentes",
+        "restrição de crédito",
+        "restricao de credito",
+    )
+    defective_product_markers = (
+        "produto defeituoso",
+        "produto com defeito",
+        "vício do produto",
+        "vicio do produto",
+        "produto impróprio",
+        "produto improprio",
+        "garantia",
+        "troca do produto",
+        "assistência técnica",
+        "assistencia tecnica",
+    )
+    defective_service_markers = (
+        "serviço defeituoso",
+        "servico defeituoso",
+        "falha na prestação do serviço",
+        "falha na prestacao do servico",
+        "serviço não prestado",
+        "servico nao prestado",
+        "serviço incompleto",
+        "servico incompleto",
+        "má prestação do serviço",
+        "ma prestacao do servico",
+    )
+    health_plan_markers = (
+        "plano de saúde",
+        "plano de saude",
+        "operadora de saúde",
+        "operadora de saude",
+        "negativa de cobertura",
+        "negou cobertura",
+        "procedimento médico",
+        "procedimento medico",
+        "tratamento médico",
+        "tratamento medico",
+        "autorização médica",
+        "autorizacao medica",
+        "internação",
+        "internacao",
+        "cirurgia",
+    )
+    general_contract_markers = (
+        "contrato de consumo",
+        "contrato",
+        "oferta",
+        "publicidade",
+        "compra",
+        "pedido",
+        "entrega",
+        "cancelamento",
+        "restituição",
+        "restituicao",
+        "reembolso",
+        "descumprimento contratual",
+    )
+    consumer_damage_markers = (
+        "dano material",
+        "danos materiais",
+        "dano moral",
+        "danos morais",
+        "indenização",
+        "indenizacao",
+        "prejuízo",
+        "prejuizo",
+    )
+    consumer_no_damage_markers = (
+        "sem pedido de dano moral",
+        "sem pedido de danos morais",
+        "sem indenização",
+        "sem indenizacao",
+    )
+
+    is_consumer = _editor_text_has_any(
+        normalized_text,
+        consumer_context_markers,
+    )
+
+    return {
+        "is_consumer": is_consumer,
+        "banking_fraud": is_consumer
+        and _editor_text_has_any(normalized_text, banking_fraud_markers),
+        "wrongful_charge": is_consumer
+        and _editor_text_has_any(normalized_text, wrongful_charge_markers),
+        "negative_listing": is_consumer
+        and _editor_text_has_any(normalized_text, negative_listing_markers),
+        "defective_product": is_consumer
+        and _editor_text_has_any(normalized_text, defective_product_markers),
+        "defective_service": is_consumer
+        and _editor_text_has_any(normalized_text, defective_service_markers),
+        "health_plan": is_consumer
+        and _editor_text_has_any(normalized_text, health_plan_markers),
+        "general_contract": is_consumer
+        and _editor_text_has_any(normalized_text, general_contract_markers),
+        "consumer_damage": is_consumer
+        and _editor_text_has_any(normalized_text, consumer_damage_markers)
+        and not _editor_text_has_any(
+            normalized_text,
+            consumer_no_damage_markers,
+        ),
+    }
+
+
 def _build_editor_all_blocks_action_specialization(
     source_text: str,
     context: dict[str, Any] | None = None,
@@ -2274,6 +2456,7 @@ def _build_editor_all_blocks_action_specialization(
         source_text,
         *(case_context.values()),
     )
+    consumer_scopes = _detect_consumer_editor_scopes(normalized)
 
     if _is_cobranca_contratual_without_moral_damage(source_text, context):
         return (
@@ -2603,160 +2786,15 @@ def _build_editor_all_blocks_action_specialization(
             ),
         )
 
-    consumer_context_markers = (
-        "consumidor",
-        "consumidora",
-        "relação de consumo",
-        "relacao de consumo",
-        "fornecedor",
-        "fornecedora",
-        "código de defesa do consumidor",
-        "codigo de defesa do consumidor",
-        "cdc",
-        "banco",
-        "instituição financeira",
-        "instituicao financeira",
-        "cartão",
-        "cartao",
-        "pix",
-        "cobrança indevida",
-        "cobranca indevida",
-        "negativação",
-        "negativacao",
-        "serasa",
-        "spc",
-        "produto",
-        "serviço",
-        "servico",
-        "plano de saúde",
-        "plano de saude",
-        "operadora de saúde",
-        "operadora de saude",
-    )
-    if _editor_text_has_any(normalized, consumer_context_markers):
-        banking_fraud_markers = (
-            "fraude bancária",
-            "fraude bancaria",
-            "golpe bancário",
-            "golpe bancario",
-            "pix não reconhecido",
-            "pix nao reconhecido",
-            "transferência não reconhecida",
-            "transferencia nao reconhecida",
-            "transação não reconhecida",
-            "transacao nao reconhecida",
-            "acesso indevido",
-            "invasão de conta",
-            "invasao de conta",
-            "cartão clonado",
-            "cartao clonado",
-        )
-        wrongful_charge_markers = (
-            "cobrança indevida",
-            "cobranca indevida",
-            "débito indevido",
-            "debito indevido",
-            "desconto indevido",
-            "tarifa indevida",
-            "parcelas não contratadas",
-            "parcelas nao contratadas",
-            "serviço não contratado",
-            "servico nao contratado",
-        )
-        negative_listing_markers = (
-            "negativação indevida",
-            "negativacao indevida",
-            "inscrição indevida",
-            "inscricao indevida",
-            "serasa",
-            "spc",
-            "cadastro de inadimplentes",
-            "restrição de crédito",
-            "restricao de credito",
-        )
-        defective_product_markers = (
-            "produto defeituoso",
-            "produto com defeito",
-            "vício do produto",
-            "vicio do produto",
-            "produto impróprio",
-            "produto improprio",
-            "garantia",
-            "troca do produto",
-            "assistência técnica",
-            "assistencia tecnica",
-        )
-        defective_service_markers = (
-            "serviço defeituoso",
-            "servico defeituoso",
-            "falha na prestação do serviço",
-            "falha na prestacao do servico",
-            "serviço não prestado",
-            "servico nao prestado",
-            "serviço incompleto",
-            "servico incompleto",
-            "má prestação do serviço",
-            "ma prestacao do servico",
-        )
-        health_plan_markers = (
-            "plano de saúde",
-            "plano de saude",
-            "operadora de saúde",
-            "operadora de saude",
-            "negativa de cobertura",
-            "negou cobertura",
-            "procedimento médico",
-            "procedimento medico",
-            "tratamento médico",
-            "tratamento medico",
-            "autorização médica",
-            "autorizacao medica",
-            "internação",
-            "internacao",
-            "cirurgia",
-        )
-        general_contract_markers = (
-            "contrato de consumo",
-            "contrato",
-            "oferta",
-            "publicidade",
-            "compra",
-            "pedido",
-            "entrega",
-            "cancelamento",
-            "restituição",
-            "restituicao",
-            "reembolso",
-            "descumprimento contratual",
-        )
-        consumer_damage_markers = (
-            "dano material",
-            "danos materiais",
-            "dano moral",
-            "danos morais",
-            "indenização",
-            "indenizacao",
-            "prejuízo",
-            "prejuizo",
-        )
-        consumer_no_damage_markers = (
-            "sem pedido de dano moral",
-            "sem pedido de danos morais",
-            "sem indenização",
-            "sem indenizacao",
-        )
-
-        has_banking_fraud = _editor_text_has_any(normalized, banking_fraud_markers)
-        has_wrongful_charge = _editor_text_has_any(normalized, wrongful_charge_markers)
-        has_negative_listing = _editor_text_has_any(normalized, negative_listing_markers)
-        has_defective_product = _editor_text_has_any(normalized, defective_product_markers)
-        has_defective_service = _editor_text_has_any(normalized, defective_service_markers)
-        has_health_plan = _editor_text_has_any(normalized, health_plan_markers)
-        has_general_contract = _editor_text_has_any(normalized, general_contract_markers)
-        has_consumer_damage = (
-            _editor_text_has_any(normalized, consumer_damage_markers)
-            and not _editor_text_has_any(normalized, consumer_no_damage_markers)
-        )
+    if consumer_scopes["is_consumer"]:
+        has_banking_fraud = consumer_scopes["banking_fraud"]
+        has_wrongful_charge = consumer_scopes["wrongful_charge"]
+        has_negative_listing = consumer_scopes["negative_listing"]
+        has_defective_product = consumer_scopes["defective_product"]
+        has_defective_service = consumer_scopes["defective_service"]
+        has_health_plan = consumer_scopes["health_plan"]
+        has_general_contract = consumer_scopes["general_contract"]
+        has_consumer_damage = consumer_scopes["consumer_damage"]
 
         foundation_parts = [
             (
@@ -2835,7 +2873,7 @@ def _build_editor_all_blocks_action_specialization(
                 "além da exibição do contrato, diretrizes, protocolos e justificativa formal da negativa."
             )
 
-        if has_general_contract or not any(
+        if not any(
             (
                 has_banking_fraud,
                 has_wrongful_charge,
@@ -3146,6 +3184,88 @@ def _editor_all_blocks_ready_response(
             "Protesta-se ainda pela prova testemunhal de colegas do setor de fusão, supervisores ou demais pessoas que possam descrever rotina, tempo de exposição, calor, uso e eficácia dos EPIs, "
             "sem prejuízo de depoimento pessoal da reclamada, juntada posterior de novos documentos e expedição de ofícios quando necessário."
         )
+    elif action_specialization_kind == "consumer_vehicle_contract_display_restitution":
+        provas = (
+            "Protesta-se pela produção dos meios de prova compatíveis com a controvérsia consumerista envolvendo veículo, "
+            "especialmente contrato, recibos, comprovantes Pix, comprovantes de pagamento, mensagens, documentos do veículo, placa, RENAVAM, "
+            "consulta de restrição ou bloqueio, registros da negociação, justificativa da retomada ou retenção e eventual ordem judicial relacionada ao bem. "
+            "Requer-se a preservação, exibição e juntada dos documentos mantidos pela revendedora ou parte responsável, "
+            "inclusive contrato integral, histórico financeiro, recibos, registros internos, documentos da transferência e fundamento documental de eventual restrição. "
+            "Perícia, inspeção, consulta oficial, expedição de ofícios e outras provas devem ser requeridas apenas quando pertinentes "
+            "e após revisão do advogado responsável."
+        )
+    elif action_specialization_kind == "consumer_universal_action_scope_claim":
+        consumer_evidence_scopes = _detect_consumer_editor_scopes(
+            _normalize_editor_detection_text(
+                source_body,
+                *(editor_context["case_context"].values()),
+            )
+        )
+        evidence_parts = [
+            (
+                "Protesta-se pela produção dos meios de prova compatíveis com os escopos consumeristas efetivamente identificados, "
+                "sempre limitada aos fatos relatados e aos documentos disponíveis."
+            )
+        ]
+
+        if consumer_evidence_scopes["banking_fraud"]:
+            evidence_parts.append(
+                "Para a fraude bancária ou transação não reconhecida, devem ser preservados e juntados extratos bancários, "
+                "comprovantes das transações, boletim de ocorrência, protocolos de contestação, mensagens, gravações e respostas da instituição financeira. "
+                "Requer-se, quando pertinente, a exibição de logs, IPs, dispositivos, autenticações, alertas, bloqueios e registros internos da operação."
+            )
+
+        if consumer_evidence_scopes["wrongful_charge"]:
+            evidence_parts.append(
+                "Para a cobrança indevida, devem ser examinados contrato, faturas, extratos, autorizações, comprovantes de pagamento, "
+                "protocolos de contestação, histórico dos débitos e documentos capazes de demonstrar a origem ou ausência de contratação."
+            )
+
+        if consumer_evidence_scopes["negative_listing"]:
+            evidence_parts.append(
+                "Para a negativação, devem ser preservados o comprovante de negativação, certidões ou consultas dos órgãos de proteção ao crédito, "
+                "comunicação prévia, documentos que originaram a inscrição, histórico do débito e registros dos efeitos concretos da restrição."
+            )
+
+        if consumer_evidence_scopes["defective_product"]:
+            evidence_parts.append(
+                "Para produto defeituoso ou com vício, devem ser juntados nota fiscal, certificado de garantia, oferta, manual, fotografias, vídeos, "
+                "ordens de serviço, laudos disponíveis, protocolos e registros da assistência técnica, além do próprio produto quando sua preservação for viável."
+            )
+
+        if consumer_evidence_scopes["defective_service"]:
+            evidence_parts.append(
+                "Para serviço defeituoso, incompleto ou não prestado, devem ser juntados contrato, oferta, ordem de serviço, comprovantes de pagamento, "
+                "protocolos, mensagens, registros do resultado prometido, evidências da execução e documentos das tentativas de correção."
+            )
+
+        if consumer_evidence_scopes["health_plan"]:
+            evidence_parts.append(
+                "Para plano de saúde, devem ser preservados contrato do plano, relatório médico, prescrição médica, exames, prontuário, "
+                "protocolos, negativa formal da operadora, diretrizes apresentadas, documentos da urgência clínica e elementos que demonstrem risco de agravamento."
+            )
+
+        if not any(
+            (
+                consumer_evidence_scopes["banking_fraud"],
+                consumer_evidence_scopes["wrongful_charge"],
+                consumer_evidence_scopes["negative_listing"],
+                consumer_evidence_scopes["defective_product"],
+                consumer_evidence_scopes["defective_service"],
+                consumer_evidence_scopes["health_plan"],
+            )
+        ):
+            evidence_parts.append(
+                "Para o contrato consumerista geral, devem ser juntados contrato, oferta, publicidade, pedido, comprovante de pagamento, "
+                "rastreamento, registros de entrega, protocolos, mensagens, solicitação de cancelamento, reembolso e demais documentos da contratação."
+            )
+
+        evidence_parts.append(
+            "Prova pericial, depoimento pessoal, prova testemunhal com testemunhas a confirmar, inversão do ônus da prova, "
+            "expedição de ofícios, exibição de documentos, juntada posterior e demais requerimentos devem ser definidos pelo advogado "
+            "conforme a pertinência, a disponibilidade documental e o escopo real do conflito."
+        )
+        provas = " ".join(evidence_parts)
     else:
         provas = (
             "Protesta-se pela produção de todos os meios de prova em direito admitidos, especialmente documentos já disponíveis, comprovantes de pagamento, contratos, recibos, mensagens, prints, áudios, vídeos, consultas oficiais, registros administrativos, depoimento pessoal da parte ré, oitiva de testemunhas a confirmar e demais provas que se mostrarem necessárias. "
