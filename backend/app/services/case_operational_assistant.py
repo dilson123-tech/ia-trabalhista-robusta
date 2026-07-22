@@ -3066,6 +3066,82 @@ def _editor_all_blocks_ready_response(
         editor_context,
     )
 
+    consumer_action_specialization_kinds = {
+        "consumer_universal_action_scope_claim",
+        "consumer_vehicle_contract_display_restitution",
+    }
+    if action_specialization_kind in consumer_action_specialization_kinds:
+        enderecamento = (
+            "EXCELENTÍSSIMO(A) SENHOR(A) DOUTOR(A) JUIZ(A) DE DIREITO DO JUÍZO CÍVEL COMPETENTE "
+            "DE [LOCALIDADE A CONFIRMAR PELO ADVOGADO].\n\n"
+            "O advogado responsável deverá confirmar, antes do protocolo, se a demanda deve tramitar perante Vara Cível "
+            "ou Juizado Especial Cível, considerando a competência territorial, o domicílio do consumidor, "
+            "o local de cumprimento da obrigação, eventual cláusula contratual aplicável, o valor da causa, "
+            "a complexidade probatória, a necessidade de perícia, eventual prevenção e o rito aplicável."
+        )
+
+        def _consumer_party_label(
+            fragment: str | None,
+            source_labels: tuple[str, ...],
+            target_label: str,
+            fallback: str,
+        ) -> str:
+            if not fragment:
+                return fallback
+
+            cleaned = fragment.strip()
+            lowered = cleaned.lower()
+
+            for source_label in source_labels:
+                if lowered.startswith(source_label.lower()):
+                    return f"{target_label}:{cleaned[len(source_label):]}"
+
+            return f"{target_label}: {cleaned}"
+
+        qualificacao = "\n\n".join(
+            item
+            for item in (
+                _consumer_party_label(
+                    parte_autora or business_parte_autora,
+                    (
+                        "Parte autora:",
+                        "Autor:",
+                        "Autora:",
+                        "Consumidor:",
+                        "Consumidora:",
+                        "Consumidor(a):",
+                    ),
+                    "Consumidor(a)",
+                    (
+                        "Consumidor(a): a confirmar, conforme nome completo ou razão social, nacionalidade, "
+                        "estado civil quando aplicável, profissão, CPF ou CNPJ, documento de identificação, "
+                        "e-mail, telefone, comprovante de endereço, procuração e cadastro do caso."
+                    ),
+                ),
+                _consumer_party_label(
+                    parte_re or business_parte_re,
+                    (
+                        "Parte ré:",
+                        "Parte re:",
+                        "Ré:",
+                        "Re:",
+                        "Requerida:",
+                        "Requerido:",
+                        "Fornecedor:",
+                        "Fornecedora:",
+                        "Fornecedor(a):",
+                    ),
+                    "Fornecedor(a)",
+                    (
+                        "Fornecedor(a): a confirmar, conforme nome empresarial ou nome completo, CNPJ ou CPF, "
+                        "representação legal quando aplicável, endereço para citação, contrato, faturas, "
+                        "cadastro público e documentos da relação de consumo."
+                    ),
+                ),
+            )
+            if item
+        )
+
     family_action_specialization_kinds = {
         "family_support_guardianship_claim",
     }

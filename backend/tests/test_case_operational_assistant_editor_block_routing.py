@@ -1286,9 +1286,9 @@ Comece direto pelo BLOCO 1.
         "BLOCO 3 — Resumo Fático", 1
     )[0]
 
-    assert "Parte autora:" in qualificacao
+    assert "Consumidor(a):" in qualificacao
     assert "Maria de Souza" in qualificacao
-    assert "Parte ré:" in qualificacao
+    assert "Fornecedor(a):" in qualificacao
     assert "Empresa Alfa Serviços LTDA" in qualificacao
 
     forbidden_qualification_markers = (
@@ -1799,8 +1799,8 @@ Comece direto pelo BLOCO 1.
             "competente",
         ),
         "BLOCO 2 — Qualificação das partes": (
-            "parte autora",
-            "parte ré",
+            "consumidor(a)",
+            "fornecedor(a)",
             "a confirmar",
         ),
         "BLOCO 3 — Resumo Fático": (
@@ -1922,8 +1922,8 @@ def test_editor_all_blocks_ready_frontend_prompt_stays_synced_with_golden_contra
             "competente",
         ),
         "BLOCO 2 — Qualificação das partes": (
-            "parte autora",
-            "parte ré",
+            "consumidor(a)",
+            "fornecedor(a)",
             "a confirmar",
         ),
         "BLOCO 3 — Resumo Fático": (
@@ -3276,4 +3276,126 @@ def test_editor_all_blocks_ready_consumer_browser_regression_detects_plain_negat
     assert "comprovante de negativação" in provas
     assert "órgãos de proteção ao crédito" in provas
     assert "contrato consumerista geral" not in provas
+
+
+def test_editor_all_blocks_ready_consumer_addressing_qualification_uses_consumer_civil_boundaries():
+    response = _consumer_scope_ready_response(
+        "CONS-END-QUAL-001",
+        "Fraude bancária por Pix",
+        "ação declaratória consumerista",
+        (
+            "Consumidor afirma não reconhecer transferência Pix e apresentou extratos, "
+            "comprovante da transação e protocolos de contestação."
+        ),
+    )
+
+    assert response["metadata"]["action_specialization_kind"] == (
+        "consumer_universal_action_scope_claim"
+    )
+
+    enderecamento = _consumer_scope_block(
+        response,
+        "BLOCO 1 — Endereçamento",
+        "BLOCO 2 — Qualificação das partes",
+    )
+    qualificacao = _consumer_scope_block(
+        response,
+        "BLOCO 2 — Qualificação das partes",
+        "BLOCO 3 — Resumo Fático",
+    )
+
+    assert "juiz(a) de direito do juízo cível competente" in enderecamento
+    assert "vara cível ou juizado especial cível" in enderecamento
+    assert "competência territorial" in enderecamento
+    assert "domicílio do consumidor" in enderecamento
+    assert "valor da causa" in enderecamento
+    assert "complexidade probatória" in enderecamento
+    assert "necessidade de perícia" in enderecamento
+    assert "rito aplicável" in enderecamento
+
+    assert "consumidor(a):" in qualificacao
+    assert "fornecedor(a):" in qualificacao
+    assert "cpf" in qualificacao
+    assert "comprovante de endereço" in qualificacao
+    assert "cnpj ou cpf" in qualificacao
+    assert "endereço para citação" in qualificacao
+    assert "documentos da relação de consumo" in qualificacao
+
+    combined = f"{enderecamento} {qualificacao}"
+    forbidden_markers = (
+        "vara do trabalho",
+        "justiça do trabalho",
+        "reclamante:",
+        "reclamada:",
+        "vara de família",
+        "requerente:",
+        "requerido(a):",
+        "criança/adolescente:",
+        "parte autora:",
+        "parte ré:",
+        "parte re:",
+    )
+    for marker in forbidden_markers:
+        assert marker not in combined
+
+
+def test_editor_all_blocks_ready_consumer_addressing_qualification_preserves_named_parties():
+    response = _consumer_scope_ready_response(
+        "CONS-END-QUAL-NOMES-001",
+        "Cobrança indevida e negativação",
+        "ação declaratória consumerista",
+        (
+            "Parte autora: Maria de Souza, CPF 000.000.000-00, residente em Joinville/SC. "
+            "Parte ré: Banco Exemplo S.A., CNPJ 00.000.000/0001-00. "
+            "A consumidora contesta cobrança indevida e inscrição em cadastro restritivo."
+        ),
+    )
+
+    qualificacao = _consumer_scope_block(
+        response,
+        "BLOCO 2 — Qualificação das partes",
+        "BLOCO 3 — Resumo Fático",
+    )
+
+    assert "consumidor(a): maria de souza" in qualificacao
+    assert "cpf 000.000.000-00" in qualificacao
+    assert "fornecedor(a): banco exemplo s.a." in qualificacao
+    assert "cnpj 00.000.000/0001-00" in qualificacao
+    assert "parte autora:" not in qualificacao
+    assert "parte ré:" not in qualificacao
+    assert "parte re:" not in qualificacao
+
+
+def test_editor_all_blocks_ready_consumer_vehicle_addressing_qualification_uses_same_consumer_boundaries():
+    response = _consumer_scope_ready_response(
+        "CONS-VEICULO-END-QUAL-001",
+        "Retenção de veículo e exibição contratual",
+        "ação consumerista envolvendo veículo",
+        (
+            "Consumidor adquiriu veículo de revendedora, realizou pagamentos por Pix "
+            "e depois o bem foi retomado. Há contrato, recibos, documentos do veículo, "
+            "placa, RENAVAM, consulta de restrição e mensagens."
+        ),
+    )
+
+    assert response["metadata"]["action_specialization_kind"] == (
+        "consumer_vehicle_contract_display_restitution"
+    )
+
+    enderecamento = _consumer_scope_block(
+        response,
+        "BLOCO 1 — Endereçamento",
+        "BLOCO 2 — Qualificação das partes",
+    )
+    qualificacao = _consumer_scope_block(
+        response,
+        "BLOCO 2 — Qualificação das partes",
+        "BLOCO 3 — Resumo Fático",
+    )
+
+    assert "juízo cível competente" in enderecamento
+    assert "vara cível ou juizado especial cível" in enderecamento
+    assert "consumidor(a):" in qualificacao
+    assert "fornecedor(a):" in qualificacao
+    assert "documentos da relação de consumo" in qualificacao
 
