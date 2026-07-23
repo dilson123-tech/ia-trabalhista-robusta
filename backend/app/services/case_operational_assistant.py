@@ -2412,6 +2412,16 @@ def _detect_consumer_editor_scopes(normalized_text: str) -> dict[str, bool]:
         "sem pedido de danos morais",
         "sem indenização",
         "sem indenizacao",
+        "sem inventar prejuízo",
+        "sem inventar prejuizo",
+        "sem inventar prejuízos",
+        "sem inventar prejuizos",
+        "sem inventar datas, valores, prejuízos",
+        "sem inventar datas, valores, prejuizos",
+        "prejuízo não informado",
+        "prejuizo nao informado",
+        "prejuízos não informados",
+        "prejuizos nao informados",
     )
 
     is_consumer = _editor_text_has_any(
@@ -2444,6 +2454,259 @@ def _detect_consumer_editor_scopes(normalized_text: str) -> dict[str, bool]:
     }
 
 
+def _detect_health_plan_editor_details(normalized_text: str) -> dict[str, bool]:
+    return {
+        "procedure": _editor_text_has_any(
+            normalized_text,
+            (
+                "procedimento médico",
+                "procedimento medico",
+                "procedimento prescrito",
+                "procedimento negado",
+                "autorização de procedimento",
+                "autorizacao de procedimento",
+                "procedimento ou tratamento",
+            ),
+        ),
+        "treatment": _editor_text_has_any(
+            normalized_text,
+            (
+                "tratamento indicado",
+                "tratamento prescrito",
+                "tratamento negado",
+                "autorização de tratamento",
+                "autorizacao de tratamento",
+                "procedimento ou tratamento",
+            ),
+        ),
+        "exam_request": _editor_text_has_any(
+            normalized_text,
+            (
+                "exame negado",
+                "exames negados",
+                "autorização de exame",
+                "autorizacao de exame",
+                "cobertura de exame",
+                "realização de exame",
+                "realizacao de exame",
+            ),
+        ),
+        "hospitalization": _editor_text_has_any(
+            normalized_text,
+            (
+                "internação negada",
+                "internacao negada",
+                "autorização de internação",
+                "autorizacao de internacao",
+                "cobertura de internação",
+                "cobertura de internacao",
+            ),
+        ),
+        "surgery": _editor_text_has_any(
+            normalized_text,
+            ("cirurgia",),
+        ),
+        "urgency": _editor_text_has_any(
+            normalized_text,
+            (
+                "urgência clínica",
+                "urgencia clinica",
+                "risco de agravamento",
+                "risco concreto",
+                "tutela de urgência",
+                "tutela de urgencia",
+                "caráter urgente",
+                "carater urgente",
+                "situação emergencial",
+                "situacao emergencial",
+            ),
+        ),
+        "contract_or_card": _editor_text_has_any(
+            normalized_text,
+            (
+                "contrato do plano",
+                "contrato",
+                "carteirinha",
+            ),
+        ),
+        "medical_report": _editor_text_has_any(
+            normalized_text,
+            (
+                "relatório médico",
+                "relatorio medico",
+            ),
+        ),
+        "prescription": _editor_text_has_any(
+            normalized_text,
+            (
+                "prescrição médica",
+                "prescricao medica",
+            ),
+        ),
+        "authorization_request": _editor_text_has_any(
+            normalized_text,
+            (
+                "pedido de autorização",
+                "pedido de autorizacao",
+                "solicitação de autorização",
+                "solicitacao de autorizacao",
+            ),
+        ),
+        "denial_response": _editor_text_has_any(
+            normalized_text,
+            (
+                "negativa",
+                "negou",
+                "recusou",
+                "não autorizou",
+                "nao autorizou",
+                "resposta da operadora",
+                "justificativa de negativa",
+            ),
+        ),
+        "protocols": _editor_text_has_any(
+            normalized_text,
+            ("protocolo", "protocolos"),
+        ),
+        "messages": _editor_text_has_any(
+            normalized_text,
+            ("mensagem", "mensagens"),
+        ),
+        "exams": _editor_text_has_any(
+            normalized_text,
+            ("exames",),
+        ),
+        "medical_record": _editor_text_has_any(
+            normalized_text,
+            ("prontuário", "prontuario"),
+        ),
+    }
+
+
+def _detect_general_consumer_contract_details(
+    normalized_text: str,
+) -> dict[str, bool]:
+    return {
+        "contract": _editor_text_has_any(
+            normalized_text,
+            (
+                "possui contrato",
+                "há contrato",
+                "ha contrato",
+                "contrato disponível",
+                "contrato disponivel",
+                "cópia do contrato",
+                "copia do contrato",
+                "contrato de consumo disponível",
+                "contrato de consumo disponivel",
+                "instrumento contratual disponível",
+                "instrumento contratual disponivel",
+            ),
+        ),
+        "offer": _editor_text_has_any(
+            normalized_text,
+            ("oferta",),
+        ),
+        "advertising": _editor_text_has_any(
+            normalized_text,
+            (
+                "publicidade",
+                "anúncio",
+                "anuncio",
+            ),
+        ),
+        "order": _editor_text_has_any(
+            normalized_text,
+            (
+                "registro do pedido",
+                "número do pedido",
+                "numero do pedido",
+                "pedido de compra",
+                "há pedido",
+                "ha pedido",
+            ),
+        ),
+        "payment": _editor_text_has_any(
+            normalized_text,
+            (
+                "comprovante de pagamento",
+                "comprovantes de pagamento",
+                "efetuou o pagamento",
+                "pagamento realizado",
+            ),
+        ),
+        "non_delivery": _editor_text_has_any(
+            normalized_text,
+            (
+                "não foi entregue",
+                "nao foi entregue",
+                "entrega não ocorreu",
+                "entrega nao ocorreu",
+                "pedido não entregue",
+                "pedido nao entregue",
+            ),
+        ),
+        "tracking": _editor_text_has_any(
+            normalized_text,
+            (
+                "rastreamento",
+                "código de rastreio",
+                "codigo de rastreio",
+            ),
+        ),
+        "delivery_records": _editor_text_has_any(
+            normalized_text,
+            (
+                "registro de entrega",
+                "registros de entrega",
+                "comprovante de entrega",
+                "comprovantes de entrega",
+            ),
+        ),
+        "protocols": _editor_text_has_any(
+            normalized_text,
+            (
+                "protocolo",
+                "protocolos",
+            ),
+        ),
+        "messages": _editor_text_has_any(
+            normalized_text,
+            (
+                "mensagem",
+                "mensagens",
+            ),
+        ),
+        "cancellation": _editor_text_has_any(
+            normalized_text,
+            (
+                "cancelamento",
+                "cancelar",
+            ),
+        ),
+        "refund": _editor_text_has_any(
+            normalized_text,
+            (
+                "reembolso",
+                "restituição dos valores",
+                "restituicao dos valores",
+                "devolução dos valores",
+                "devolucao dos valores",
+                "valores comprovados",
+            ),
+        ),
+        "specific_obligation": _editor_text_has_any(
+            normalized_text,
+            (
+                "obrigação específica",
+                "obrigacao especifica",
+                "obrigação de fazer",
+                "obrigacao de fazer",
+            ),
+        ),
+    }
+
+
 def _build_editor_all_blocks_action_specialization(
     source_text: str,
     context: dict[str, Any] | None = None,
@@ -2457,6 +2720,10 @@ def _build_editor_all_blocks_action_specialization(
         *(case_context.values()),
     )
     consumer_scopes = _detect_consumer_editor_scopes(normalized)
+    health_plan_details = _detect_health_plan_editor_details(normalized)
+    general_contract_details = _detect_general_consumer_contract_details(
+        normalized
+    )
 
     if _is_cobranca_contratual_without_moral_damage(source_text, context):
         return (
@@ -2767,23 +3034,126 @@ def _build_editor_all_blocks_action_specialization(
     if _editor_text_has_any(normalized, vehicle_markers) and _editor_text_has_any(
         normalized, vehicle_dispute_markers
     ):
-        return (
-            "consumer_vehicle_contract_display_restitution",
+        has_vehicle_damage = consumer_scopes["consumer_damage"]
+
+        has_vehicle_value_restitution = _editor_text_has_any(
+            normalized,
+            (
+                "restituição dos valores",
+                "restituicao dos valores",
+                "devolução dos valores",
+                "devolucao dos valores",
+                "valores comprovados",
+            ),
+        )
+
+        has_vehicle_urgency = (
+            _editor_text_has_any(
+                normalized,
+                (
+                    "tutela de urgência",
+                    "tutela de urgencia",
+                    "pedido de urgência",
+                    "pedido de urgencia",
+                    "risco atual",
+                    "risco concreto",
+                    "busca do bem",
+                    "busca e apreensão",
+                    "busca e apreensao",
+                ),
+            )
+            and not _editor_text_has_any(
+                normalized,
+                (
+                    "sem inventar urgência",
+                    "sem inventar urgencia",
+                    "urgência não informada",
+                    "urgencia nao informada",
+                    "urgência não informados",
+                    "urgencia nao informados",
+                    "sem urgência",
+                    "sem urgencia",
+                ),
+            )
+        )
+
+        vehicle_foundation_parts = [
             (
                 "A fundamentação preliminar deve se concentrar na relação contratual e de consumo envolvendo aquisição de veículo, "
-                "pagamentos realizados, documentos contratuais pendentes, eventual restrição ou bloqueio informado e possível recolhimento ou retenção do bem. "
-                "Devem ser avaliados comprovantes de pagamento, contrato, recibos, conversas, documentos do veículo, placa, RENAVAM, consulta de restrição, "
-                "eventual ordem judicial, justificativa apresentada pela parte ré e a viabilidade de exibição de documentos, restituição do veículo, "
-                "regularização da situação ou perdas e danos. "
-                "A base legal específica, competência, rito, urgência e extensão dos pedidos permanecem sujeitos à revisão profissional."
+                "pagamentos realizados, documentos contratuais pendentes, eventual restrição ou bloqueio informado "
+                "e possível recolhimento ou retenção do bem. "
+                "Devem ser avaliados comprovantes de pagamento, contrato, recibos, conversas, documentos do veículo, "
+                "placa, RENAVAM, consulta de restrição, eventual ordem judicial e justificativa apresentada pela parte ré. "
+                "Também devem ser examinadas a viabilidade de exibição de documentos, a restituição do veículo "
+                "e a regularização da situação do bem."
+            )
+        ]
+
+        if has_vehicle_value_restitution:
+            vehicle_foundation_parts.append(
+                "A restituição dos valores comprovados deve ser examinada somente nos limites dos pagamentos "
+                "documentados e da estratégia definida pelo advogado responsável."
+            )
+
+        if has_vehicle_damage:
+            vehicle_foundation_parts.append(
+                "Eventual indenização material equivalente deve ser analisada apenas porque foi expressamente indicada no caso, "
+                "sempre condicionada à prova documental e à revisão profissional."
+            )
+
+        if has_vehicle_urgency:
+            vehicle_foundation_parts.append(
+                "A tutela de urgência e eventual busca do bem devem ser examinadas somente porque foram expressamente indicadas, "
+                "dependendo de risco concreto e suporte documental suficiente."
+            )
+
+        vehicle_foundation_parts.append(
+            "A base legal específica, competência, rito e extensão dos pedidos permanecem sujeitos à revisão profissional."
+        )
+
+        vehicle_request_parts = [
+            (
+                "Diante do exposto, e sem prejuízo de adequação pelo advogado responsável, "
+                "requer-se a citação da parte ré, a exibição do contrato, recibos, documentos do veículo, "
+                "justificativa do bloqueio ou restrição e demais documentos essenciais da negociação."
             ),
             (
-                "Diante do exposto, e sem prejuízo de adequação pelo advogado responsável, requer-se a citação da parte ré, "
-                "a exibição do contrato, recibos, documentos do veículo, justificativa do bloqueio ou restrição e demais documentos essenciais da negociação. "
-                "Requer-se também a análise da restituição do veículo, regularização da situação do bem ou indenização material equivalente, conforme a prova documental e a estratégia confirmada. "
-                "Devem ser juntados e preservados comprovantes Pix, mensagens, consultas oficiais, documentos do veículo e demais registros disponíveis. "
-                "Tutela de urgência, busca do bem, obrigação específica, perdas e danos, valor da causa, custas e honorários devem ser definidos pelo advogado apenas se houver suporte documental suficiente."
+                "Requer-se também a análise da restituição do veículo ou da regularização da situação do bem, "
+                "conforme a prova documental e a estratégia confirmada."
             ),
+        ]
+
+        if has_vehicle_value_restitution:
+            vehicle_request_parts.append(
+                "Requer-se ainda a restituição dos valores comprovados, somente na extensão demonstrada "
+                "pelos recibos, comprovantes Pix e demais documentos disponíveis."
+            )
+
+        if has_vehicle_damage:
+            vehicle_request_parts.append(
+                "Requer-se a análise de indenização material equivalente, apenas nos limites expressamente indicados, "
+                "documentados e confirmados pelo advogado responsável."
+            )
+
+        vehicle_request_parts.append(
+            "Devem ser juntados e preservados comprovantes Pix, mensagens, consultas oficiais, "
+            "documentos do veículo e demais registros disponíveis."
+        )
+
+        if has_vehicle_urgency:
+            vehicle_request_parts.append(
+                "Tutela de urgência, busca do bem ou obrigação específica devem ser definidas pelo advogado "
+                "somente se houver risco concreto e suporte documental suficiente."
+            )
+
+        vehicle_request_parts.append(
+            "Valor da causa, custas, honorários e demais requerimentos devem ser definidos pelo advogado responsável."
+        )
+
+        return (
+            "consumer_vehicle_contract_display_restitution",
+            " ".join(vehicle_foundation_parts),
+            " ".join(vehicle_request_parts),
         )
 
     if consumer_scopes["is_consumer"]:
@@ -2863,15 +3233,99 @@ def _build_editor_all_blocks_action_specialization(
             )
 
         if has_health_plan:
+            health_foundation_items = []
+
+            if health_plan_details["contract_or_card"]:
+                health_foundation_items.append(
+                    "o contrato ou a comprovação do vínculo com o plano"
+                )
+            if health_plan_details["medical_report"]:
+                health_foundation_items.append("o relatório médico")
+            if health_plan_details["prescription"]:
+                health_foundation_items.append("a prescrição médica")
+            if health_plan_details["authorization_request"]:
+                health_foundation_items.append("o pedido de autorização")
+            if health_plan_details["denial_response"]:
+                health_foundation_items.append(
+                    "a resposta ou justificativa de negativa da operadora"
+                )
+            if health_plan_details["protocols"]:
+                health_foundation_items.append("os protocolos da operadora")
+            if health_plan_details["messages"]:
+                health_foundation_items.append("as mensagens disponíveis")
+
+            if not health_foundation_items:
+                health_foundation_items.append(
+                    "os documentos médicos e contratuais efetivamente disponíveis"
+                )
+
             foundation_parts.append(
-                "Devem ser avaliados contrato, cobertura assistencial, relatório e prescrição médica, "
-                "justificativa de negativa, urgência clínica, risco de agravamento e protocolos da operadora."
+                "Devem ser avaliados "
+                + ", ".join(health_foundation_items)
+                + ", sempre nos limites dos fatos e documentos informados."
             )
-            request_parts.append(
-                "Requer-se a autorização ou cobertura do procedimento, exame, internação ou tratamento indicado, "
-                "com tutela de urgência apenas quando sustentada por relatório médico e risco concreto, "
-                "além da exibição do contrato, diretrizes, protocolos e justificativa formal da negativa."
+
+            if health_plan_details["urgency"]:
+                foundation_parts.append(
+                    "Devem também ser examinados a urgência clínica e o risco de agravamento "
+                    "expressamente relatados, conforme o suporte médico disponível."
+                )
+
+            health_requested_items = []
+
+            if health_plan_details["procedure"]:
+                health_requested_items.append("do procedimento")
+            if health_plan_details["treatment"]:
+                health_requested_items.append("do tratamento")
+            if health_plan_details["exam_request"]:
+                health_requested_items.append("do exame")
+            if health_plan_details["hospitalization"]:
+                health_requested_items.append("da internação")
+            if health_plan_details["surgery"]:
+                health_requested_items.append("da cirurgia")
+
+            if not health_requested_items:
+                health_requested_items.append(
+                    "da medida assistencial indicada nos documentos do caso, a confirmar"
+                )
+
+            health_request_documents = []
+
+            if health_plan_details["contract_or_card"]:
+                health_request_documents.append("contrato ou carteirinha")
+            if health_plan_details["medical_report"]:
+                health_request_documents.append("relatório médico")
+            if health_plan_details["prescription"]:
+                health_request_documents.append("prescrição médica")
+            if health_plan_details["authorization_request"]:
+                health_request_documents.append("pedido de autorização")
+            if health_plan_details["protocols"]:
+                health_request_documents.append("protocolos")
+            if health_plan_details["messages"]:
+                health_request_documents.append("mensagens")
+            if health_plan_details["denial_response"]:
+                health_request_documents.append(
+                    "justificativa formal da negativa"
+                )
+
+            health_request = (
+                "Requer-se a autorização ou cobertura "
+                + " ou ".join(health_requested_items)
             )
+
+            if health_plan_details["urgency"]:
+                health_request += (
+                    ", com tutela de urgência apenas quando sustentada "
+                    "por relatório médico e risco concreto"
+                )
+
+            if health_request_documents:
+                health_request += (
+                    ", além da preservação ou exibição de "
+                    + ", ".join(health_request_documents)
+                )
+
+            request_parts.append(health_request + ".")
 
         if not any(
             (
@@ -2883,13 +3337,76 @@ def _build_editor_all_blocks_action_specialization(
                 has_health_plan,
             )
         ):
+            general_foundation_items = []
+
+            if general_contract_details["contract"]:
+                general_foundation_items.append("o contrato informado")
+            if general_contract_details["offer"]:
+                general_foundation_items.append("a oferta")
+            if general_contract_details["advertising"]:
+                general_foundation_items.append("a publicidade")
+            if general_contract_details["order"]:
+                general_foundation_items.append("o registro do pedido")
+            if general_contract_details["payment"]:
+                general_foundation_items.append(
+                    "os comprovantes de pagamento"
+                )
+            if general_contract_details["non_delivery"]:
+                general_foundation_items.append("a não entrega relatada")
+            if general_contract_details["cancellation"]:
+                general_foundation_items.append(
+                    "a solicitação de cancelamento"
+                )
+            if general_contract_details["protocols"]:
+                general_foundation_items.append(
+                    "os protocolos de atendimento"
+                )
+            if general_contract_details["messages"]:
+                general_foundation_items.append(
+                    "as mensagens disponíveis"
+                )
+
+            if not general_foundation_items:
+                general_foundation_items.append(
+                    "os documentos efetivamente disponíveis da contratação"
+                )
+
             foundation_parts.append(
-                "Devem ser avaliados contrato, oferta, publicidade, comprovantes de pagamento, entrega, cancelamento, "
-                "protocolos de atendimento e o cumprimento efetivo das obrigações assumidas."
+                "Devem ser avaliados "
+                + ", ".join(general_foundation_items)
+                + " e o cumprimento efetivo das obrigações assumidas, "
+                "sempre nos limites dos fatos e documentos informados."
             )
+
+            general_requested_measures = []
+
+            if general_contract_details["offer"]:
+                general_requested_measures.append(
+                    "o cumprimento da oferta"
+                )
+            if general_contract_details["cancellation"]:
+                general_requested_measures.append(
+                    "o cancelamento da contratação"
+                )
+            if general_contract_details["refund"]:
+                general_requested_measures.append(
+                    "a restituição dos valores comprovados"
+                )
+            if general_contract_details["specific_obligation"]:
+                general_requested_measures.append(
+                    "a obrigação específica expressamente indicada"
+                )
+
+            if not general_requested_measures:
+                general_requested_measures.append(
+                    "a medida contratual compatível com os fatos comprovados"
+                )
+
             request_parts.append(
-                "Requer-se a exibição dos documentos essenciais da contratação e a adoção apenas das medidas compatíveis com o caso, "
-                "como cumprimento da oferta, correção do serviço, cancelamento, restituição ou obrigação específica."
+                "Requer-se a exibição dos documentos essenciais da contratação "
+                "e a análise das seguintes medidas: "
+                + ", ".join(general_requested_measures)
+                + ", conforme a prova disponível e a revisão do advogado responsável."
             )
 
         if has_consumer_damage:
@@ -2903,8 +3420,8 @@ def _build_editor_all_blocks_action_specialization(
             )
 
         request_parts.append(
-            "Requer-se a preservação e juntada de contratos, faturas, extratos, notas fiscais, comprovantes, mensagens, "
-            "protocolos, gravações, telas, relatórios, contestações administrativas e demais provas específicas do conflito."
+            "Requer-se a preservação e juntada das provas efetivamente informadas no caso, "
+            "sem presumir a existência de documentos ou registros não relatados."
         )
         request_parts.append(
             "Tutela de urgência, inversão do ônus da prova, restituição, multa, valor da causa, custas, honorários "
@@ -3271,10 +3788,19 @@ def _editor_all_blocks_ready_response(
             "e após revisão do advogado responsável."
         )
     elif action_specialization_kind == "consumer_universal_action_scope_claim":
+        consumer_evidence_normalized = _normalize_editor_detection_text(
+            source_body,
+            *(editor_context["case_context"].values()),
+        )
         consumer_evidence_scopes = _detect_consumer_editor_scopes(
-            _normalize_editor_detection_text(
-                source_body,
-                *(editor_context["case_context"].values()),
+            consumer_evidence_normalized
+        )
+        health_plan_evidence_details = _detect_health_plan_editor_details(
+            consumer_evidence_normalized
+        )
+        general_contract_evidence_details = (
+            _detect_general_consumer_contract_details(
+                consumer_evidence_normalized
             )
         )
         evidence_parts = [
@@ -3316,10 +3842,50 @@ def _editor_all_blocks_ready_response(
             )
 
         if consumer_evidence_scopes["health_plan"]:
-            evidence_parts.append(
-                "Para plano de saúde, devem ser preservados contrato do plano, relatório médico, prescrição médica, exames, prontuário, "
-                "protocolos, negativa formal da operadora, diretrizes apresentadas, documentos da urgência clínica e elementos que demonstrem risco de agravamento."
+            health_evidence_items = []
+
+            if health_plan_evidence_details["contract_or_card"]:
+                health_evidence_items.append(
+                    "contrato do plano ou carteirinha"
+                )
+            if health_plan_evidence_details["medical_report"]:
+                health_evidence_items.append("relatório médico")
+            if health_plan_evidence_details["prescription"]:
+                health_evidence_items.append("prescrição médica")
+            if health_plan_evidence_details["exams"]:
+                health_evidence_items.append("exames")
+            if health_plan_evidence_details["medical_record"]:
+                health_evidence_items.append("prontuário")
+            if health_plan_evidence_details["authorization_request"]:
+                health_evidence_items.append("pedido de autorização")
+            if health_plan_evidence_details["denial_response"]:
+                health_evidence_items.append(
+                    "resposta ou negativa formal da operadora"
+                )
+            if health_plan_evidence_details["protocols"]:
+                health_evidence_items.append("protocolos")
+            if health_plan_evidence_details["messages"]:
+                health_evidence_items.append("mensagens")
+
+            if not health_evidence_items:
+                health_evidence_items.append(
+                    "documentos médicos e contratuais efetivamente disponíveis"
+                )
+
+            health_evidence_text = (
+                "Para plano de saúde, devem ser preservados e juntados "
+                + ", ".join(health_evidence_items)
+                + "."
             )
+
+            if health_plan_evidence_details["urgency"]:
+                health_evidence_text += (
+                    " Quando expressamente relatados, devem ser juntados "
+                    "documentos da urgência clínica e elementos que demonstrem "
+                    "risco de agravamento."
+                )
+
+            evidence_parts.append(health_evidence_text)
 
         if not any(
             (
@@ -3331,9 +3897,46 @@ def _editor_all_blocks_ready_response(
                 consumer_evidence_scopes["health_plan"],
             )
         ):
+            general_evidence_items = []
+
+            if general_contract_evidence_details["contract"]:
+                general_evidence_items.append("contrato")
+            if general_contract_evidence_details["offer"]:
+                general_evidence_items.append("oferta")
+            if general_contract_evidence_details["advertising"]:
+                general_evidence_items.append("publicidade")
+            if general_contract_evidence_details["order"]:
+                general_evidence_items.append("pedido")
+            if general_contract_evidence_details["payment"]:
+                general_evidence_items.append(
+                    "comprovante de pagamento"
+                )
+            if general_contract_evidence_details["tracking"]:
+                general_evidence_items.append("rastreamento")
+            if general_contract_evidence_details["delivery_records"]:
+                general_evidence_items.append(
+                    "registros de entrega"
+                )
+            if general_contract_evidence_details["protocols"]:
+                general_evidence_items.append("protocolos")
+            if general_contract_evidence_details["messages"]:
+                general_evidence_items.append("mensagens")
+            if general_contract_evidence_details["cancellation"]:
+                general_evidence_items.append(
+                    "solicitação de cancelamento"
+                )
+            if general_contract_evidence_details["refund"]:
+                general_evidence_items.append("pedido de reembolso")
+
+            if not general_evidence_items:
+                general_evidence_items.append(
+                    "documentos efetivamente disponíveis da contratação"
+                )
+
             evidence_parts.append(
-                "Para o contrato consumerista geral, devem ser juntados contrato, oferta, publicidade, pedido, comprovante de pagamento, "
-                "rastreamento, registros de entrega, protocolos, mensagens, solicitação de cancelamento, reembolso e demais documentos da contratação."
+                "Para o contrato consumerista geral, devem ser preservados e juntados "
+                + ", ".join(general_evidence_items)
+                + "."
             )
 
         evidence_parts.append(
