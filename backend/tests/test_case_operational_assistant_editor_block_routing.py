@@ -2143,7 +2143,9 @@ Comece direto pelo BLOCO 1.
 
     assert "exibição do contrato" in normalized_pedidos
     assert "restituição do veículo" in normalized_pedidos
+    assert "indenização material equivalente" in normalized_pedidos
     assert "comprovantes pix" in normalized_pedidos
+    assert "tutela de urgência, busca do bem" not in normalized_pedidos
 
     forbidden_wrong_family_markers = (
         "saldo contratual inadimplido",
@@ -3016,10 +3018,24 @@ def test_editor_all_blocks_ready_consumer_universal_scope_keeps_health_plan_spec
     )
 
     assert response["metadata"]["action_specialization_kind"] == "consumer_universal_action_scope_claim"
-    pedidos = _consumer_scope_block(response, "BLOCO 5 — Pedidos", "BLOCO 6 — Provas e requerimentos")
+    fundamentacao = _consumer_scope_block(
+        response,
+        "BLOCO 4 — Fundamentação preliminar",
+        "BLOCO 5 — Pedidos",
+    )
+    pedidos = _consumer_scope_block(
+        response,
+        "BLOCO 5 — Pedidos",
+        "BLOCO 6 — Provas e requerimentos",
+    )
 
-    assert "autorização ou cobertura do procedimento" in pedidos
-    assert "tutela de urgência" in pedidos
+    assert "autorização ou cobertura" in pedidos
+    assert "procedimento" in pedidos
+    assert "cirurgia" in pedidos
+    assert "exame" not in pedidos
+    assert "internação" not in pedidos
+    assert "com tutela de urgência apenas quando sustentada" in pedidos
+    assert "risco de agravamento" in fundamentacao
     assert "relatório médico" in pedidos
     assert "justificativa formal da negativa" in pedidos
     assert "substituição do produto" not in pedidos
@@ -3044,6 +3060,7 @@ def test_editor_all_blocks_ready_consumer_universal_scope_keeps_general_contract
     assert "cumprimento da oferta" in pedidos
     assert "cancelamento" in pedidos
     assert "restituição" in pedidos
+    assert "correção do serviço" not in pedidos
     assert "transações impugnadas" not in pedidos
     assert "substituição do produto" not in pedidos
     assert "cobertura do procedimento" not in pedidos
@@ -3161,7 +3178,7 @@ def test_editor_all_blocks_ready_consumer_evidence_scope_keeps_health_plan_speci
     assert "exames" in provas
     assert "prontuário" in provas
     assert "negativa formal" in provas
-    assert "urgência clínica" in provas
+    assert "urgência clínica" not in provas
     assert "assistência técnica" not in provas
     assert "órgãos de proteção ao crédito" not in provas
 
@@ -3398,4 +3415,237 @@ def test_editor_all_blocks_ready_consumer_vehicle_addressing_qualification_uses_
     assert "consumidor(a):" in qualificacao
     assert "fornecedor(a):" in qualificacao
     assert "documentos da relação de consumo" in qualificacao
+
+
+def test_editor_all_blocks_ready_consumer_service_does_not_infer_damage_from_without_inventing_losses():
+    response = _consumer_scope_ready_response(
+        "TESTE-CONSUMIDOR-SERVICO-001",
+        "Serviço contratado prestado de forma incompleta e defeituosa",
+        "Ação consumerista por serviço defeituoso e incompleto",
+        (
+            "O consumidor contratou um serviço que foi executado de forma incompleta e apresentou falhas no resultado. "
+            "Possui contrato, oferta, ordem de serviço, comprovantes de pagamento, protocolos de atendimento e mensagens. "
+            "Solicitou a correção do problema, mas as tentativas não resolveram a falha. "
+            "Pretende a análise das medidas cabíveis, sem inventar datas, valores, prejuízos ou documentos não informados."
+        ),
+    )
+
+    fundamentacao = _consumer_scope_block(
+        response,
+        "BLOCO 4 — Fundamentação preliminar",
+        "BLOCO 5 — Pedidos",
+    )
+    pedidos = _consumer_scope_block(
+        response,
+        "BLOCO 5 — Pedidos",
+        "BLOCO 6 — Provas e requerimentos",
+    )
+
+    assert "serviço contratado" in fundamentacao
+    assert "tentativas de correção" in fundamentacao
+    assert "danos materiais ou morais" not in fundamentacao
+    assert "eventual indenização" not in pedidos
+    assert "danos materiais ou morais" not in pedidos
+
+
+def test_editor_all_blocks_ready_consumer_service_keeps_explicit_material_damage_scope():
+    response = _consumer_scope_ready_response(
+        "CONS-SERVICO-DANO-MATERIAL-001",
+        "Serviço defeituoso com prejuízo material comprovado",
+        "Ação consumerista por serviço defeituoso e danos materiais",
+        (
+            "O consumidor contratou serviço executado de forma defeituosa. "
+            "Relata prejuízo material decorrente da falha e possui comprovantes dos gastos adicionais, "
+            "contrato, ordem de serviço, protocolos e mensagens."
+        ),
+    )
+
+    fundamentacao = _consumer_scope_block(
+        response,
+        "BLOCO 4 — Fundamentação preliminar",
+        "BLOCO 5 — Pedidos",
+    )
+    pedidos = _consumer_scope_block(
+        response,
+        "BLOCO 5 — Pedidos",
+        "BLOCO 6 — Provas e requerimentos",
+    )
+
+    assert "danos materiais ou morais" in fundamentacao
+    assert "demonstração da conduta" in fundamentacao
+    assert "eventual indenização por danos materiais ou morais" in pedidos
+    assert "documentados e confirmados pelo advogado" in pedidos
+
+
+def test_editor_all_blocks_ready_health_plan_does_not_infer_unsupported_medical_scope():
+    response = _consumer_scope_ready_response(
+        "TESTE-CONSUMIDOR-PLANO-SAUDE-001",
+        "Plano de saúde negou autorização de procedimento prescrito",
+        "Ação consumerista contra plano de saúde por negativa de autorização",
+        (
+            "O consumidor é beneficiário de plano de saúde e recebeu prescrição médica "
+            "para realização de procedimento ou tratamento. "
+            "A operadora negou ou não concluiu a autorização, apesar dos pedidos e protocolos. "
+            "Possui contrato ou carteirinha, prescrição médica, pedido de autorização, "
+            "resposta ou negativa da operadora, protocolos e mensagens. "
+            "Pretende a análise das medidas cabíveis, sem inventar diagnóstico, urgência, "
+            "datas, valores, cobertura contratual ou documentos não informados."
+        ),
+    )
+
+    fundamentacao = _consumer_scope_block(
+        response,
+        "BLOCO 4 — Fundamentação preliminar",
+        "BLOCO 5 — Pedidos",
+    )
+    pedidos = _consumer_scope_block(
+        response,
+        "BLOCO 5 — Pedidos",
+        "BLOCO 6 — Provas e requerimentos",
+    )
+    provas = _consumer_scope_block(
+        response,
+        "BLOCO 6 — Provas e requerimentos",
+        "BLOCO 7 — Fechamento e conferência final",
+    )
+
+    assert "contrato" in fundamentacao
+    assert "prescrição médica" in fundamentacao
+    assert "justificativa de negativa" in fundamentacao
+    assert "urgência clínica" not in fundamentacao
+    assert "risco de agravamento" not in fundamentacao
+
+    assert "autorização ou cobertura" in pedidos
+    assert "procedimento" in pedidos
+    assert "tratamento" in pedidos
+    assert "exame" not in pedidos
+    assert "internação" not in pedidos
+    assert "cirurgia" not in pedidos
+    assert "com tutela de urgência apenas quando sustentada" not in pedidos
+    assert "risco concreto" not in pedidos
+
+    assert "contrato do plano" in provas
+    assert "prescrição médica" in provas
+    assert "pedido de autorização" in provas
+    assert "negativa formal" in provas
+    assert "protocolos" in provas
+    assert "mensagens" in provas
+    assert "exames" not in provas
+    assert "prontuário" not in provas
+    assert "urgência clínica" not in provas
+    assert "risco de agravamento" not in provas
+
+
+def test_editor_all_blocks_ready_consumer_vehicle_does_not_infer_unsupported_damage_or_urgency():
+    response = _consumer_scope_ready_response(
+        "TESTE-CONSUMIDOR-VEICULO-001",
+        "Revendedora recolheu veículo sem apresentar contrato ou justificativa completa",
+        "Ação consumerista para exibição de contrato e restituição de veículo",
+        (
+            "O consumidor adquiriu um veículo de uma revendedora mediante negociação parcelada. "
+            "Possui recibos, comprovantes Pix, mensagens e documentos do veículo, "
+            "mas não dispõe de cópia integral do contrato. "
+            "Após os pagamentos informados, a revendedora recolheu o veículo alegando bloqueio, "
+            "sem apresentar ordem judicial, justificativa documental completa ou prestação de contas. "
+            "Pretende a análise da exibição do contrato e dos documentos da negociação, "
+            "do esclarecimento do alegado bloqueio e da possível restituição do veículo "
+            "ou dos valores comprovados, sem inventar datas, valores, dívida, restrição, "
+            "ordem judicial, danos ou urgência não informados."
+        ),
+    )
+
+    fundamentacao = _consumer_scope_block(
+        response,
+        "BLOCO 4 — Fundamentação preliminar",
+        "BLOCO 5 — Pedidos",
+    )
+    pedidos = _consumer_scope_block(
+        response,
+        "BLOCO 5 — Pedidos",
+        "BLOCO 6 — Provas e requerimentos",
+    )
+
+    assert response["metadata"]["action_specialization_kind"] == (
+        "consumer_vehicle_contract_display_restitution"
+    )
+
+    assert "aquisição de veículo" in fundamentacao
+    assert "exibição de documentos" in fundamentacao
+    assert "restituição do veículo" in fundamentacao
+    assert "perdas e danos" not in fundamentacao
+
+    assert "exibição do contrato" in pedidos
+    assert "restituição do veículo" in pedidos
+    assert "restituição dos valores comprovados" in pedidos
+    assert "indenização material equivalente" not in pedidos
+    assert "perdas e danos" not in pedidos
+    assert "tutela de urgência" not in pedidos
+    assert "busca do bem" not in pedidos
+
+
+def test_editor_all_blocks_ready_consumer_general_contract_does_not_infer_service_correction_or_unavailable_delivery_evidence():
+    response = _consumer_scope_ready_response(
+        "TESTE-CONSUMIDOR-CONTRATO-GERAL-001",
+        "Compra não entregue após pagamento e pedido de cancelamento",
+        "Ação consumerista por descumprimento de oferta e não entrega",
+        (
+            "O consumidor realizou uma compra após oferta divulgada pelo fornecedor e efetuou o pagamento. "
+            "O pedido não foi entregue, e as tentativas de solução e cancelamento não foram concluídas. "
+            "Possui oferta ou publicidade, registro do pedido, comprovante de pagamento, "
+            "protocolos de atendimento, mensagens, solicitação de cancelamento e pedido de reembolso. "
+            "Pretende a análise do cumprimento da oferta, do cancelamento da contratação "
+            "ou da restituição dos valores comprovados, sem inventar datas, valores, danos, "
+            "urgência, entrega parcial ou documentos não informados."
+        ),
+    )
+
+    fundamentacao = _consumer_scope_block(
+        response,
+        "BLOCO 4 — Fundamentação preliminar",
+        "BLOCO 5 — Pedidos",
+    )
+    pedidos = _consumer_scope_block(
+        response,
+        "BLOCO 5 — Pedidos",
+        "BLOCO 6 — Provas e requerimentos",
+    )
+    provas = _consumer_scope_block(
+        response,
+        "BLOCO 6 — Provas e requerimentos",
+        "BLOCO 7 — Fechamento e conferência final",
+    )
+
+    assert response["metadata"]["action_specialization_kind"] == (
+        "consumer_universal_action_scope_claim"
+    )
+
+    assert "oferta" in fundamentacao
+    assert "comprovantes de pagamento" in fundamentacao
+    assert "cancelamento" in fundamentacao
+    assert "cumprimento efetivo das obrigações" in fundamentacao
+    assert "contrato informado" not in fundamentacao
+
+    assert "cumprimento da oferta" in pedidos
+    assert "cancelamento" in pedidos
+    assert "restituição dos valores comprovados" in pedidos
+    assert "correção do serviço" not in pedidos
+    assert "obrigação específica" not in pedidos
+    assert "análise de o cumprimento" not in pedidos
+    assert "contratos, faturas" not in pedidos
+    assert "extratos" not in pedidos
+    assert "notas fiscais" not in pedidos
+    assert "gravações" not in pedidos
+    assert "relatórios" not in pedidos
+
+    assert "oferta" in provas
+    assert "publicidade" in provas
+    assert "pedido" in provas
+    assert "comprovante de pagamento" in provas
+    assert "protocolos" in provas
+    assert "mensagens" in provas
+    assert "solicitação de cancelamento" in provas
+    assert "reembolso" in provas
+    assert "rastreamento" not in provas
+    assert "registros de entrega" not in provas
+    assert "juntados contrato," not in provas
 
