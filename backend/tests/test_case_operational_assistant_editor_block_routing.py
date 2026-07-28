@@ -3093,7 +3093,7 @@ def test_editor_all_blocks_ready_consumer_evidence_scope_combines_bank_charge_an
     assert "ips" in provas
     assert "dispositivos" in provas
     assert "comprovante de negativação" in provas
-    assert "órgãos de proteção ao crédito" in provas
+    assert "órgãos de proteção ao crédito" not in provas
     assert "assistência técnica" not in provas
     assert "prescrição médica" not in provas
 
@@ -3289,11 +3289,185 @@ def test_editor_all_blocks_ready_consumer_browser_regression_detects_plain_negat
     assert "documentos essenciais da contratação" not in pedidos
 
     assert "extratos bancários" in provas
-    assert "histórico dos débitos" in provas
+    assert "histórico dos débitos" not in provas
     assert "comprovante de negativação" in provas
-    assert "órgãos de proteção ao crédito" in provas
+    assert "órgãos de proteção ao crédito" not in provas
     assert "contrato consumerista geral" not in provas
 
+
+
+def test_editor_all_blocks_ready_consumer_browser_regression_keeps_banking_fraud_isolated():
+    response = _consumer_scope_ready_response(
+        "TESTE-CONSUMIDOR-FRAUDE-BANCARIA-ISOLADA-001",
+        "Fraude bancária por Pix não reconhecido",
+        "ação declaratória consumerista por transação não reconhecida",
+        (
+            "O consumidor identificou uma transferência via Pix que afirma não ter realizado nem autorizado. "
+            "Comunicou imediatamente a instituição financeira e contestou a operação. "
+            "Possui extratos bancários, comprovante da transação, protocolos e mensagens."
+        ),
+    )
+
+    assert response["metadata"]["action_specialization_kind"] == (
+        "consumer_universal_action_scope_claim"
+    )
+
+    fundamentacao = _consumer_scope_block(
+        response,
+        "BLOCO 4 — Fundamentação preliminar",
+        "BLOCO 5 — Pedidos",
+    )
+    pedidos = _consumer_scope_block(
+        response,
+        "BLOCO 5 — Pedidos",
+        "BLOCO 6 — Provas e requerimentos",
+    )
+    provas = _consumer_scope_block(
+        response,
+        "BLOCO 6 — Provas e requerimentos",
+        "BLOCO 7 — Fechamento e conferência final",
+    )
+
+    assert "segurança da operação bancária" in fundamentacao
+    assert "origem da cobrança" not in fundamentacao
+    assert "regularidade da inscrição" not in fundamentacao
+    assert "cumprimento efetivo das obrigações assumidas" not in fundamentacao
+
+    assert "transações impugnadas" in pedidos
+    assert "logs" in pedidos
+    assert "ips" in pedidos
+    assert "dispositivos" in pedidos
+    assert "bloqueio de cobranças relacionadas" not in pedidos
+    assert "inexistência ou inexigibilidade da cobrança" not in pedidos
+    assert "retirada ou suspensão da anotação indevida" not in pedidos
+    assert "documentos essenciais da contratação" not in pedidos
+
+    assert "extratos bancários" in provas
+    assert "comprovantes das transações" in provas
+    assert "protocolos de contestação" in provas
+    assert "logs" in provas
+    assert "ips" in provas
+    assert "dispositivos" in provas
+    assert "boletim de ocorrência" not in provas
+    assert "gravações" not in provas
+    assert "respostas da instituição financeira" not in provas
+    assert "histórico dos débitos" not in provas
+    assert "comprovante de negativação" not in provas
+    assert "órgãos de proteção ao crédito" not in provas
+
+
+def test_editor_all_blocks_ready_consumer_browser_regression_keeps_wrongful_charge_isolated():
+    response = _consumer_scope_ready_response(
+        "TESTE-CONSUMIDOR-COBRANCA-INDEVIDA-ISOLADA-001",
+        "Cobrança indevida isolada",
+        "ação declaratória consumerista por cobrança indevida",
+        (
+            "A consumidora identificou tarifa indevida em sua fatura e afirma não ter autorizado o lançamento. "
+            "Contestou administrativamente a cobrança. "
+            "Possui fatura, extrato, comprovante de pagamento e protocolos de atendimento."
+        ),
+    )
+
+    assert response["metadata"]["action_specialization_kind"] == (
+        "consumer_universal_action_scope_claim"
+    )
+
+    fundamentacao = _consumer_scope_block(
+        response,
+        "BLOCO 4 — Fundamentação preliminar",
+        "BLOCO 5 — Pedidos",
+    )
+    pedidos = _consumer_scope_block(
+        response,
+        "BLOCO 5 — Pedidos",
+        "BLOCO 6 — Provas e requerimentos",
+    )
+    provas = _consumer_scope_block(
+        response,
+        "BLOCO 6 — Provas e requerimentos",
+        "BLOCO 7 — Fechamento e conferência final",
+    )
+
+    assert "origem da cobrança" in fundamentacao
+    assert "segurança da operação bancária" not in fundamentacao
+    assert "regularidade da inscrição" not in fundamentacao
+    assert "cumprimento efetivo das obrigações assumidas" not in fundamentacao
+
+    assert "inexistência ou inexigibilidade da cobrança" in pedidos
+    assert "restituição simples ou em dobro" in pedidos
+    assert "interrupção de novos débitos" not in pedidos
+    assert "transações impugnadas" not in pedidos
+    assert "retirada ou suspensão da anotação indevida" not in pedidos
+    assert "documentos essenciais da contratação" not in pedidos
+
+    assert "fatura" in provas
+    assert "extrato" in provas
+    assert "comprovante de pagamento" in provas
+    assert "protocolos de contestação" in provas
+    assert "contrato" not in provas
+    assert "autorizações" not in provas
+    assert "histórico dos débitos" not in provas
+    assert "logs, ips, dispositivos" not in provas
+    assert "comprovante de negativação" not in provas
+    assert "órgãos de proteção ao crédito" not in provas
+
+
+def test_editor_all_blocks_ready_consumer_browser_regression_keeps_negative_listing_isolated():
+    response = _consumer_scope_ready_response(
+        "TESTE-CONSUMIDOR-NEGATIVACAO-INDEVIDA-ISOLADA-001",
+        "Negativação indevida isolada",
+        "ação consumerista por inscrição indevida",
+        (
+            "O consumidor descobriu que seu nome foi negativado no Serasa. "
+            "Afirma desconhecer a origem do débito e solicitou esclarecimentos ao fornecedor. "
+            "Possui comprovante de negativação, consulta do órgão de proteção ao crédito, "
+            "protocolos de atendimento e mensagens."
+        ),
+    )
+
+    assert response["metadata"]["action_specialization_kind"] == (
+        "consumer_universal_action_scope_claim"
+    )
+
+    fundamentacao = _consumer_scope_block(
+        response,
+        "BLOCO 4 — Fundamentação preliminar",
+        "BLOCO 5 — Pedidos",
+    )
+    pedidos = _consumer_scope_block(
+        response,
+        "BLOCO 5 — Pedidos",
+        "BLOCO 6 — Provas e requerimentos",
+    )
+    provas = _consumer_scope_block(
+        response,
+        "BLOCO 6 — Provas e requerimentos",
+        "BLOCO 7 — Fechamento e conferência final",
+    )
+
+    assert "regularidade da inscrição" in fundamentacao
+    assert "comunicação prévia" not in fundamentacao
+    assert "efeitos concretos da restrição" not in fundamentacao
+    assert "segurança da operação bancária" not in fundamentacao
+    assert "origem da cobrança" not in fundamentacao
+    assert "cumprimento efetivo das obrigações assumidas" not in fundamentacao
+
+    assert "retirada ou suspensão da anotação indevida" in pedidos
+    assert "documentos que originaram a inscrição" in pedidos
+    assert "transações impugnadas" not in pedidos
+    assert "inexistência ou inexigibilidade da cobrança" not in pedidos
+    assert "documentos essenciais da contratação" not in pedidos
+
+    assert "comprovante de negativação" in provas
+    assert "consulta do órgão de proteção ao crédito" in provas
+    assert "protocolos de atendimento" in provas
+    assert "mensagens" in provas
+    assert "comunicação prévia" not in provas
+    assert "documentos que originaram a inscrição" not in provas
+    assert "histórico do débito" not in provas
+    assert "efeitos concretos da restrição" not in provas
+    assert "extratos bancários" not in provas
+    assert "logs, ips, dispositivos" not in provas
 
 def test_editor_all_blocks_ready_consumer_addressing_qualification_uses_consumer_civil_boundaries():
     response = _consumer_scope_ready_response(
