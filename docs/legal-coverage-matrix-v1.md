@@ -190,7 +190,7 @@ Documentação antiga não pode superar o comportamento real do código atual.
 | Provas específicas para todas as ações | 🟡 | Família, risco laboral e escopos consumeristas prioritários possuem especialização | Horas, Cível e demais áreas ainda usam base genérica em parte |
 | Endereçamento específico para todas as áreas | 🟡 | Família, Trabalhista especializado e Consumidor possuem tratamento próprio | Cível, Previdenciário, Criminal e Ambiental pendentes |
 | Qualificação específica para todas as áreas | 🟡 | Família, Trabalhista especializado e Consumidor possuem tratamento próprio | Cível, Previdenciário, Criminal e Ambiental pendentes |
-| Teste real por tipo de ação | 🟡 | Consumidor possui validação real combinada e nos cinco escopos prioritários; Família e risco laboral também possuem evidências próprias | Completar ações isoladas e demais áreas conforme expansão |
+| Teste real por tipo de ação | 🟡 | Consumidor possui validação real nos cinco escopos prioritários, nas três rotas bancárias isoladas e no cenário bancário combinado; Família e risco laboral também possuem evidências próprias | Completar subtipos consumeristas e demais áreas conforme expansão |
 
 ---
 
@@ -288,16 +288,18 @@ A `v0.2.37` especializou o Bloco 1 — Endereçamento e o Bloco 2 — Qualifica�
 
 A `v0.2.38` validou em navegador produto defeituoso ou com vício, serviço defeituoso ou incompleto, plano de saúde, veículo e contrato consumerista geral. A entrega também endureceu a detecção para não inferir danos, urgência, procedimentos médicos, medidas jurídicas ou provas não informadas no caso.
 
-A área possui especialização transversal de endereçamento, qualificação, fundamentação, pedidos e provas nos escopos prioritários. Permanecem parciais os subtipos ainda genéricos e as validações isoladas de algumas rotas bancárias.
+A `v0.2.39` validou em navegador, de forma isolada, fraude bancária ou Pix não reconhecido, cobrança indevida e negativação indevida. A entrega tornou condicionais os pedidos, fundamentos e provas dessas rotas, impedindo a presunção de cobranças futuras, boletim de ocorrência, contratos, autorizações, histórico de débitos, comunicação prévia, efeitos da restrição ou outros elementos não informados.
+
+A área possui especialização transversal de endereçamento, qualificação, fundamentação, pedidos e provas nos escopos prioritários. As rotas bancárias prioritárias possuem validação combinada e isolada. Permanecem parciais os subtipos consumeristas ainda genéricos.
 
 | Tipo de ação ou tema | Operacional / checklist | Editor especializado | Status geral | Entregas principais | Lacuna atual |
 |---|---:|---:|---:|---|---|
 | Veículo, contrato, retenção ou restituição do bem | ✅ | ✅ | ✅ | `v0.2.26`, `v0.2.36`, `v0.2.37`, `v0.2.38` | Validação real concluída; preservar danos e urgência somente quando expressamente relatados |
-| Fraude bancária | ✅ | 🟡 | 🟡 | `v0.2.34`, `v0.2.36`, `v0.2.37` | Endereçamento, qualificação e provas especializados; ampliar validação real isolada |
-| Pix não reconhecido | ✅ | 🟡 | 🟡 | `v0.2.34`, `v0.2.36`, `v0.2.37` | Estrutura completa dos blocos prioritários e validação combinada concluídas |
-| Cobrança indevida | ✅ | 🟡 | 🟡 | `v0.2.34`, `v0.2.36`, `v0.2.37` | Estrutura especializada concluída; critérios finais permanecem sob revisão profissional |
-| Negativação indevida | ✅ | 🟡 | 🟡 | `v0.2.34`, `v0.2.36`, `v0.2.37` | Endereçamento, partes, documentos do débito e cadastro restritivo especializados |
-| Fraude + cobrança + negativação | ✅ | 🟡 | 🟡 | `v0.2.34`, `v0.2.36`, `v0.2.37` | Sete blocos, incluindo endereçamento e qualificação, validados em navegador; manter revisão profissional |
+| Fraude bancária | ✅ | ✅ | ✅ | `v0.2.34`, `v0.2.36`, `v0.2.37`, `v0.2.39` | Validação real isolada concluída; preservar somente fatos, pedidos e provas efetivamente informados |
+| Pix não reconhecido | ✅ | ✅ | ✅ | `v0.2.34`, `v0.2.36`, `v0.2.37`, `v0.2.39` | Validação real isolada concluída sem presumir cobrança, negativação ou documentos não relatados |
+| Cobrança indevida | ✅ | ✅ | ✅ | `v0.2.34`, `v0.2.36`, `v0.2.37`, `v0.2.39` | Validação real isolada concluída; cobranças futuras e documentos permanecem condicionados ao relato |
+| Negativação indevida | ✅ | ✅ | ✅ | `v0.2.34`, `v0.2.36`, `v0.2.37`, `v0.2.39` | Validação real isolada concluída; não presumir comunicação prévia, histórico ou efeitos concretos da restrição |
+| Fraude + cobrança + negativação | ✅ | ✅ | ✅ | `v0.2.34`, `v0.2.36`, `v0.2.37`, `v0.2.39` | Cenário combinado e componentes isolados validados em navegador, com separação prudente dos escopos |
 | Produto defeituoso | ✅ | ✅ | ✅ | `v0.2.34`, `v0.2.36`, `v0.2.37`, `v0.2.38` | Validação real concluída; preservar documentos, reparos e soluções compatíveis com a prova |
 | Vício do produto | ✅ | ✅ | ✅ | `v0.2.34`, `v0.2.36`, `v0.2.37`, `v0.2.38` | Validação real concluída; aprofundar distinções jurídicas somente quando o caso exigir |
 | Serviço defeituoso ou incompleto | ✅ | ✅ | ✅ | `v0.2.34`, `v0.2.36`, `v0.2.37`, `v0.2.38` | Validação real concluída; dano somente quando expressamente alegado e documentado |
@@ -318,14 +320,13 @@ A área possui especialização transversal de endereçamento, qualificação, f
 
 #### Próximo pacote recomendado
 
-A `v0.2.38` concluiu as validações reais prioritárias de produto, serviço, plano de saúde, veículo e contrato consumerista geral.
+A `v0.2.39` concluiu as validações reais isoladas de fraude bancária ou Pix não reconhecido, cobrança indevida e negativação indevida, complementando o cenário bancário combinado já validado.
 
 Próximos ciclos recomendados:
 
-1. validar isoladamente fraude bancária, cobrança indevida e negativação;
-2. separar serviço não prestado da rota de serviço defeituoso ou incompleto;
-3. criar especializações próprias para oferta/publicidade, cancelamento, entrega e garantia;
-4. preservar as regressões que impedem danos, urgência, documentos e medidas não informadas.
+1. separar serviço não prestado da rota de serviço defeituoso ou incompleto;
+2. criar especializações próprias para oferta/publicidade, cancelamento, entrega e garantia;
+3. preservar as regressões que impedem danos, urgência, documentos, cobranças futuras e medidas não informadas.
 
 ---
 
@@ -520,7 +521,7 @@ A evolução deve começar por um tipo de ação real, com documentos e resultad
 |---|---:|---|
 | Trabalhista | 🟡 Parcial avançado | Forte em risco laboral; horas e demais ações ainda incompletas |
 | Família | ✅ Pronto no núcleo atual | Alimentos, guarda e convivência especializados e testados |
-| Consumidor | 🟡 Parcial avançado | Sete blocos especializados e validação real concluída nos escopos prioritários; subtipos e rotas isoladas ainda precisam expansão |
+| Consumidor | 🟡 Parcial avançado | Sete blocos especializados; validação real concluída nos escopos prioritários e nas rotas bancárias combinada e isoladas; subtipos ainda precisam expansão |
 | Cível | 🟡 Parcial | Algumas rotas específicas, sem arquitetura completa por ação |
 | Previdenciário | 🟡 Operacional, Editor pendente | BPC/LOAS possui base e QA, mas não Editor específico |
 | Criminal | 🟡 Operacional, Editor pendente | Pacote inicial validado fora do Editor atual |
@@ -535,7 +536,7 @@ A prioridade deve considerar ganho jurídico, fechamento de lacunas existentes e
 
 ### Prioridade 1 — completar áreas já roteadas
 
-1. Completar os subtipos consumeristas ainda parciais: rotas bancárias isoladas, serviço não prestado, oferta, cancelamento, entrega e garantia.
+1. Completar os subtipos consumeristas ainda parciais: serviço não prestado, oferta, cancelamento, entrega e garantia.
 2. Provas específicas de horas extras e intervalo.
 3. Provas, partes e endereçamento da cobrança contratual.
 

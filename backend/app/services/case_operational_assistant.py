@@ -2454,6 +2454,236 @@ def _detect_consumer_editor_scopes(normalized_text: str) -> dict[str, bool]:
     }
 
 
+
+def _detect_banking_fraud_editor_details(
+    normalized_text: str,
+) -> dict[str, bool]:
+    return {
+        "bank_statements": _editor_text_has_any(
+            normalized_text,
+            (
+                "extrato bancário",
+                "extrato bancario",
+                "extratos bancários",
+                "extratos bancarios",
+                "extrato da conta",
+                "extratos da conta",
+            ),
+        ),
+        "transaction_receipts": _editor_text_has_any(
+            normalized_text,
+            (
+                "comprovante da transação",
+                "comprovante da transacao",
+                "comprovantes das transações",
+                "comprovantes das transacoes",
+                "comprovante do pix",
+                "comprovante pix",
+                "comprovantes pix",
+            ),
+        ),
+        "police_report": _editor_text_has_any(
+            normalized_text,
+            (
+                "boletim de ocorrência",
+                "boletim de ocorrencia",
+                "registro policial",
+                "b.o.",
+            ),
+        ),
+        "protocols": _editor_text_has_any(
+            normalized_text,
+            ("protocolo", "protocolos"),
+        ),
+        "messages": _editor_text_has_any(
+            normalized_text,
+            ("mensagem", "mensagens"),
+        ),
+        "recordings": _editor_text_has_any(
+            normalized_text,
+            (
+                "gravação",
+                "gravacao",
+                "gravações",
+                "gravacoes",
+            ),
+        ),
+        "bank_responses": _editor_text_has_any(
+            normalized_text,
+            (
+                "resposta da instituição financeira",
+                "resposta da instituicao financeira",
+                "respostas da instituição financeira",
+                "respostas da instituicao financeira",
+                "resposta do banco",
+                "respostas do banco",
+            ),
+        ),
+    }
+
+
+def _detect_wrongful_charge_editor_details(
+    normalized_text: str,
+) -> dict[str, bool]:
+    return {
+        "contract": _editor_text_has_any(
+            normalized_text,
+            (
+                "possui contrato",
+                "há contrato",
+                "ha contrato",
+                "cópia do contrato",
+                "copia do contrato",
+                "contrato disponível",
+                "contrato disponivel",
+            ),
+        ),
+        "invoice": _editor_text_has_any(
+            normalized_text,
+            ("fatura", "faturas"),
+        ),
+        "multiple_invoices": "faturas" in normalized_text,
+        "statement": _editor_text_has_any(
+            normalized_text,
+            ("extrato", "extratos"),
+        ),
+        "multiple_statements": "extratos" in normalized_text,
+        "authorizations": _editor_text_has_any(
+            normalized_text,
+            (
+                "autorização documental",
+                "autorizacao documental",
+                "autorizações",
+                "autorizacoes",
+            ),
+        ),
+        "payment_receipt": _editor_text_has_any(
+            normalized_text,
+            (
+                "comprovante de pagamento",
+                "comprovantes de pagamento",
+            ),
+        ),
+        "multiple_payment_receipts": (
+            "comprovantes de pagamento" in normalized_text
+        ),
+        "protocols": _editor_text_has_any(
+            normalized_text,
+            ("protocolo", "protocolos"),
+        ),
+        "debit_history": _editor_text_has_any(
+            normalized_text,
+            (
+                "histórico dos débitos",
+                "historico dos debitos",
+                "histórico de cobranças",
+                "historico de cobrancas",
+            ),
+        ),
+        "recurring_debits": _editor_text_has_any(
+            normalized_text,
+            (
+                "novos débitos",
+                "novos debitos",
+                "débitos recorrentes",
+                "debitos recorrentes",
+                "cobranças recorrentes",
+                "cobrancas recorrentes",
+                "continua sendo cobrado",
+                "continua sendo cobrada",
+                "descontos mensais",
+                "parcelas futuras",
+            ),
+        ),
+    }
+
+
+def _detect_negative_listing_editor_details(
+    normalized_text: str,
+) -> dict[str, bool]:
+    return {
+        "listing_receipt": _editor_text_has_any(
+            normalized_text,
+            (
+                "comprovante de negativação",
+                "comprovante de negativacao",
+                "documento da negativação",
+                "documento da negativacao",
+                "comprovante da inscrição",
+                "comprovante da inscricao",
+            ),
+        ),
+        "credit_bureau_consultation": _editor_text_has_any(
+            normalized_text,
+            (
+                "consulta do órgão de proteção ao crédito",
+                "consulta do orgao de protecao ao credito",
+                "consulta dos órgãos de proteção ao crédito",
+                "consulta dos orgaos de protecao ao credito",
+                "consulta ao serasa",
+                "consulta ao spc",
+            ),
+        ),
+        "multiple_credit_bureau_consultations": _editor_text_has_any(
+            normalized_text,
+            (
+                "consultas dos órgãos de proteção ao crédito",
+                "consultas dos orgaos de protecao ao credito",
+                "certidões ou consultas",
+                "certidoes ou consultas",
+            ),
+        ),
+        "prior_notice": _editor_text_has_any(
+            normalized_text,
+            (
+                "comunicação prévia",
+                "comunicacao previa",
+                "notificação prévia",
+                "notificacao previa",
+                "aviso prévio da inscrição",
+                "aviso previo da inscricao",
+            ),
+        ),
+        "origin_documents": _editor_text_has_any(
+            normalized_text,
+            (
+                "documentos que originaram a inscrição",
+                "documentos que originaram a inscricao",
+                "documentos de origem da inscrição",
+                "documentos de origem da inscricao",
+            ),
+        ),
+        "debt_history": _editor_text_has_any(
+            normalized_text,
+            (
+                "histórico do débito",
+                "historico do debito",
+                "histórico da dívida",
+                "historico da divida",
+            ),
+        ),
+        "restriction_effects": _editor_text_has_any(
+            normalized_text,
+            (
+                "efeitos concretos da restrição",
+                "efeitos concretos da restricao",
+                "crédito negado",
+                "credito negado",
+                "financiamento negado",
+                "cartão recusado",
+                "cartao recusado",
+            ),
+        ),
+        "protocols": _editor_text_has_any(
+            normalized_text,
+            ("protocolo", "protocolos"),
+        ),
+        "messages": _editor_text_has_any(
+            normalized_text,
+            ("mensagem", "mensagens"),
+        ),
+    }
+
 def _detect_health_plan_editor_details(normalized_text: str) -> dict[str, bool]:
     return {
         "procedure": _editor_text_has_any(
@@ -2720,6 +2950,13 @@ def _build_editor_all_blocks_action_specialization(
         *(case_context.values()),
     )
     consumer_scopes = _detect_consumer_editor_scopes(normalized)
+    banking_fraud_details = _detect_banking_fraud_editor_details(normalized)
+    wrongful_charge_details = _detect_wrongful_charge_editor_details(
+        normalized
+    )
+    negative_listing_details = _detect_negative_listing_editor_details(
+        normalized
+    )
     health_plan_details = _detect_health_plan_editor_details(normalized)
     general_contract_details = _detect_general_consumer_contract_details(
         normalized
@@ -3188,25 +3425,116 @@ def _build_editor_all_blocks_action_specialization(
             )
             request_parts.append(
                 "Requer-se o reconhecimento ou declaração de não contratação das transações impugnadas, "
-                "o bloqueio de cobranças relacionadas, a recomposição dos valores comprovadamente subtraídos "
+                "a recomposição dos valores comprovadamente subtraídos "
                 "e a preservação ou exibição de logs, IPs, dispositivos, autenticações, gravações e registros internos da operação."
             )
 
         if has_wrongful_charge:
-            foundation_parts.append(
-                "Devem ser examinadas a origem da cobrança, a existência de contratação válida, faturas, extratos, "
-                "autorizações, protocolos de contestação e pagamentos realizados."
+            charge_foundation_items = []
+
+            if wrongful_charge_details["contract"]:
+                charge_foundation_items.append("contrato")
+            if wrongful_charge_details["invoice"]:
+                charge_foundation_items.append(
+                    "faturas"
+                    if wrongful_charge_details["multiple_invoices"]
+                    else "fatura"
+                )
+            if wrongful_charge_details["statement"]:
+                charge_foundation_items.append(
+                    "extratos"
+                    if wrongful_charge_details["multiple_statements"]
+                    else "extrato"
+                )
+            if wrongful_charge_details["authorizations"]:
+                charge_foundation_items.append("autorizações")
+            if wrongful_charge_details["payment_receipt"]:
+                charge_foundation_items.append(
+                    "comprovantes de pagamento"
+                    if wrongful_charge_details[
+                        "multiple_payment_receipts"
+                    ]
+                    else "comprovante de pagamento"
+                )
+            if wrongful_charge_details["protocols"]:
+                charge_foundation_items.append(
+                    "protocolos de contestação"
+                )
+            if wrongful_charge_details["debit_history"]:
+                charge_foundation_items.append(
+                    "histórico dos débitos"
+                )
+
+            if charge_foundation_items:
+                foundation_parts.append(
+                    "Devem ser examinadas a origem da cobrança e a existência de contratação válida "
+                    "à luz somente dos elementos efetivamente informados: "
+                    f"{', '.join(charge_foundation_items)}."
+                )
+            else:
+                foundation_parts.append(
+                    "Devem ser examinadas a origem da cobrança e a existência de contratação válida, "
+                    "sem presumir contratos, autorizações ou outros documentos não relatados."
+                )
+
+            wrongful_charge_request = (
+                "Requer-se a declaração de inexistência ou inexigibilidade da cobrança impugnada"
             )
-            request_parts.append(
-                "Requer-se a declaração de inexistência ou inexigibilidade da cobrança impugnada, "
-                "a interrupção de novos débitos e a restituição simples ou em dobro apenas conforme o enquadramento jurídico e a prova disponível."
+            if wrongful_charge_details["recurring_debits"]:
+                wrongful_charge_request += (
+                    ", a interrupção de novos débitos ou cobranças reiteradas"
+                )
+            wrongful_charge_request += (
+                " e a restituição simples ou em dobro apenas conforme o enquadramento jurídico "
+                "e a prova disponível."
             )
+            request_parts.append(wrongful_charge_request)
 
         if has_negative_listing:
-            foundation_parts.append(
-                "Devem ser avaliadas a origem do débito, a regularidade da inscrição, a comunicação prévia, "
-                "os registros dos órgãos de proteção ao crédito e os efeitos concretos da restrição."
+            negative_foundation_items = []
+
+            if negative_listing_details["listing_receipt"]:
+                negative_foundation_items.append(
+                    "comprovante de negativação"
+                )
+            if negative_listing_details["credit_bureau_consultation"]:
+                negative_foundation_items.append(
+                    "consulta do órgão de proteção ao crédito"
+                )
+            if negative_listing_details["prior_notice"]:
+                negative_foundation_items.append(
+                    "comunicação prévia"
+                )
+            if negative_listing_details["origin_documents"]:
+                negative_foundation_items.append(
+                    "documentos que originaram a inscrição"
+                )
+            if negative_listing_details["debt_history"]:
+                negative_foundation_items.append(
+                    "histórico do débito"
+                )
+            if negative_listing_details["restriction_effects"]:
+                negative_foundation_items.append(
+                    "efeitos concretos da restrição"
+                )
+            if negative_listing_details["protocols"]:
+                negative_foundation_items.append(
+                    "protocolos de atendimento"
+                )
+            if negative_listing_details["messages"]:
+                negative_foundation_items.append("mensagens")
+
+            negative_foundation_text = (
+                "Devem ser avaliadas a origem do débito e a regularidade da inscrição"
             )
+            if negative_foundation_items:
+                negative_foundation_text += (
+                    " à luz somente dos elementos efetivamente informados: "
+                    f"{', '.join(negative_foundation_items)}"
+                )
+            negative_foundation_text += "."
+
+            foundation_parts.append(negative_foundation_text)
             request_parts.append(
                 "Requer-se a retirada ou suspensão da anotação indevida, a declaração de inexistência do débito quando cabível "
                 "e a exibição dos documentos que originaram a inscrição."
@@ -3795,6 +4123,21 @@ def _editor_all_blocks_ready_response(
         consumer_evidence_scopes = _detect_consumer_editor_scopes(
             consumer_evidence_normalized
         )
+        banking_fraud_evidence_details = (
+            _detect_banking_fraud_editor_details(
+                consumer_evidence_normalized
+            )
+        )
+        wrongful_charge_evidence_details = (
+            _detect_wrongful_charge_editor_details(
+                consumer_evidence_normalized
+            )
+        )
+        negative_listing_evidence_details = (
+            _detect_negative_listing_editor_details(
+                consumer_evidence_normalized
+            )
+        )
         health_plan_evidence_details = _detect_health_plan_editor_details(
             consumer_evidence_normalized
         )
@@ -3811,22 +4154,157 @@ def _editor_all_blocks_ready_response(
         ]
 
         if consumer_evidence_scopes["banking_fraud"]:
+            banking_evidence_items = []
+
+            if banking_fraud_evidence_details["bank_statements"]:
+                banking_evidence_items.append("extratos bancários")
+            if banking_fraud_evidence_details["transaction_receipts"]:
+                banking_evidence_items.append(
+                    "comprovantes das transações"
+                )
+            if banking_fraud_evidence_details["police_report"]:
+                banking_evidence_items.append(
+                    "boletim de ocorrência"
+                )
+            if banking_fraud_evidence_details["protocols"]:
+                banking_evidence_items.append(
+                    "protocolos de contestação"
+                )
+            if banking_fraud_evidence_details["messages"]:
+                banking_evidence_items.append("mensagens")
+            if banking_fraud_evidence_details["recordings"]:
+                banking_evidence_items.append("gravações")
+            if banking_fraud_evidence_details["bank_responses"]:
+                banking_evidence_items.append(
+                    "respostas da instituição financeira"
+                )
+
+            if not banking_evidence_items:
+                banking_evidence_items.append(
+                    "documentos e registros bancários efetivamente disponíveis"
+                )
+
+            banking_evidence_text = ", ".join(
+                banking_evidence_items
+            )
             evidence_parts.append(
-                "Para a fraude bancária ou transação não reconhecida, devem ser preservados e juntados extratos bancários, "
-                "comprovantes das transações, boletim de ocorrência, protocolos de contestação, mensagens, gravações e respostas da instituição financeira. "
-                "Requer-se, quando pertinente, a exibição de logs, IPs, dispositivos, autenticações, alertas, bloqueios e registros internos da operação."
+                "Para a fraude bancária ou transação não reconhecida, "
+                "devem ser preservados e juntados somente os elementos efetivamente informados no caso: "
+                f"{banking_evidence_text}. "
+                "Requer-se, quando pertinente, a exibição de logs, IPs, dispositivos, autenticações, "
+                "alertas, bloqueios e registros internos da operação."
             )
 
         if consumer_evidence_scopes["wrongful_charge"]:
+            wrongful_charge_evidence_items = []
+
+            if wrongful_charge_evidence_details["contract"]:
+                wrongful_charge_evidence_items.append("contrato")
+            if wrongful_charge_evidence_details["invoice"]:
+                wrongful_charge_evidence_items.append(
+                    "faturas"
+                    if wrongful_charge_evidence_details[
+                        "multiple_invoices"
+                    ]
+                    else "fatura"
+                )
+            if wrongful_charge_evidence_details["statement"]:
+                wrongful_charge_evidence_items.append(
+                    "extratos"
+                    if wrongful_charge_evidence_details[
+                        "multiple_statements"
+                    ]
+                    else "extrato"
+                )
+            if wrongful_charge_evidence_details["authorizations"]:
+                wrongful_charge_evidence_items.append(
+                    "autorizações"
+                )
+            if wrongful_charge_evidence_details["payment_receipt"]:
+                wrongful_charge_evidence_items.append(
+                    "comprovantes de pagamento"
+                    if wrongful_charge_evidence_details[
+                        "multiple_payment_receipts"
+                    ]
+                    else "comprovante de pagamento"
+                )
+            if wrongful_charge_evidence_details["protocols"]:
+                wrongful_charge_evidence_items.append(
+                    "protocolos de contestação"
+                )
+            if wrongful_charge_evidence_details["debit_history"]:
+                wrongful_charge_evidence_items.append(
+                    "histórico dos débitos"
+                )
+
+            if not wrongful_charge_evidence_items:
+                wrongful_charge_evidence_items.append(
+                    "documentos efetivamente disponíveis sobre a cobrança"
+                )
+
+            wrongful_charge_evidence_text = ", ".join(
+                wrongful_charge_evidence_items
+            )
             evidence_parts.append(
-                "Para a cobrança indevida, devem ser examinados contrato, faturas, extratos, autorizações, comprovantes de pagamento, "
-                "protocolos de contestação, histórico dos débitos e documentos capazes de demonstrar a origem ou ausência de contratação."
+                "Para a cobrança indevida, devem ser preservados e examinados somente os elementos "
+                "efetivamente informados no caso: "
+                f"{wrongful_charge_evidence_text}."
             )
 
         if consumer_evidence_scopes["negative_listing"]:
+            negative_listing_evidence_items = []
+
+            if negative_listing_evidence_details["listing_receipt"]:
+                negative_listing_evidence_items.append(
+                    "comprovante de negativação"
+                )
+            if negative_listing_evidence_details[
+                "credit_bureau_consultation"
+            ]:
+                negative_listing_evidence_items.append(
+                    "consultas dos órgãos de proteção ao crédito"
+                    if negative_listing_evidence_details[
+                        "multiple_credit_bureau_consultations"
+                    ]
+                    else "consulta do órgão de proteção ao crédito"
+                )
+            if negative_listing_evidence_details["prior_notice"]:
+                negative_listing_evidence_items.append(
+                    "comunicação prévia"
+                )
+            if negative_listing_evidence_details["origin_documents"]:
+                negative_listing_evidence_items.append(
+                    "documentos que originaram a inscrição"
+                )
+            if negative_listing_evidence_details["debt_history"]:
+                negative_listing_evidence_items.append(
+                    "histórico do débito"
+                )
+            if negative_listing_evidence_details["restriction_effects"]:
+                negative_listing_evidence_items.append(
+                    "registros dos efeitos concretos da restrição"
+                )
+            if negative_listing_evidence_details["protocols"]:
+                negative_listing_evidence_items.append(
+                    "protocolos de atendimento"
+                )
+            if negative_listing_evidence_details["messages"]:
+                negative_listing_evidence_items.append(
+                    "mensagens"
+                )
+
+            if not negative_listing_evidence_items:
+                negative_listing_evidence_items.append(
+                    "documentos efetivamente disponíveis sobre a inscrição"
+                )
+
+            negative_listing_evidence_text = ", ".join(
+                negative_listing_evidence_items
+            )
             evidence_parts.append(
-                "Para a negativação, devem ser preservados o comprovante de negativação, certidões ou consultas dos órgãos de proteção ao crédito, "
-                "comunicação prévia, documentos que originaram a inscrição, histórico do débito e registros dos efeitos concretos da restrição."
+                "Para a negativação, devem ser preservados e examinados somente os elementos "
+                "efetivamente informados no caso: "
+                f"{negative_listing_evidence_text}."
             )
 
         if consumer_evidence_scopes["defective_product"]:
