@@ -2359,12 +2359,22 @@ def _detect_consumer_editor_scopes(normalized_text: str) -> dict[str, bool]:
         "servico defeituoso",
         "falha na prestação do serviço",
         "falha na prestacao do servico",
-        "serviço não prestado",
-        "servico nao prestado",
         "serviço incompleto",
         "servico incompleto",
         "má prestação do serviço",
         "ma prestacao do servico",
+    )
+    service_not_rendered_markers = (
+        "serviço não prestado",
+        "servico nao prestado",
+        "serviço não foi prestado",
+        "servico nao foi prestado",
+        "serviço jamais prestado",
+        "servico jamais prestado",
+        "não iniciou nem executou a prestação",
+        "nao iniciou nem executou a prestacao",
+        "não iniciou o serviço",
+        "nao iniciou o servico",
     )
     health_plan_markers = (
         "plano de saúde",
@@ -2441,6 +2451,8 @@ def _detect_consumer_editor_scopes(normalized_text: str) -> dict[str, bool]:
         and _editor_text_has_any(normalized_text, defective_product_markers),
         "defective_service": is_consumer
         and _editor_text_has_any(normalized_text, defective_service_markers),
+        "service_not_rendered": is_consumer
+        and _editor_text_has_any(normalized_text, service_not_rendered_markers),
         "health_plan": is_consumer
         and _editor_text_has_any(normalized_text, health_plan_markers),
         "general_contract": is_consumer
@@ -2683,6 +2695,74 @@ def _detect_negative_listing_editor_details(
             ("mensagem", "mensagens"),
         ),
     }
+
+def _detect_service_not_rendered_editor_details(
+    normalized_text: str,
+) -> dict[str, bool]:
+    return {
+        "contract": _editor_text_has_any(
+            normalized_text,
+            (
+                "possui contrato",
+                "há contrato",
+                "ha contrato",
+                "cópia do contrato",
+                "copia do contrato",
+                "contrato disponível",
+                "contrato disponivel",
+                "contrato, oferta",
+            ),
+        ),
+        "offer": _editor_text_has_any(
+            normalized_text,
+            (
+                "possui oferta",
+                "há oferta",
+                "ha oferta",
+                "oferta disponível",
+                "oferta disponivel",
+                "contrato, oferta",
+            ),
+        ),
+        "service_order": _editor_text_has_any(
+            normalized_text,
+            (
+                "ordem de serviço",
+                "ordem de servico",
+                "ordens de serviço",
+                "ordens de servico",
+            ),
+        ),
+        "payment_receipt": _editor_text_has_any(
+            normalized_text,
+            (
+                "comprovante de pagamento",
+                "comprovantes de pagamento",
+                "comprovante do pagamento",
+                "comprovantes dos pagamentos",
+            ),
+        ),
+        "protocols": _editor_text_has_any(
+            normalized_text,
+            ("protocolo", "protocolos"),
+        ),
+        "messages": _editor_text_has_any(
+            normalized_text,
+            ("mensagem", "mensagens"),
+        ),
+        "start_requests": _editor_text_has_any(
+            normalized_text,
+            (
+                "cobrando o início do serviço",
+                "cobrando o inicio do servico",
+                "solicitando o início do serviço",
+                "solicitando o inicio do servico",
+                "pedido de início do serviço",
+                "pedido de inicio do servico",
+            ),
+        ),
+    }
+
 
 def _detect_health_plan_editor_details(normalized_text: str) -> dict[str, bool]:
     return {
@@ -2956,6 +3036,9 @@ def _build_editor_all_blocks_action_specialization(
     )
     negative_listing_details = _detect_negative_listing_editor_details(
         normalized
+    )
+    service_not_rendered_details = (
+        _detect_service_not_rendered_editor_details(normalized)
     )
     health_plan_details = _detect_health_plan_editor_details(normalized)
     general_contract_details = _detect_general_consumer_contract_details(
@@ -3399,6 +3482,7 @@ def _build_editor_all_blocks_action_specialization(
         has_negative_listing = consumer_scopes["negative_listing"]
         has_defective_product = consumer_scopes["defective_product"]
         has_defective_service = consumer_scopes["defective_service"]
+        has_service_not_rendered = consumer_scopes["service_not_rendered"]
         has_health_plan = consumer_scopes["health_plan"]
         has_general_contract = consumer_scopes["general_contract"]
         has_consumer_damage = consumer_scopes["consumer_damage"]
@@ -3560,6 +3644,52 @@ def _build_editor_all_blocks_action_specialization(
                 "a restituição dos valores incompatíveis com o serviço efetivamente prestado ou outra medida compatível com o caso."
             )
 
+        if has_service_not_rendered:
+            service_not_rendered_foundation_items = [
+                "a ausência de execução do serviço"
+            ]
+
+            if service_not_rendered_details["contract"]:
+                service_not_rendered_foundation_items.append("o contrato")
+            if service_not_rendered_details["offer"]:
+                service_not_rendered_foundation_items.append("a oferta")
+            if service_not_rendered_details["service_order"]:
+                service_not_rendered_foundation_items.append(
+                    "a ordem de serviço"
+                )
+            if service_not_rendered_details["payment_receipt"]:
+                service_not_rendered_foundation_items.append(
+                    "o comprovante de pagamento"
+                )
+            if service_not_rendered_details["protocols"]:
+                service_not_rendered_foundation_items.append(
+                    "os protocolos de atendimento"
+                )
+            if service_not_rendered_details["messages"]:
+                service_not_rendered_foundation_items.append(
+                    "as mensagens disponíveis"
+                )
+            if service_not_rendered_details["start_requests"]:
+                service_not_rendered_foundation_items.append(
+                    "as solicitações de início da prestação"
+                )
+
+            foundation_parts.append(
+                "Devem ser examinados "
+                + ", ".join(service_not_rendered_foundation_items)
+                + ", somente nos limites dos fatos e elementos efetivamente informados."
+            )
+            service_not_rendered_request = (
+                "Requer-se, conforme a prova disponível e a revisão do advogado responsável, "
+                "a prestação do serviço quando ainda útil e juridicamente cabível ou a resolução da contratação"
+            )
+            if service_not_rendered_details["payment_receipt"]:
+                service_not_rendered_request += (
+                    ", com restituição dos valores comprovadamente pagos"
+                )
+            service_not_rendered_request += "."
+            request_parts.append(service_not_rendered_request)
+
         if has_health_plan:
             health_foundation_items = []
 
@@ -3662,6 +3792,7 @@ def _build_editor_all_blocks_action_specialization(
                 has_negative_listing,
                 has_defective_product,
                 has_defective_service,
+                has_service_not_rendered,
                 has_health_plan,
             )
         ):
@@ -4138,6 +4269,11 @@ def _editor_all_blocks_ready_response(
                 consumer_evidence_normalized
             )
         )
+        service_not_rendered_evidence_details = (
+            _detect_service_not_rendered_editor_details(
+                consumer_evidence_normalized
+            )
+        )
         health_plan_evidence_details = _detect_health_plan_editor_details(
             consumer_evidence_normalized
         )
@@ -4315,8 +4451,45 @@ def _editor_all_blocks_ready_response(
 
         if consumer_evidence_scopes["defective_service"]:
             evidence_parts.append(
-                "Para serviço defeituoso, incompleto ou não prestado, devem ser juntados contrato, oferta, ordem de serviço, comprovantes de pagamento, "
+                "Para serviço defeituoso ou incompleto, devem ser juntados contrato, oferta, ordem de serviço, comprovantes de pagamento, "
                 "protocolos, mensagens, registros do resultado prometido, evidências da execução e documentos das tentativas de correção."
+            )
+
+        if consumer_evidence_scopes["service_not_rendered"]:
+            service_not_rendered_evidence_items = []
+
+            if service_not_rendered_evidence_details["contract"]:
+                service_not_rendered_evidence_items.append("contrato")
+            if service_not_rendered_evidence_details["offer"]:
+                service_not_rendered_evidence_items.append("oferta")
+            if service_not_rendered_evidence_details["service_order"]:
+                service_not_rendered_evidence_items.append(
+                    "ordem de serviço"
+                )
+            if service_not_rendered_evidence_details["payment_receipt"]:
+                service_not_rendered_evidence_items.append(
+                    "comprovante de pagamento"
+                )
+            if service_not_rendered_evidence_details["protocols"]:
+                service_not_rendered_evidence_items.append("protocolos")
+            if service_not_rendered_evidence_details["messages"]:
+                service_not_rendered_evidence_items.append("mensagens")
+            if service_not_rendered_evidence_details["start_requests"]:
+                service_not_rendered_evidence_items.append(
+                    "registros das solicitações de início da prestação"
+                )
+
+            if not service_not_rendered_evidence_items:
+                service_not_rendered_evidence_items.append(
+                    "documentos efetivamente disponíveis sobre a contratação "
+                    "e a ausência de prestação"
+                )
+
+            evidence_parts.append(
+                "Para serviço não prestado, devem ser preservados e examinados "
+                "somente os elementos efetivamente informados no caso: "
+                + ", ".join(service_not_rendered_evidence_items)
+                + "."
             )
 
         if consumer_evidence_scopes["health_plan"]:
@@ -4372,6 +4545,7 @@ def _editor_all_blocks_ready_response(
                 consumer_evidence_scopes["negative_listing"],
                 consumer_evidence_scopes["defective_product"],
                 consumer_evidence_scopes["defective_service"],
+                consumer_evidence_scopes["service_not_rendered"],
                 consumer_evidence_scopes["health_plan"],
             )
         ):
