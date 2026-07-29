@@ -190,7 +190,7 @@ Documentação antiga não pode superar o comportamento real do código atual.
 | Provas específicas para todas as ações | 🟡 | Família, risco laboral e escopos consumeristas prioritários possuem especialização | Horas, Cível e demais áreas ainda usam base genérica em parte |
 | Endereçamento específico para todas as áreas | 🟡 | Família, Trabalhista especializado e Consumidor possuem tratamento próprio | Cível, Previdenciário, Criminal e Ambiental pendentes |
 | Qualificação específica para todas as áreas | 🟡 | Família, Trabalhista especializado e Consumidor possuem tratamento próprio | Cível, Previdenciário, Criminal e Ambiental pendentes |
-| Teste real por tipo de ação | 🟡 | Consumidor possui validação real nos cinco escopos prioritários, nas três rotas bancárias isoladas e no cenário bancário combinado; Família e risco laboral também possuem evidências próprias | Completar subtipos consumeristas e demais áreas conforme expansão |
+| Teste real por tipo de ação | 🟡 | Consumidor possui validação real nos seis escopos prioritários, nas três rotas bancárias isoladas e no cenário bancário combinado; Família e risco laboral também possuem evidências próprias | Completar subtipos consumeristas e demais áreas conforme expansão |
 
 ---
 
@@ -290,6 +290,8 @@ A `v0.2.38` validou em navegador produto defeituoso ou com vício, serviço defe
 
 A `v0.2.39` validou em navegador, de forma isolada, fraude bancária ou Pix não reconhecido, cobrança indevida e negativação indevida. A entrega tornou condicionais os pedidos, fundamentos e provas dessas rotas, impedindo a presunção de cobranças futuras, boletim de ocorrência, contratos, autorizações, histórico de débitos, comunicação prévia, efeitos da restrição ou outros elementos não informados.
 
+A `v0.2.40` separou serviço não prestado da rota de serviço defeituoso ou incompleto e validou em navegador os cenários completo e mínimo. A entrega passou a tratar a ausência total de execução sem presumir refazimento, correção, execução parcial, tentativas de reparo ou documentos não informados, condicionando a restituição à existência de pagamento relatado.
+
 A área possui especialização transversal de endereçamento, qualificação, fundamentação, pedidos e provas nos escopos prioritários. As rotas bancárias prioritárias possuem validação combinada e isolada. Permanecem parciais os subtipos consumeristas ainda genéricos.
 
 | Tipo de ação ou tema | Operacional / checklist | Editor especializado | Status geral | Entregas principais | Lacuna atual |
@@ -303,7 +305,7 @@ A área possui especialização transversal de endereçamento, qualificação, f
 | Produto defeituoso | ✅ | ✅ | ✅ | `v0.2.34`, `v0.2.36`, `v0.2.37`, `v0.2.38` | Validação real concluída; preservar documentos, reparos e soluções compatíveis com a prova |
 | Vício do produto | ✅ | ✅ | ✅ | `v0.2.34`, `v0.2.36`, `v0.2.37`, `v0.2.38` | Validação real concluída; aprofundar distinções jurídicas somente quando o caso exigir |
 | Serviço defeituoso ou incompleto | ✅ | ✅ | ✅ | `v0.2.34`, `v0.2.36`, `v0.2.37`, `v0.2.38` | Validação real concluída; dano somente quando expressamente alegado e documentado |
-| Serviço não prestado | ✅ | 🟡 | 🟡 | Checklist, `v0.2.34`, `v0.2.36`, `v0.2.37` | Coberto pela rota de serviço; criar caso real específico |
+| Serviço não prestado | ✅ | ✅ | ✅ | `v0.2.34`, `v0.2.36`, `v0.2.37`, `v0.2.40` | Validação real concluída nos cenários completo e mínimo; restituição somente quando houver pagamento informado |
 | Plano de saúde e negativa de cobertura | ✅ | ✅ | ✅ | `v0.2.34`, `v0.2.36`, `v0.2.37`, `v0.2.38` | Validação real concluída; não inferir urgência, risco, exame, internação, cirurgia ou prontuário |
 | Contrato consumerista geral | ✅ | ✅ | ✅ | `v0.2.34`, `v0.2.36`, `v0.2.37`, `v0.2.38` | Núcleo de oferta, não entrega, cancelamento e reembolso validado sem presumir documentos |
 | Oferta ou publicidade | ✅ | 🟡 | 🟡 | Fallback contratual consumerista | Criar ação específica quando houver caso real |
@@ -320,12 +322,12 @@ A área possui especialização transversal de endereçamento, qualificação, f
 
 #### Próximo pacote recomendado
 
-A `v0.2.39` concluiu as validações reais isoladas de fraude bancária ou Pix não reconhecido, cobrança indevida e negativação indevida, complementando o cenário bancário combinado já validado.
+A `v0.2.40` concluiu a separação e a validação real de serviço não prestado, preservando a distinção em relação ao serviço defeituoso ou incompleto e impedindo restituição sem pagamento informado.
 
 Próximos ciclos recomendados:
 
-1. separar serviço não prestado da rota de serviço defeituoso ou incompleto;
-2. criar especializações próprias para oferta/publicidade, cancelamento, entrega e garantia;
+1. criar especializações próprias para oferta/publicidade, cancelamento, entrega e garantia;
+2. preservar as regressões que distinguem ausência total de execução, serviço incompleto e serviço defeituoso;
 3. preservar as regressões que impedem danos, urgência, documentos, cobranças futuras e medidas não informadas.
 
 ---
@@ -521,7 +523,7 @@ A evolução deve começar por um tipo de ação real, com documentos e resultad
 |---|---:|---|
 | Trabalhista | 🟡 Parcial avançado | Forte em risco laboral; horas e demais ações ainda incompletas |
 | Família | ✅ Pronto no núcleo atual | Alimentos, guarda e convivência especializados e testados |
-| Consumidor | 🟡 Parcial avançado | Sete blocos especializados; validação real concluída nos escopos prioritários e nas rotas bancárias combinada e isoladas; subtipos ainda precisam expansão |
+| Consumidor | 🟡 Parcial avançado | Sete blocos especializados; validação real concluída nos escopos prioritários, em serviço não prestado e nas rotas bancárias combinada e isoladas; subtipos ainda precisam expansão |
 | Cível | 🟡 Parcial | Algumas rotas específicas, sem arquitetura completa por ação |
 | Previdenciário | 🟡 Operacional, Editor pendente | BPC/LOAS possui base e QA, mas não Editor específico |
 | Criminal | 🟡 Operacional, Editor pendente | Pacote inicial validado fora do Editor atual |
@@ -536,7 +538,7 @@ A prioridade deve considerar ganho jurídico, fechamento de lacunas existentes e
 
 ### Prioridade 1 — completar áreas já roteadas
 
-1. Completar os subtipos consumeristas ainda parciais: serviço não prestado, oferta, cancelamento, entrega e garantia.
+1. Completar os subtipos consumeristas ainda parciais: oferta, publicidade, cancelamento, entrega e garantia.
 2. Provas específicas de horas extras e intervalo.
 3. Provas, partes e endereçamento da cobrança contratual.
 

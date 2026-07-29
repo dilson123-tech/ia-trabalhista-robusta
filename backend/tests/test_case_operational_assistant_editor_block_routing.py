@@ -3823,3 +3823,102 @@ def test_editor_all_blocks_ready_consumer_general_contract_does_not_infer_servic
     assert "registros de entrega" not in provas
     assert "juntados contrato," not in provas
 
+
+
+def test_editor_all_blocks_ready_consumer_service_not_rendered_is_separate_from_defective_service():
+    response = _consumer_scope_ready_response(
+        "CONS-SERVICO-NAO-PRESTADO-001",
+        "Serviço contratado e não prestado",
+        "Ação consumerista por serviço não prestado",
+        (
+            "O consumidor contratou um serviço, efetuou o pagamento e o fornecedor não iniciou nem executou a prestação. "
+            "Possui contrato, oferta, comprovante de pagamento, protocolos e mensagens cobrando o início do serviço. "
+            "Pretende o cumprimento da prestação ou, se juridicamente cabível, a resolução da contratação "
+            "com restituição do valor pago."
+        ),
+    )
+
+    fundamentacao = _consumer_scope_block(
+        response,
+        "BLOCO 4 — Fundamentação preliminar",
+        "BLOCO 5 — Pedidos",
+    )
+    pedidos = _consumer_scope_block(
+        response,
+        "BLOCO 5 — Pedidos",
+        "BLOCO 6 — Provas e requerimentos",
+    )
+    provas = _consumer_scope_block(
+        response,
+        "BLOCO 6 — Provas e requerimentos",
+        "BLOCO 7 — Fechamento e conferência final",
+    )
+
+    assert response["metadata"]["action_specialization_kind"] == (
+        "consumer_universal_action_scope_claim"
+    )
+
+    assert "ausência de execução do serviço" in fundamentacao
+    assert "extensão da falha" not in fundamentacao
+    assert "tentativas de correção" not in fundamentacao
+
+    assert "prestação do serviço" in pedidos
+    assert "resolução da contratação" in pedidos
+    assert "restituição dos valores comprovadamente pagos" in pedidos
+    assert "refazimento adequado do serviço" not in pedidos
+    assert "correção da falha" not in pedidos
+    assert "serviço efetivamente prestado" not in pedidos
+
+    assert "contrato" in provas
+    assert "oferta" in provas
+    assert "comprovante de pagamento" in provas
+    assert "protocolos" in provas
+    assert "mensagens" in provas
+    assert "evidências da execução" not in provas
+    assert "tentativas de correção" not in provas
+
+
+def test_editor_all_blocks_ready_consumer_service_not_rendered_does_not_infer_unreported_documents_or_execution():
+    response = _consumer_scope_ready_response(
+        "CONS-SERVICO-NAO-PRESTADO-MINIMO-001",
+        "Serviço não prestado",
+        "Ação consumerista por serviço não prestado",
+        (
+            "O consumidor relata que o serviço contratado não foi prestado. "
+            "Pretende a análise das medidas juridicamente cabíveis, sem inventar fatos, "
+            "documentos, datas, valores ou prejuízos não informados."
+        ),
+    )
+
+    fundamentacao = _consumer_scope_block(
+        response,
+        "BLOCO 4 — Fundamentação preliminar",
+        "BLOCO 5 — Pedidos",
+    )
+    pedidos = _consumer_scope_block(
+        response,
+        "BLOCO 5 — Pedidos",
+        "BLOCO 6 — Provas e requerimentos",
+    )
+    provas = _consumer_scope_block(
+        response,
+        "BLOCO 6 — Provas e requerimentos",
+        "BLOCO 7 — Fechamento e conferência final",
+    )
+
+    assert "ausência de execução do serviço" in fundamentacao
+    assert "extensão da falha" not in fundamentacao
+    assert "tentativas de correção" not in fundamentacao
+
+    assert "refazimento adequado do serviço" not in pedidos
+    assert "correção da falha" not in pedidos
+    assert "serviço efetivamente prestado" not in pedidos
+    assert "restituição dos valores comprovadamente pagos" not in pedidos
+
+    assert "contrato, oferta" not in provas
+    assert "ordem de serviço" not in provas
+    assert "comprovantes de pagamento" not in provas
+    assert "protocolos" not in provas
+    assert "mensagens" not in provas
+    assert "evidências da execução" not in provas
+    assert "tentativas de correção" not in provas
