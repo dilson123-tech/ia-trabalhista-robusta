@@ -190,7 +190,7 @@ Documentação antiga não pode superar o comportamento real do código atual.
 | Provas específicas para todas as ações | 🟡 | Família, risco laboral e escopos consumeristas prioritários possuem especialização | Horas, Cível e demais áreas ainda usam base genérica em parte |
 | Endereçamento específico para todas as áreas | 🟡 | Família, Trabalhista especializado e Consumidor possuem tratamento próprio | Cível, Previdenciário, Criminal e Ambiental pendentes |
 | Qualificação específica para todas as áreas | 🟡 | Família, Trabalhista especializado e Consumidor possuem tratamento próprio | Cível, Previdenciário, Criminal e Ambiental pendentes |
-| Teste real por tipo de ação | 🟡 | Consumidor possui validação real nos seis escopos prioritários, nas três rotas bancárias isoladas e no cenário bancário combinado; Família e risco laboral também possuem evidências próprias | Completar subtipos consumeristas e demais áreas conforme expansão |
+| Teste real por tipo de ação | 🟡 | Consumidor possui validação real nos sete escopos prioritários, nas três rotas bancárias isoladas e no cenário bancário combinado; Família e risco laboral também possuem evidências próprias | Completar subtipos consumeristas e demais áreas conforme expansão |
 
 ---
 
@@ -292,6 +292,8 @@ A `v0.2.39` validou em navegador, de forma isolada, fraude bancária ou Pix não
 
 A `v0.2.40` separou serviço não prestado da rota de serviço defeituoso ou incompleto e validou em navegador os cenários completo e mínimo. A entrega passou a tratar a ausência total de execução sem presumir refazimento, correção, execução parcial, tentativas de reparo ou documentos não informados, condicionando a restituição à existência de pagamento relatado.
 
+A `v0.2.41` separou descumprimento de oferta ou publicidade do contrato consumerista geral e validou em navegador os cenários completo e mínimo. A entrega passou a examinar o conteúdo anunciado e a conduta do fornecedor sem presumir pedido, pagamento, protocolos, mensagens, cancelamento, reembolso, não entrega, rastreamento, danos ou outros elementos não informados.
+
 A área possui especialização transversal de endereçamento, qualificação, fundamentação, pedidos e provas nos escopos prioritários. As rotas bancárias prioritárias possuem validação combinada e isolada. Permanecem parciais os subtipos consumeristas ainda genéricos.
 
 | Tipo de ação ou tema | Operacional / checklist | Editor especializado | Status geral | Entregas principais | Lacuna atual |
@@ -308,7 +310,7 @@ A área possui especialização transversal de endereçamento, qualificação, f
 | Serviço não prestado | ✅ | ✅ | ✅ | `v0.2.34`, `v0.2.36`, `v0.2.37`, `v0.2.40` | Validação real concluída nos cenários completo e mínimo; restituição somente quando houver pagamento informado |
 | Plano de saúde e negativa de cobertura | ✅ | ✅ | ✅ | `v0.2.34`, `v0.2.36`, `v0.2.37`, `v0.2.38` | Validação real concluída; não inferir urgência, risco, exame, internação, cirurgia ou prontuário |
 | Contrato consumerista geral | ✅ | ✅ | ✅ | `v0.2.34`, `v0.2.36`, `v0.2.37`, `v0.2.38` | Núcleo de oferta, não entrega, cancelamento e reembolso validado sem presumir documentos |
-| Oferta ou publicidade | ✅ | 🟡 | 🟡 | Fallback contratual consumerista | Criar ação específica quando houver caso real |
+| Oferta ou publicidade | ✅ | ✅ | ✅ | `v0.2.34`, `v0.2.36`, `v0.2.37`, `v0.2.41` | Validação real concluída nos cenários completo e mínimo; documentos e medidas somente quando efetivamente informados |
 | Cancelamento não respeitado | ✅ | 🟡 | 🟡 | Checklist e contrato geral | Criar teste próprio |
 | Atraso na entrega | ✅ | 🟡 | 🟡 | Checklist e contrato geral | Criar teste próprio |
 | Falha de garantia | ✅ | 🟡 | 🟡 | Checklist e produto | Criar teste próprio |
@@ -322,12 +324,12 @@ A área possui especialização transversal de endereçamento, qualificação, f
 
 #### Próximo pacote recomendado
 
-A `v0.2.40` concluiu a separação e a validação real de serviço não prestado, preservando a distinção em relação ao serviço defeituoso ou incompleto e impedindo restituição sem pagamento informado.
+A `v0.2.41` concluiu a separação e a validação real de oferta ou publicidade não cumprida, preservando a rota contratual geral somente quando existem questões adicionais de entrega, cancelamento, reembolso ou obrigação específica.
 
 Próximos ciclos recomendados:
 
-1. criar especializações próprias para oferta/publicidade, cancelamento, entrega e garantia;
-2. preservar as regressões que distinguem ausência total de execução, serviço incompleto e serviço defeituoso;
+1. criar especializações próprias para cancelamento, entrega e garantia;
+2. preservar as regressões que distinguem oferta ou publicidade não cumprida das questões contratuais adicionais;
 3. preservar as regressões que impedem danos, urgência, documentos, cobranças futuras e medidas não informadas.
 
 ---
@@ -538,7 +540,7 @@ A prioridade deve considerar ganho jurídico, fechamento de lacunas existentes e
 
 ### Prioridade 1 — completar áreas já roteadas
 
-1. Completar os subtipos consumeristas ainda parciais: oferta, publicidade, cancelamento, entrega e garantia.
+1. Completar os subtipos consumeristas ainda parciais: cancelamento, entrega e garantia.
 2. Provas específicas de horas extras e intervalo.
 3. Provas, partes e endereçamento da cobrança contratual.
 

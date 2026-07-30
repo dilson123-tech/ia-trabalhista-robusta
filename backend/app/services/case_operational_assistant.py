@@ -2376,6 +2376,26 @@ def _detect_consumer_editor_scopes(normalized_text: str) -> dict[str, bool]:
         "não iniciou o serviço",
         "nao iniciou o servico",
     )
+    offer_publicity_markers = (
+        "descumprimento de oferta",
+        "descumprimento da oferta",
+        "oferta não cumprida",
+        "oferta nao cumprida",
+        "não cumpriu a oferta",
+        "nao cumpriu a oferta",
+        "não honrou a oferta",
+        "nao honrou a oferta",
+        "publicidade enganosa",
+        "publicidade abusiva",
+        "se recusou a cumprir o conteúdo anunciado",
+        "se recusou a cumprir o conteudo anunciado",
+        "se recusou a cumprir as condições anunciadas",
+        "se recusou a cumprir as condicoes anunciadas",
+        "recusou-se a cumprir o conteúdo anunciado",
+        "recusou-se a cumprir o conteudo anunciado",
+        "recusou-se a cumprir as condições anunciadas",
+        "recusou-se a cumprir as condicoes anunciadas",
+    )
     health_plan_markers = (
         "plano de saúde",
         "plano de saude",
@@ -2453,6 +2473,8 @@ def _detect_consumer_editor_scopes(normalized_text: str) -> dict[str, bool]:
         and _editor_text_has_any(normalized_text, defective_service_markers),
         "service_not_rendered": is_consumer
         and _editor_text_has_any(normalized_text, service_not_rendered_markers),
+        "offer_publicity": is_consumer
+        and _editor_text_has_any(normalized_text, offer_publicity_markers),
         "health_plan": is_consumer
         and _editor_text_has_any(normalized_text, health_plan_markers),
         "general_contract": is_consumer
@@ -2893,6 +2915,83 @@ def _detect_health_plan_editor_details(normalized_text: str) -> dict[str, bool]:
     }
 
 
+def _detect_offer_publicity_editor_details(
+    normalized_text: str,
+) -> dict[str, bool]:
+    return {
+        "advertising_capture": _editor_text_has_any(
+            normalized_text,
+            (
+                "captura da publicidade",
+                "captura de publicidade",
+                "captura do anúncio",
+                "captura do anuncio",
+                "print da publicidade",
+                "print do anúncio",
+                "print do anuncio",
+                "imagem da publicidade",
+                "registro visual da publicidade",
+            ),
+        ),
+        "offer_record": _editor_text_has_any(
+            normalized_text,
+            (
+                "registro da oferta",
+                "documento da oferta",
+                "cópia da oferta",
+                "copia da oferta",
+                "oferta documentada",
+            ),
+        ),
+        "order": _editor_text_has_any(
+            normalized_text,
+            (
+                "registro do pedido",
+                "número do pedido",
+                "numero do pedido",
+                "pedido de compra",
+                "há pedido",
+                "ha pedido",
+                "registro da oferta, pedido",
+                "publicidade, pedido",
+                "oferta, pedido",
+            ),
+        ),
+        "payment_receipt": _editor_text_has_any(
+            normalized_text,
+            (
+                "comprovante de pagamento",
+                "comprovantes de pagamento",
+                "efetuou o pagamento",
+                "pagamento realizado",
+            ),
+        ),
+        "protocols": _editor_text_has_any(
+            normalized_text,
+            (
+                "protocolo",
+                "protocolos",
+            ),
+        ),
+        "messages": _editor_text_has_any(
+            normalized_text,
+            (
+                "mensagem",
+                "mensagens",
+            ),
+        ),
+        "specific_fulfillment_request": _editor_text_has_any(
+            normalized_text,
+            (
+                "pretende o cumprimento da oferta",
+                "requer o cumprimento da oferta",
+                "pede o cumprimento da oferta",
+                "cumprimento da oferta nos limites",
+            ),
+        ),
+    }
+
+
 def _detect_general_consumer_contract_details(
     normalized_text: str,
 ) -> dict[str, bool]:
@@ -3039,6 +3138,9 @@ def _build_editor_all_blocks_action_specialization(
     )
     service_not_rendered_details = (
         _detect_service_not_rendered_editor_details(normalized)
+    )
+    offer_publicity_details = _detect_offer_publicity_editor_details(
+        normalized
     )
     health_plan_details = _detect_health_plan_editor_details(normalized)
     general_contract_details = _detect_general_consumer_contract_details(
@@ -3483,6 +3585,7 @@ def _build_editor_all_blocks_action_specialization(
         has_defective_product = consumer_scopes["defective_product"]
         has_defective_service = consumer_scopes["defective_service"]
         has_service_not_rendered = consumer_scopes["service_not_rendered"]
+        has_offer_publicity = consumer_scopes["offer_publicity"]
         has_health_plan = consumer_scopes["health_plan"]
         has_general_contract = consumer_scopes["general_contract"]
         has_consumer_damage = consumer_scopes["consumer_damage"]
@@ -3690,6 +3793,57 @@ def _build_editor_all_blocks_action_specialization(
             service_not_rendered_request += "."
             request_parts.append(service_not_rendered_request)
 
+        if has_offer_publicity:
+            offer_publicity_foundation_items = [
+                "o conteúdo anunciado",
+                "a conduta do fornecedor diante da oferta ou publicidade",
+            ]
+
+            if offer_publicity_details["advertising_capture"]:
+                offer_publicity_foundation_items.append(
+                    "a captura da publicidade"
+                )
+            if offer_publicity_details["offer_record"]:
+                offer_publicity_foundation_items.append(
+                    "o registro da oferta"
+                )
+            if offer_publicity_details["order"]:
+                offer_publicity_foundation_items.append("o pedido")
+            if offer_publicity_details["payment_receipt"]:
+                offer_publicity_foundation_items.append(
+                    "o comprovante de pagamento"
+                )
+            if offer_publicity_details["protocols"]:
+                offer_publicity_foundation_items.append(
+                    "os protocolos de atendimento"
+                )
+            if offer_publicity_details["messages"]:
+                offer_publicity_foundation_items.append(
+                    "as mensagens disponíveis"
+                )
+
+            foundation_parts.append(
+                "Devem ser examinados "
+                + ", ".join(offer_publicity_foundation_items)
+                + ", somente nos limites dos fatos e elementos efetivamente informados."
+            )
+
+            offer_publicity_request = (
+                "Requer-se, conforme a prova disponível e a revisão do advogado responsável, "
+            )
+            if offer_publicity_details["specific_fulfillment_request"]:
+                offer_publicity_request += (
+                    "o cumprimento da oferta nos limites do conteúdo comprovado"
+                )
+            else:
+                offer_publicity_request += (
+                    "o cumprimento da oferta quando ainda útil e juridicamente cabível"
+                )
+            offer_publicity_request += (
+                ", sempre conforme o conteúdo efetivamente demonstrado."
+            )
+            request_parts.append(offer_publicity_request)
+
         if has_health_plan:
             health_foundation_items = []
 
@@ -3785,7 +3939,7 @@ def _build_editor_all_blocks_action_specialization(
 
             request_parts.append(health_request + ".")
 
-        if not any(
+        has_other_specialized_consumer_scope = any(
             (
                 has_banking_fraud,
                 has_wrongful_charge,
@@ -3795,16 +3949,38 @@ def _build_editor_all_blocks_action_specialization(
                 has_service_not_rendered,
                 has_health_plan,
             )
+        )
+        has_additional_general_contract_issue = any(
+            (
+                general_contract_details["non_delivery"],
+                general_contract_details["cancellation"],
+                general_contract_details["refund"],
+                general_contract_details["specific_obligation"],
+            )
+        )
+
+        if not has_other_specialized_consumer_scope and (
+            not has_offer_publicity
+            or has_additional_general_contract_issue
         ):
             general_foundation_items = []
 
             if general_contract_details["contract"]:
                 general_foundation_items.append("o contrato informado")
-            if general_contract_details["offer"]:
+            if (
+                general_contract_details["offer"]
+                and not has_offer_publicity
+            ):
                 general_foundation_items.append("a oferta")
-            if general_contract_details["advertising"]:
+            if (
+                general_contract_details["advertising"]
+                and not has_offer_publicity
+            ):
                 general_foundation_items.append("a publicidade")
-            if general_contract_details["order"]:
+            if (
+                general_contract_details["order"]
+                and not has_offer_publicity
+            ):
                 general_foundation_items.append("o registro do pedido")
             if general_contract_details["payment"]:
                 general_foundation_items.append(
@@ -3816,11 +3992,17 @@ def _build_editor_all_blocks_action_specialization(
                 general_foundation_items.append(
                     "a solicitação de cancelamento"
                 )
-            if general_contract_details["protocols"]:
+            if (
+                general_contract_details["protocols"]
+                and not has_offer_publicity
+            ):
                 general_foundation_items.append(
                     "os protocolos de atendimento"
                 )
-            if general_contract_details["messages"]:
+            if (
+                general_contract_details["messages"]
+                and not has_offer_publicity
+            ):
                 general_foundation_items.append(
                     "as mensagens disponíveis"
                 )
@@ -3839,7 +4021,10 @@ def _build_editor_all_blocks_action_specialization(
 
             general_requested_measures = []
 
-            if general_contract_details["offer"]:
+            if (
+                general_contract_details["offer"]
+                and not has_offer_publicity
+            ):
                 general_requested_measures.append(
                     "o cumprimento da oferta"
                 )
@@ -4274,6 +4459,11 @@ def _editor_all_blocks_ready_response(
                 consumer_evidence_normalized
             )
         )
+        offer_publicity_evidence_details = (
+            _detect_offer_publicity_editor_details(
+                consumer_evidence_normalized
+            )
+        )
         health_plan_evidence_details = _detect_health_plan_editor_details(
             consumer_evidence_normalized
         )
@@ -4492,6 +4682,40 @@ def _editor_all_blocks_ready_response(
                 + "."
             )
 
+        if consumer_evidence_scopes["offer_publicity"]:
+            offer_publicity_evidence_items = []
+
+            if offer_publicity_evidence_details["advertising_capture"]:
+                offer_publicity_evidence_items.append(
+                    "captura da publicidade"
+                )
+            if offer_publicity_evidence_details["offer_record"]:
+                offer_publicity_evidence_items.append(
+                    "registro da oferta"
+                )
+            if offer_publicity_evidence_details["order"]:
+                offer_publicity_evidence_items.append("pedido")
+            if offer_publicity_evidence_details["payment_receipt"]:
+                offer_publicity_evidence_items.append(
+                    "comprovante de pagamento"
+                )
+            if offer_publicity_evidence_details["protocols"]:
+                offer_publicity_evidence_items.append("protocolos")
+            if offer_publicity_evidence_details["messages"]:
+                offer_publicity_evidence_items.append("mensagens")
+
+            if not offer_publicity_evidence_items:
+                offer_publicity_evidence_items.append(
+                    "elementos efetivamente disponíveis sobre a oferta ou publicidade"
+                )
+
+            evidence_parts.append(
+                "Para oferta ou publicidade não cumprida, devem ser preservados e examinados "
+                "somente os elementos efetivamente informados no caso: "
+                + ", ".join(offer_publicity_evidence_items)
+                + "."
+            )
+
         if consumer_evidence_scopes["health_plan"]:
             health_evidence_items = []
 
@@ -4538,7 +4762,7 @@ def _editor_all_blocks_ready_response(
 
             evidence_parts.append(health_evidence_text)
 
-        if not any(
+        has_other_specialized_evidence_scope = any(
             (
                 consumer_evidence_scopes["banking_fraud"],
                 consumer_evidence_scopes["wrongful_charge"],
@@ -4548,18 +4772,46 @@ def _editor_all_blocks_ready_response(
                 consumer_evidence_scopes["service_not_rendered"],
                 consumer_evidence_scopes["health_plan"],
             )
+        )
+        has_offer_publicity_evidence = consumer_evidence_scopes[
+            "offer_publicity"
+        ]
+        has_additional_general_evidence_issue = any(
+            (
+                general_contract_evidence_details["non_delivery"],
+                general_contract_evidence_details["cancellation"],
+                general_contract_evidence_details["refund"],
+                general_contract_evidence_details["specific_obligation"],
+            )
+        )
+
+        if not has_other_specialized_evidence_scope and (
+            not has_offer_publicity_evidence
+            or has_additional_general_evidence_issue
         ):
             general_evidence_items = []
 
             if general_contract_evidence_details["contract"]:
                 general_evidence_items.append("contrato")
-            if general_contract_evidence_details["offer"]:
+            if (
+                general_contract_evidence_details["offer"]
+                and not has_offer_publicity_evidence
+            ):
                 general_evidence_items.append("oferta")
-            if general_contract_evidence_details["advertising"]:
+            if (
+                general_contract_evidence_details["advertising"]
+                and not has_offer_publicity_evidence
+            ):
                 general_evidence_items.append("publicidade")
-            if general_contract_evidence_details["order"]:
+            if (
+                general_contract_evidence_details["order"]
+                and not has_offer_publicity_evidence
+            ):
                 general_evidence_items.append("pedido")
-            if general_contract_evidence_details["payment"]:
+            if (
+                general_contract_evidence_details["payment"]
+                and not has_offer_publicity_evidence
+            ):
                 general_evidence_items.append(
                     "comprovante de pagamento"
                 )
@@ -4569,9 +4821,15 @@ def _editor_all_blocks_ready_response(
                 general_evidence_items.append(
                     "registros de entrega"
                 )
-            if general_contract_evidence_details["protocols"]:
+            if (
+                general_contract_evidence_details["protocols"]
+                and not has_offer_publicity_evidence
+            ):
                 general_evidence_items.append("protocolos")
-            if general_contract_evidence_details["messages"]:
+            if (
+                general_contract_evidence_details["messages"]
+                and not has_offer_publicity_evidence
+            ):
                 general_evidence_items.append("mensagens")
             if general_contract_evidence_details["cancellation"]:
                 general_evidence_items.append(
