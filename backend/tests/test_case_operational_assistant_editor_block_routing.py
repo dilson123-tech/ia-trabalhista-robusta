@@ -3825,6 +3825,121 @@ def test_editor_all_blocks_ready_consumer_general_contract_does_not_infer_servic
 
 
 
+
+def test_editor_all_blocks_ready_consumer_offer_publicity_is_separate_from_general_contract_fallback():
+    response = _consumer_scope_ready_response(
+        "CONS-OFERTA-PUBLICIDADE-001",
+        "Oferta anunciada não cumprida",
+        "Ação consumerista por descumprimento de oferta e publicidade",
+        (
+            "O consumidor relata que o fornecedor divulgou oferta com preço e condições específicas, "
+            "mas se recusou a cumprir o conteúdo anunciado. Possui captura da publicidade, "
+            "registro da oferta, pedido, comprovante de pagamento, protocolos e mensagens. "
+            "Pretende o cumprimento da oferta nos limites do conteúdo comprovado, "
+            "sem inventar fatos, datas, valores ou prejuízos não informados."
+        ),
+    )
+
+    fundamentacao = _consumer_scope_block(
+        response,
+        "BLOCO 4 — Fundamentação preliminar",
+        "BLOCO 5 — Pedidos",
+    )
+    pedidos = _consumer_scope_block(
+        response,
+        "BLOCO 5 — Pedidos",
+        "BLOCO 6 — Provas e requerimentos",
+    )
+    provas = _consumer_scope_block(
+        response,
+        "BLOCO 6 — Provas e requerimentos",
+        "BLOCO 7 — Fechamento e conferência final",
+    )
+
+    assert response["metadata"]["action_specialization_kind"] == (
+        "consumer_universal_action_scope_claim"
+    )
+
+    assert "conteúdo anunciado" in fundamentacao
+    assert "conduta do fornecedor" in fundamentacao
+    assert "captura da publicidade" in fundamentacao
+    assert "registro da oferta" in fundamentacao
+    assert "pedido" in fundamentacao
+    assert "comprovante de pagamento" in fundamentacao
+    assert "protocolos" in fundamentacao
+    assert "mensagens" in fundamentacao
+    assert "não entrega relatada" not in fundamentacao
+
+    assert "cumprimento da oferta nos limites do conteúdo comprovado" in pedidos
+    assert "cancelamento da contratação" not in pedidos
+    assert "restituição dos valores comprovados" not in pedidos
+    assert "correção do serviço" not in pedidos
+
+    assert "captura da publicidade" in provas
+    assert "registro da oferta" in provas
+    assert "pedido" in provas
+    assert "comprovante de pagamento" in provas
+    assert "protocolos" in provas
+    assert "mensagens" in provas
+    assert "rastreamento" not in provas
+    assert "registros de entrega" not in provas
+    assert "solicitação de cancelamento" not in provas
+    assert "pedido de reembolso" not in provas
+
+
+def test_editor_all_blocks_ready_consumer_offer_publicity_does_not_infer_unreported_documents_or_remedies():
+    response = _consumer_scope_ready_response(
+        "CONS-OFERTA-PUBLICIDADE-MINIMO-001",
+        "Oferta não cumprida",
+        "Ação consumerista por descumprimento de oferta",
+        (
+            "O consumidor relata que o fornecedor divulgou uma oferta e depois se recusou "
+            "a cumprir as condições anunciadas. Pretende a análise das medidas juridicamente "
+            "cabíveis, sem inventar fatos, documentos, datas, valores ou prejuízos não informados."
+        ),
+    )
+
+    fundamentacao = _consumer_scope_block(
+        response,
+        "BLOCO 4 — Fundamentação preliminar",
+        "BLOCO 5 — Pedidos",
+    )
+    pedidos = _consumer_scope_block(
+        response,
+        "BLOCO 5 — Pedidos",
+        "BLOCO 6 — Provas e requerimentos",
+    )
+    provas = _consumer_scope_block(
+        response,
+        "BLOCO 6 — Provas e requerimentos",
+        "BLOCO 7 — Fechamento e conferência final",
+    )
+
+    assert "conteúdo anunciado" in fundamentacao
+    assert "conduta do fornecedor" in fundamentacao
+    assert "captura da publicidade" not in fundamentacao
+    assert "registro da oferta" not in fundamentacao
+    assert "comprovante de pagamento" not in fundamentacao
+    assert "protocolos" not in fundamentacao
+    assert "mensagens" not in fundamentacao
+
+    assert "cumprimento da oferta quando ainda útil e juridicamente cabível" in pedidos
+    assert "cancelamento da contratação" not in pedidos
+    assert "restituição dos valores comprovados" not in pedidos
+    assert "obrigação específica expressamente indicada" not in pedidos
+
+    assert "elementos efetivamente disponíveis sobre a oferta ou publicidade" in provas
+    assert "captura da publicidade" not in provas
+    assert "registro da oferta" not in provas
+    assert "pedido" not in provas
+    assert "comprovante de pagamento" not in provas
+    assert "protocolos" not in provas
+    assert "mensagens" not in provas
+    assert "rastreamento" not in provas
+    assert "solicitação de cancelamento" not in provas
+    assert "pedido de reembolso" not in provas
+
+
 def test_editor_all_blocks_ready_consumer_service_not_rendered_is_separate_from_defective_service():
     response = _consumer_scope_ready_response(
         "CONS-SERVICO-NAO-PRESTADO-001",
