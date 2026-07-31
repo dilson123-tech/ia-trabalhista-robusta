@@ -3940,6 +3940,120 @@ def test_editor_all_blocks_ready_consumer_offer_publicity_does_not_infer_unrepor
     assert "pedido de reembolso" not in provas
 
 
+
+def test_editor_all_blocks_ready_consumer_cancellation_not_respected_is_separate_from_general_contract_fallback():
+    response = _consumer_scope_ready_response(
+        "CONS-CANCELAMENTO-001",
+        "Cancelamento solicitado e não efetivado",
+        "Ação consumerista por cancelamento não respeitado",
+        (
+            "O consumidor solicitou o cancelamento da contratação, mas o fornecedor não efetivou o pedido "
+            "e continuou realizando cobranças. Possui contrato, solicitação de cancelamento, protocolo, "
+            "mensagens, faturas posteriores ao pedido e comprovantes dos pagamentos realizados após o cancelamento solicitado. "
+            "Pretende a efetivação definitiva do cancelamento, a interrupção das cobranças posteriores "
+            "e a análise da restituição dos valores comprovadamente pagos após o pedido, "
+            "sem inventar fatos, datas, valores, danos ou documentos não informados."
+        ),
+    )
+
+    fundamentacao = _consumer_scope_block(
+        response,
+        "BLOCO 4 — Fundamentação preliminar",
+        "BLOCO 5 — Pedidos",
+    )
+    pedidos = _consumer_scope_block(
+        response,
+        "BLOCO 5 — Pedidos",
+        "BLOCO 6 — Provas e requerimentos",
+    )
+    provas = _consumer_scope_block(
+        response,
+        "BLOCO 6 — Provas e requerimentos",
+        "BLOCO 7 — Fechamento e conferência final",
+    )
+
+    assert response["metadata"]["action_specialization_kind"] == (
+        "consumer_universal_action_scope_claim"
+    )
+
+    assert "pedido de cancelamento não efetivado" in fundamentacao
+    assert "contrato" in fundamentacao
+    assert "solicitação de cancelamento" in fundamentacao
+    assert "protocolo" in fundamentacao
+    assert "mensagens" in fundamentacao
+    assert "faturas posteriores" in fundamentacao
+    assert "comprovantes dos pagamentos realizados após" in fundamentacao
+    assert "não entrega relatada" not in fundamentacao
+    assert "conteúdo anunciado" not in fundamentacao
+
+    assert "efetivação definitiva do cancelamento" in pedidos
+    assert "interrupção das cobranças posteriores" in pedidos
+    assert "restituição dos valores comprovadamente pagos após o pedido de cancelamento" in pedidos
+    assert "cumprimento da oferta" not in pedidos
+    assert "medida contratual compatível" not in pedidos
+
+    assert "contrato" in provas
+    assert "solicitação de cancelamento" in provas
+    assert "protocolo" in provas
+    assert "mensagens" in provas
+    assert "faturas posteriores ao pedido" in provas
+    assert "comprovantes dos pagamentos realizados após o pedido" in provas
+    assert "rastreamento" not in provas
+    assert "registros de entrega" not in provas
+    assert "publicidade" not in provas
+
+
+def test_editor_all_blocks_ready_consumer_cancellation_not_respected_does_not_infer_unreported_charges_payments_or_documents():
+    response = _consumer_scope_ready_response(
+        "CONS-CANCELAMENTO-MINIMO-001",
+        "Cancelamento não respeitado",
+        "Ação consumerista por cancelamento não respeitado",
+        (
+            "O consumidor relata que solicitou o cancelamento da contratação, mas o fornecedor não efetivou o pedido. "
+            "Pretende a análise das medidas juridicamente cabíveis, sem inventar fatos, documentos, "
+            "datas, valores, cobranças posteriores, pagamentos ou prejuízos não informados."
+        ),
+    )
+
+    fundamentacao = _consumer_scope_block(
+        response,
+        "BLOCO 4 — Fundamentação preliminar",
+        "BLOCO 5 — Pedidos",
+    )
+    pedidos = _consumer_scope_block(
+        response,
+        "BLOCO 5 — Pedidos",
+        "BLOCO 6 — Provas e requerimentos",
+    )
+    provas = _consumer_scope_block(
+        response,
+        "BLOCO 6 — Provas e requerimentos",
+        "BLOCO 7 — Fechamento e conferência final",
+    )
+
+    assert "pedido de cancelamento não efetivado" in fundamentacao
+    assert "contrato" not in fundamentacao
+    assert "protocolo de atendimento" not in fundamentacao
+    assert "mensagens" not in fundamentacao
+    assert "faturas posteriores" not in fundamentacao
+    assert "comprovantes dos pagamentos realizados após" not in fundamentacao
+
+    assert "efetivação definitiva do cancelamento" in pedidos
+    assert "interrupção das cobranças posteriores" not in pedidos
+    assert "restituição dos valores comprovadamente pagos após" not in pedidos
+    assert "cumprimento da oferta" not in pedidos
+    assert "obrigação específica expressamente indicada" not in pedidos
+
+    assert "elementos efetivamente disponíveis sobre o pedido de cancelamento não efetivado" in provas
+    assert "contrato" not in provas
+    assert "protocolo" not in provas
+    assert "mensagens" not in provas
+    assert "faturas posteriores ao pedido" not in provas
+    assert "comprovantes dos pagamentos realizados após o pedido" not in provas
+    assert "rastreamento" not in provas
+    assert "pedido de reembolso" not in provas
+
+
 def test_editor_all_blocks_ready_consumer_service_not_rendered_is_separate_from_defective_service():
     response = _consumer_scope_ready_response(
         "CONS-SERVICO-NAO-PRESTADO-001",

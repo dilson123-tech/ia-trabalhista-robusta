@@ -2396,6 +2396,26 @@ def _detect_consumer_editor_scopes(normalized_text: str) -> dict[str, bool]:
         "recusou-se a cumprir as condições anunciadas",
         "recusou-se a cumprir as condicoes anunciadas",
     )
+    cancellation_not_respected_markers = (
+        "cancelamento não respeitado",
+        "cancelamento nao respeitado",
+        "cancelamento não efetivado",
+        "cancelamento nao efetivado",
+        "cancelamento não concluído",
+        "cancelamento nao concluido",
+        "cancelamento não atendido",
+        "cancelamento nao atendido",
+        "pedido de cancelamento não efetivado",
+        "pedido de cancelamento nao efetivado",
+        "solicitação de cancelamento não efetivada",
+        "solicitacao de cancelamento nao efetivada",
+        "solicitação de cancelamento não atendida",
+        "solicitacao de cancelamento nao atendida",
+        "não efetivou o pedido de cancelamento",
+        "nao efetivou o pedido de cancelamento",
+        "não efetivou o pedido",
+        "nao efetivou o pedido",
+    )
     health_plan_markers = (
         "plano de saúde",
         "plano de saude",
@@ -2475,6 +2495,11 @@ def _detect_consumer_editor_scopes(normalized_text: str) -> dict[str, bool]:
         and _editor_text_has_any(normalized_text, service_not_rendered_markers),
         "offer_publicity": is_consumer
         and _editor_text_has_any(normalized_text, offer_publicity_markers),
+        "cancellation_not_respected": is_consumer
+        and _editor_text_has_any(
+            normalized_text,
+            cancellation_not_respected_markers,
+        ),
         "health_plan": is_consumer
         and _editor_text_has_any(normalized_text, health_plan_markers),
         "general_contract": is_consumer
@@ -2992,6 +3017,103 @@ def _detect_offer_publicity_editor_details(
     }
 
 
+def _detect_cancellation_not_respected_editor_details(
+    normalized_text: str,
+) -> dict[str, bool]:
+    return {
+        "contract": _editor_text_has_any(
+            normalized_text,
+            (
+                "possui contrato",
+                "há contrato",
+                "ha contrato",
+                "contrato disponível",
+                "contrato disponivel",
+                "cópia do contrato",
+                "copia do contrato",
+            ),
+        ),
+        "cancellation_request": _editor_text_has_any(
+            normalized_text,
+            (
+                "possui solicitação de cancelamento",
+                "possui solicitacao de cancelamento",
+                "possui pedido de cancelamento",
+                "comprovante da solicitação de cancelamento",
+                "comprovante da solicitacao de cancelamento",
+                "registro da solicitação de cancelamento",
+                "registro da solicitacao de cancelamento",
+                "registro do pedido de cancelamento",
+                "solicitação de cancelamento, protocolo",
+                "solicitacao de cancelamento, protocolo",
+                "pedido de cancelamento, protocolo",
+            ),
+        ),
+        "protocols": _editor_text_has_any(
+            normalized_text,
+            (
+                "protocolo",
+                "protocolos",
+            ),
+        ),
+        "messages": _editor_text_has_any(
+            normalized_text,
+            (
+                "mensagem",
+                "mensagens",
+            ),
+        ),
+        "post_cancellation_invoices": _editor_text_has_any(
+            normalized_text,
+            (
+                "faturas posteriores ao pedido",
+                "fatura posterior ao pedido",
+                "faturas emitidas após o cancelamento",
+                "faturas emitidas apos o cancelamento",
+                "continuou realizando cobranças",
+                "continuou realizando cobrancas",
+                "continuaram as cobranças",
+                "continuaram as cobrancas",
+                "houve cobrança após o cancelamento",
+                "houve cobranca apos o cancelamento",
+            ),
+        ),
+        "post_cancellation_payments": _editor_text_has_any(
+            normalized_text,
+            (
+                "comprovantes dos pagamentos realizados após o cancelamento",
+                "comprovantes dos pagamentos realizados apos o cancelamento",
+                "pagamentos realizados após o cancelamento solicitado",
+                "pagamentos realizados apos o cancelamento solicitado",
+                "valores pagos após o pedido de cancelamento",
+                "valores pagos apos o pedido de cancelamento",
+            ),
+        ),
+        "stop_later_charges_request": _editor_text_has_any(
+            normalized_text,
+            (
+                "pretende a interrupção das cobranças posteriores",
+                "pretende a interrupcao das cobrancas posteriores",
+                "requer a interrupção das cobranças posteriores",
+                "requer a interrupcao das cobrancas posteriores",
+                "interrupção das cobranças posteriores",
+                "interrupcao das cobrancas posteriores",
+            ),
+        ),
+        "refund_after_cancellation_request": _editor_text_has_any(
+            normalized_text,
+            (
+                "restituição dos valores comprovadamente pagos após o pedido",
+                "restituicao dos valores comprovadamente pagos apos o pedido",
+                "restituição dos valores pagos após o cancelamento",
+                "restituicao dos valores pagos apos o cancelamento",
+                "devolução dos valores pagos após o cancelamento",
+                "devolucao dos valores pagos apos o cancelamento",
+            ),
+        ),
+    }
+
+
 def _detect_general_consumer_contract_details(
     normalized_text: str,
 ) -> dict[str, bool]:
@@ -3141,6 +3263,9 @@ def _build_editor_all_blocks_action_specialization(
     )
     offer_publicity_details = _detect_offer_publicity_editor_details(
         normalized
+    )
+    cancellation_not_respected_details = (
+        _detect_cancellation_not_respected_editor_details(normalized)
     )
     health_plan_details = _detect_health_plan_editor_details(normalized)
     general_contract_details = _detect_general_consumer_contract_details(
@@ -3586,6 +3711,9 @@ def _build_editor_all_blocks_action_specialization(
         has_defective_service = consumer_scopes["defective_service"]
         has_service_not_rendered = consumer_scopes["service_not_rendered"]
         has_offer_publicity = consumer_scopes["offer_publicity"]
+        has_cancellation_not_respected = consumer_scopes[
+            "cancellation_not_respected"
+        ]
         has_health_plan = consumer_scopes["health_plan"]
         has_general_contract = consumer_scopes["general_contract"]
         has_consumer_damage = consumer_scopes["consumer_damage"]
@@ -3844,6 +3972,72 @@ def _build_editor_all_blocks_action_specialization(
             )
             request_parts.append(offer_publicity_request)
 
+        if has_cancellation_not_respected:
+            cancellation_foundation_items = [
+                "o pedido de cancelamento não efetivado",
+            ]
+
+            if cancellation_not_respected_details["contract"]:
+                cancellation_foundation_items.append("o contrato")
+            if cancellation_not_respected_details["cancellation_request"]:
+                cancellation_foundation_items.append(
+                    "a solicitação de cancelamento"
+                )
+            if cancellation_not_respected_details["protocols"]:
+                cancellation_foundation_items.append(
+                    "o protocolo de atendimento"
+                )
+            if cancellation_not_respected_details["messages"]:
+                cancellation_foundation_items.append(
+                    "as mensagens disponíveis"
+                )
+            if cancellation_not_respected_details[
+                "post_cancellation_invoices"
+            ]:
+                cancellation_foundation_items.append(
+                    "as faturas posteriores ao pedido"
+                )
+            if cancellation_not_respected_details[
+                "post_cancellation_payments"
+            ]:
+                cancellation_foundation_items.append(
+                    "os comprovantes dos pagamentos realizados após "
+                    "o pedido de cancelamento"
+                )
+
+            foundation_parts.append(
+                "Devem ser examinados "
+                + ", ".join(cancellation_foundation_items)
+                + ", a resposta do fornecedor e o cumprimento efetivo "
+                "da solicitação, somente nos limites dos fatos e documentos "
+                "efetivamente informados."
+            )
+
+            cancellation_request = (
+                "Requer-se, conforme a prova disponível e a revisão do "
+                "advogado responsável, a efetivação definitiva do cancelamento"
+            )
+
+            if cancellation_not_respected_details[
+                "stop_later_charges_request"
+            ]:
+                cancellation_request += (
+                    ", a interrupção das cobranças posteriores"
+                )
+
+            if cancellation_not_respected_details[
+                "refund_after_cancellation_request"
+            ]:
+                cancellation_request += (
+                    ", a restituição dos valores comprovadamente pagos "
+                    "após o pedido de cancelamento"
+                )
+
+            cancellation_request += (
+                ", sempre nos limites do que estiver efetivamente demonstrado."
+            )
+            request_parts.append(cancellation_request)
+
         if has_health_plan:
             health_foundation_items = []
 
@@ -3953,14 +4147,23 @@ def _build_editor_all_blocks_action_specialization(
         has_additional_general_contract_issue = any(
             (
                 general_contract_details["non_delivery"],
-                general_contract_details["cancellation"],
-                general_contract_details["refund"],
+                (
+                    general_contract_details["cancellation"]
+                    and not has_cancellation_not_respected
+                ),
+                (
+                    general_contract_details["refund"]
+                    and not has_cancellation_not_respected
+                ),
                 general_contract_details["specific_obligation"],
             )
         )
 
         if not has_other_specialized_consumer_scope and (
-            not has_offer_publicity
+            (
+                not has_offer_publicity
+                and not has_cancellation_not_respected
+            )
             or has_additional_general_contract_issue
         ):
             general_foundation_items = []
@@ -3988,7 +4191,10 @@ def _build_editor_all_blocks_action_specialization(
                 )
             if general_contract_details["non_delivery"]:
                 general_foundation_items.append("a não entrega relatada")
-            if general_contract_details["cancellation"]:
+            if (
+                general_contract_details["cancellation"]
+                and not has_cancellation_not_respected
+            ):
                 general_foundation_items.append(
                     "a solicitação de cancelamento"
                 )
@@ -4028,11 +4234,17 @@ def _build_editor_all_blocks_action_specialization(
                 general_requested_measures.append(
                     "o cumprimento da oferta"
                 )
-            if general_contract_details["cancellation"]:
+            if (
+                general_contract_details["cancellation"]
+                and not has_cancellation_not_respected
+            ):
                 general_requested_measures.append(
                     "o cancelamento da contratação"
                 )
-            if general_contract_details["refund"]:
+            if (
+                general_contract_details["refund"]
+                and not has_cancellation_not_respected
+            ):
                 general_requested_measures.append(
                     "a restituição dos valores comprovados"
                 )
@@ -4464,6 +4676,11 @@ def _editor_all_blocks_ready_response(
                 consumer_evidence_normalized
             )
         )
+        cancellation_not_respected_evidence_details = (
+            _detect_cancellation_not_respected_editor_details(
+                consumer_evidence_normalized
+            )
+        )
         health_plan_evidence_details = _detect_health_plan_editor_details(
             consumer_evidence_normalized
         )
@@ -4716,6 +4933,48 @@ def _editor_all_blocks_ready_response(
                 + "."
             )
 
+        if consumer_evidence_scopes["cancellation_not_respected"]:
+            cancellation_evidence_items = []
+
+            if cancellation_not_respected_evidence_details["contract"]:
+                cancellation_evidence_items.append("contrato")
+            if cancellation_not_respected_evidence_details[
+                "cancellation_request"
+            ]:
+                cancellation_evidence_items.append(
+                    "solicitação de cancelamento"
+                )
+            if cancellation_not_respected_evidence_details["protocols"]:
+                cancellation_evidence_items.append("protocolo")
+            if cancellation_not_respected_evidence_details["messages"]:
+                cancellation_evidence_items.append("mensagens")
+            if cancellation_not_respected_evidence_details[
+                "post_cancellation_invoices"
+            ]:
+                cancellation_evidence_items.append(
+                    "faturas posteriores ao pedido"
+                )
+            if cancellation_not_respected_evidence_details[
+                "post_cancellation_payments"
+            ]:
+                cancellation_evidence_items.append(
+                    "comprovantes dos pagamentos realizados após o pedido"
+                )
+
+            if not cancellation_evidence_items:
+                cancellation_evidence_items.append(
+                    "elementos efetivamente disponíveis sobre o pedido "
+                    "de cancelamento não efetivado"
+                )
+
+            evidence_parts.append(
+                "Para o pedido de cancelamento não efetivado, devem ser "
+                "preservados e examinados somente os elementos efetivamente "
+                "informados no caso: "
+                + ", ".join(cancellation_evidence_items)
+                + "."
+            )
+
         if consumer_evidence_scopes["health_plan"]:
             health_evidence_items = []
 
@@ -4776,17 +5035,29 @@ def _editor_all_blocks_ready_response(
         has_offer_publicity_evidence = consumer_evidence_scopes[
             "offer_publicity"
         ]
+        has_cancellation_not_respected_evidence = consumer_evidence_scopes[
+            "cancellation_not_respected"
+        ]
         has_additional_general_evidence_issue = any(
             (
                 general_contract_evidence_details["non_delivery"],
-                general_contract_evidence_details["cancellation"],
-                general_contract_evidence_details["refund"],
+                (
+                    general_contract_evidence_details["cancellation"]
+                    and not has_cancellation_not_respected_evidence
+                ),
+                (
+                    general_contract_evidence_details["refund"]
+                    and not has_cancellation_not_respected_evidence
+                ),
                 general_contract_evidence_details["specific_obligation"],
             )
         )
 
         if not has_other_specialized_evidence_scope and (
-            not has_offer_publicity_evidence
+            (
+                not has_offer_publicity_evidence
+                and not has_cancellation_not_respected_evidence
+            )
             or has_additional_general_evidence_issue
         ):
             general_evidence_items = []
@@ -4824,18 +5095,26 @@ def _editor_all_blocks_ready_response(
             if (
                 general_contract_evidence_details["protocols"]
                 and not has_offer_publicity_evidence
+                and not has_cancellation_not_respected_evidence
             ):
                 general_evidence_items.append("protocolos")
             if (
                 general_contract_evidence_details["messages"]
                 and not has_offer_publicity_evidence
+                and not has_cancellation_not_respected_evidence
             ):
                 general_evidence_items.append("mensagens")
-            if general_contract_evidence_details["cancellation"]:
+            if (
+                general_contract_evidence_details["cancellation"]
+                and not has_cancellation_not_respected_evidence
+            ):
                 general_evidence_items.append(
                     "solicitação de cancelamento"
                 )
-            if general_contract_evidence_details["refund"]:
+            if (
+                general_contract_evidence_details["refund"]
+                and not has_cancellation_not_respected_evidence
+            ):
                 general_evidence_items.append("pedido de reembolso")
 
             if not general_evidence_items:
