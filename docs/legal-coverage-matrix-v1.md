@@ -190,7 +190,7 @@ Documentação antiga não pode superar o comportamento real do código atual.
 | Provas específicas para todas as ações | 🟡 | Família, risco laboral e escopos consumeristas prioritários possuem especialização | Horas, Cível e demais áreas ainda usam base genérica em parte |
 | Endereçamento específico para todas as áreas | 🟡 | Família, Trabalhista especializado e Consumidor possuem tratamento próprio | Cível, Previdenciário, Criminal e Ambiental pendentes |
 | Qualificação específica para todas as áreas | 🟡 | Família, Trabalhista especializado e Consumidor possuem tratamento próprio | Cível, Previdenciário, Criminal e Ambiental pendentes |
-| Teste real por tipo de ação | 🟡 | Consumidor possui validação real nos oito escopos prioritários, nas três rotas bancárias isoladas e no cenário bancário combinado; Família e risco laboral também possuem evidências próprias | Completar subtipos consumeristas e demais áreas conforme expansão |
+| Teste real por tipo de ação | 🟡 | Consumidor possui validação real nos nove escopos prioritários, nas três rotas bancárias isoladas e no cenário bancário combinado; Família e risco laboral também possuem evidências próprias | Completar subtipos consumeristas e demais áreas conforme expansão |
 
 ---
 
@@ -296,6 +296,8 @@ A `v0.2.41` separou descumprimento de oferta ou publicidade do contrato consumer
 
 A `v0.2.42` separou cancelamento solicitado e não efetivado do contrato consumerista geral e validou em navegador os cenários completo e mínimo. A entrega passou a tratar fundamentação, pedidos e provas de forma específica e condicional, sem presumir contrato, protocolo, mensagens, faturas posteriores, pagamentos, cobranças posteriores, restituição, danos ou outros elementos não informados.
 
+A `v0.2.43` separou atraso ou falha de entrega do contrato consumerista geral e validou em navegador os cenários completo e mínimo. A entrega passou a tratar prazo vencido e pedido não entregue com fundamentação, pedido e provas específicos, sem presumir registro do pedido, pagamento, comprovante de prazo, rastreamento, protocolos, mensagens, tentativa de entrega, entrega parcial, cancelamento, reembolso, danos, datas, valores ou outros elementos não informados.
+
 A área possui especialização transversal de endereçamento, qualificação, fundamentação, pedidos e provas nos escopos prioritários. As rotas bancárias prioritárias possuem validação combinada e isolada. Permanecem parciais os subtipos consumeristas ainda genéricos.
 
 | Tipo de ação ou tema | Operacional / checklist | Editor especializado | Status geral | Entregas principais | Lacuna atual |
@@ -311,10 +313,10 @@ A área possui especialização transversal de endereçamento, qualificação, f
 | Serviço defeituoso ou incompleto | ✅ | ✅ | ✅ | `v0.2.34`, `v0.2.36`, `v0.2.37`, `v0.2.38` | Validação real concluída; dano somente quando expressamente alegado e documentado |
 | Serviço não prestado | ✅ | ✅ | ✅ | `v0.2.34`, `v0.2.36`, `v0.2.37`, `v0.2.40` | Validação real concluída nos cenários completo e mínimo; restituição somente quando houver pagamento informado |
 | Plano de saúde e negativa de cobertura | ✅ | ✅ | ✅ | `v0.2.34`, `v0.2.36`, `v0.2.37`, `v0.2.38` | Validação real concluída; não inferir urgência, risco, exame, internação, cirurgia ou prontuário |
-| Contrato consumerista geral | ✅ | ✅ | ✅ | `v0.2.34`, `v0.2.36`, `v0.2.37`, `v0.2.38`, `v0.2.41`, `v0.2.42` | Fallback residual preservado para não entrega, reembolso ou obrigação contratual adicional, sem duplicar oferta, publicidade ou cancelamento especializados |
+| Contrato consumerista geral | ✅ | ✅ | ✅ | `v0.2.34`, `v0.2.36`, `v0.2.37`, `v0.2.38`, `v0.2.41`, `v0.2.42`, `v0.2.43` | Fallback residual preservado para reembolso ou obrigação contratual adicional, sem duplicar oferta, publicidade, cancelamento ou entrega especializados |
 | Oferta ou publicidade | ✅ | ✅ | ✅ | `v0.2.34`, `v0.2.36`, `v0.2.37`, `v0.2.41` | Validação real concluída nos cenários completo e mínimo; documentos e medidas somente quando efetivamente informados |
 | Cancelamento não respeitado | ✅ | ✅ | ✅ | `v0.2.34`, `v0.2.36`, `v0.2.37`, `v0.2.42` | Validação real concluída nos cenários completo e mínimo; cobranças, pagamentos, restituição e documentos somente quando efetivamente informados |
-| Atraso na entrega | ✅ | 🟡 | 🟡 | Checklist e contrato geral | Criar teste próprio |
+| Atraso na entrega | ✅ | ✅ | ✅ | `v0.2.34`, `v0.2.36`, `v0.2.37`, `v0.2.43` | Validação real concluída nos cenários completo e mínimo; documentos, tentativas, entrega parcial, cancelamento, reembolso e danos somente quando efetivamente informados |
 | Falha de garantia | ✅ | 🟡 | 🟡 | Checklist e produto | Criar teste próprio |
 | Telefonia | 🟡 | 🔴 | 🟡 | Base geral de consumo | Criar especialização quando priorizada |
 | Energia elétrica | 🟡 | 🔴 | 🟡 | Base geral de consumo | Criar especialização quando priorizada |
@@ -326,12 +328,12 @@ A área possui especialização transversal de endereçamento, qualificação, f
 
 #### Próximo pacote recomendado
 
-A `v0.2.42` concluiu a separação e a validação real de cancelamento solicitado e não efetivado, preservando a rota contratual geral somente quando existem questões adicionais independentes de não entrega, reembolso ou obrigação específica.
+A `v0.2.43` concluiu a separação e a validação real de atraso ou falha de entrega, preservando a rota contratual geral somente quando existem questões adicionais independentes de reembolso ou obrigação específica.
 
 Próximos ciclos recomendados:
 
-1. criar especializações próprias para atraso ou falha de entrega e garantia;
-2. preservar as regressões que distinguem oferta, publicidade e cancelamento das questões contratuais adicionais;
+1. criar especialização própria para falha de garantia;
+2. preservar as regressões que distinguem oferta, publicidade, cancelamento e atraso ou falha de entrega das questões contratuais adicionais;
 3. preservar as regressões que impedem danos, urgência, documentos, cobranças posteriores, pagamentos, restituição e medidas não informadas.
 
 ---
@@ -542,7 +544,7 @@ A prioridade deve considerar ganho jurídico, fechamento de lacunas existentes e
 
 ### Prioridade 1 — completar áreas já roteadas
 
-1. Completar os subtipos consumeristas ainda parciais: entrega e garantia.
+1. Completar o subtipo consumerista ainda parcial: garantia.
 2. Provas específicas de horas extras e intervalo.
 3. Provas, partes e endereçamento da cobrança contratual.
 
@@ -680,6 +682,7 @@ A matriz antiga em `docs/LEGAL_MODULE_COVERAGE_MATRIX_V1.md` não deve ser apaga
 | 2026-07-22 | `v0.2.36` | Especialização do Bloco 6 por escopo consumerista, com regressão e validação real de fraude Pix, cobrança e negativação |
 | 2026-07-22 | `v0.2.37` | Especialização consumerista dos Blocos 1 e 2, com limites civis prudentes, preservação das partes e validação real no navegador |
 | 2026-07-31 | `v0.2.42` | Especialização de cancelamento solicitado e não efetivado, com fundamentação, pedidos e provas condicionais e validação real dos cenários completo e mínimo |
+| 2026-08-05 | `v0.2.43` | Especialização de atraso ou falha de entrega, com fundamentação, pedido e provas condicionais, isolamento do fallback contratual e validação real dos cenários completo e mínimo |
 
 A cada nova tag jurídica:
 

@@ -2416,6 +2416,22 @@ def _detect_consumer_editor_scopes(normalized_text: str) -> dict[str, bool]:
         "não efetivou o pedido",
         "nao efetivou o pedido",
     )
+    delivery_delay_markers = (
+        "atraso na entrega",
+        "atraso de entrega",
+        "falha de entrega",
+        "prazo de entrega vencido",
+        "prazo de entrega venceu",
+        "prazo venceu",
+        "pedido não entregue no prazo",
+        "pedido nao entregue no prazo",
+        "pedido ainda não foi entregue",
+        "pedido ainda nao foi entregue",
+        "entrega não foi concluída",
+        "entrega nao foi concluida",
+        "a entrega não foi concluída",
+        "a entrega nao foi concluida",
+    )
     health_plan_markers = (
         "plano de saúde",
         "plano de saude",
@@ -2499,6 +2515,11 @@ def _detect_consumer_editor_scopes(normalized_text: str) -> dict[str, bool]:
         and _editor_text_has_any(
             normalized_text,
             cancellation_not_respected_markers,
+        ),
+        "delivery_delay": is_consumer
+        and _editor_text_has_any(
+            normalized_text,
+            delivery_delay_markers,
         ),
         "health_plan": is_consumer
         and _editor_text_has_any(normalized_text, health_plan_markers),
@@ -3114,9 +3135,101 @@ def _detect_cancellation_not_respected_editor_details(
     }
 
 
+def _detect_delivery_delay_editor_details(
+    normalized_text: str,
+) -> dict[str, bool]:
+    return {
+        "order_record": _editor_text_has_any(
+            normalized_text,
+            (
+                "possui registro do pedido",
+                "registro do pedido",
+                "número do pedido",
+                "numero do pedido",
+                "pedido de compra disponível",
+                "pedido de compra disponivel",
+            ),
+        ),
+        "payment_receipt": _editor_text_has_any(
+            normalized_text,
+            (
+                "possui comprovante de pagamento",
+                "comprovante de pagamento",
+                "comprovantes de pagamento",
+                "pagamento realizado e comprovado",
+            ),
+        ),
+        "delivery_deadline_record": _editor_text_has_any(
+            normalized_text,
+            (
+                "possui comprovante do prazo de entrega",
+                "comprovante do prazo de entrega",
+                "registro do prazo de entrega",
+                "documento com o prazo de entrega",
+                "pedido com prazo de entrega informado",
+            ),
+        ),
+        "tracking_code": _editor_text_has_any(
+            normalized_text,
+            (
+                "código de rastreio",
+                "codigo de rastreio",
+                "código de rastreamento",
+                "codigo de rastreamento",
+                "possui rastreamento",
+            ),
+        ),
+        "protocols": _editor_text_has_any(
+            normalized_text,
+            (
+                "protocolo",
+                "protocolos",
+            ),
+        ),
+        "messages": _editor_text_has_any(
+            normalized_text,
+            (
+                "mensagem",
+                "mensagens",
+            ),
+        ),
+        "delivery_attempt_records": _editor_text_has_any(
+            normalized_text,
+            (
+                "possui registro de tentativa de entrega",
+                "possui registros de tentativa de entrega",
+                "possui registros de tentativas de entrega",
+                "há registro de tentativa de entrega",
+                "ha registro de tentativa de entrega",
+                "comprovante de tentativa de entrega",
+            ),
+        ),
+        "partial_delivery_records": _editor_text_has_any(
+            normalized_text,
+            (
+                "possui registro de entrega parcial",
+                "possui registros de entrega parcial",
+                "há registro de entrega parcial",
+                "ha registro de entrega parcial",
+                "comprovante de entrega parcial",
+            ),
+        ),
+    }
+
+
 def _detect_general_consumer_contract_details(
     normalized_text: str,
 ) -> dict[str, bool]:
+    affirmative_text = normalized_text
+    for caution_marker in (
+        "sem inventar",
+        "sem presumir",
+    ):
+        affirmative_text = affirmative_text.split(
+            caution_marker,
+            1,
+        )[0]
+
     return {
         "contract": _editor_text_has_any(
             normalized_text,
@@ -3209,14 +3322,14 @@ def _detect_general_consumer_contract_details(
             ),
         ),
         "cancellation": _editor_text_has_any(
-            normalized_text,
+            affirmative_text,
             (
                 "cancelamento",
                 "cancelar",
             ),
         ),
         "refund": _editor_text_has_any(
-            normalized_text,
+            affirmative_text,
             (
                 "reembolso",
                 "restituição dos valores",
@@ -3266,6 +3379,9 @@ def _build_editor_all_blocks_action_specialization(
     )
     cancellation_not_respected_details = (
         _detect_cancellation_not_respected_editor_details(normalized)
+    )
+    delivery_delay_details = _detect_delivery_delay_editor_details(
+        normalized
     )
     health_plan_details = _detect_health_plan_editor_details(normalized)
     general_contract_details = _detect_general_consumer_contract_details(
@@ -3714,6 +3830,7 @@ def _build_editor_all_blocks_action_specialization(
         has_cancellation_not_respected = consumer_scopes[
             "cancellation_not_respected"
         ]
+        has_delivery_delay = consumer_scopes["delivery_delay"]
         has_health_plan = consumer_scopes["health_plan"]
         has_general_contract = consumer_scopes["general_contract"]
         has_consumer_damage = consumer_scopes["consumer_damage"]
@@ -4038,6 +4155,59 @@ def _build_editor_all_blocks_action_specialization(
             )
             request_parts.append(cancellation_request)
 
+        if has_delivery_delay:
+            delivery_foundation_items = [
+                "o atraso ou falha de entrega relatada",
+            ]
+
+            if delivery_delay_details["order_record"]:
+                delivery_foundation_items.append(
+                    "o registro do pedido"
+                )
+            if delivery_delay_details["payment_receipt"]:
+                delivery_foundation_items.append(
+                    "o comprovante de pagamento"
+                )
+            if delivery_delay_details["delivery_deadline_record"]:
+                delivery_foundation_items.append(
+                    "o prazo de entrega informado"
+                )
+            if delivery_delay_details["tracking_code"]:
+                delivery_foundation_items.append(
+                    "o código de rastreio"
+                )
+            if delivery_delay_details["protocols"]:
+                delivery_foundation_items.append(
+                    "os protocolos de atendimento"
+                )
+            if delivery_delay_details["messages"]:
+                delivery_foundation_items.append(
+                    "as mensagens disponíveis"
+                )
+            if delivery_delay_details["delivery_attempt_records"]:
+                delivery_foundation_items.append(
+                    "os registros de tentativa de entrega"
+                )
+            if delivery_delay_details["partial_delivery_records"]:
+                delivery_foundation_items.append(
+                    "os registros de entrega parcial"
+                )
+
+            foundation_parts.append(
+                "Devem ser examinados "
+                + ", ".join(delivery_foundation_items)
+                + ", a conduta do fornecedor diante do prazo informado "
+                "e a situação efetiva do pedido, somente nos limites dos "
+                "fatos e documentos efetivamente informados."
+            )
+
+            request_parts.append(
+                "Requer-se, conforme a prova disponível e a revisão do "
+                "advogado responsável, a entrega do pedido quando ainda "
+                "útil e juridicamente cabível, sempre nos limites do que "
+                "estiver efetivamente demonstrado."
+            )
+
         if has_health_plan:
             health_foundation_items = []
 
@@ -4146,7 +4316,10 @@ def _build_editor_all_blocks_action_specialization(
         )
         has_additional_general_contract_issue = any(
             (
-                general_contract_details["non_delivery"],
+                (
+                    general_contract_details["non_delivery"]
+                    and not has_delivery_delay
+                ),
                 (
                     general_contract_details["cancellation"]
                     and not has_cancellation_not_respected
@@ -4163,6 +4336,7 @@ def _build_editor_all_blocks_action_specialization(
             (
                 not has_offer_publicity
                 and not has_cancellation_not_respected
+                and not has_delivery_delay
             )
             or has_additional_general_contract_issue
         ):
@@ -4183,14 +4357,23 @@ def _build_editor_all_blocks_action_specialization(
             if (
                 general_contract_details["order"]
                 and not has_offer_publicity
+                and not has_delivery_delay
             ):
                 general_foundation_items.append("o registro do pedido")
-            if general_contract_details["payment"]:
+            if (
+                general_contract_details["payment"]
+                and not has_delivery_delay
+            ):
                 general_foundation_items.append(
                     "os comprovantes de pagamento"
                 )
-            if general_contract_details["non_delivery"]:
-                general_foundation_items.append("a não entrega relatada")
+            if (
+                general_contract_details["non_delivery"]
+                and not has_delivery_delay
+            ):
+                general_foundation_items.append(
+                    "a não entrega relatada"
+                )
             if (
                 general_contract_details["cancellation"]
                 and not has_cancellation_not_respected
@@ -4201,6 +4384,7 @@ def _build_editor_all_blocks_action_specialization(
             if (
                 general_contract_details["protocols"]
                 and not has_offer_publicity
+                and not has_delivery_delay
             ):
                 general_foundation_items.append(
                     "os protocolos de atendimento"
@@ -4208,6 +4392,7 @@ def _build_editor_all_blocks_action_specialization(
             if (
                 general_contract_details["messages"]
                 and not has_offer_publicity
+                and not has_delivery_delay
             ):
                 general_foundation_items.append(
                     "as mensagens disponíveis"
@@ -4681,6 +4866,11 @@ def _editor_all_blocks_ready_response(
                 consumer_evidence_normalized
             )
         )
+        delivery_delay_evidence_details = (
+            _detect_delivery_delay_editor_details(
+                consumer_evidence_normalized
+            )
+        )
         health_plan_evidence_details = _detect_health_plan_editor_details(
             consumer_evidence_normalized
         )
@@ -4975,6 +5165,58 @@ def _editor_all_blocks_ready_response(
                 + "."
             )
 
+        if consumer_evidence_scopes["delivery_delay"]:
+            delivery_evidence_items = []
+
+            if delivery_delay_evidence_details["order_record"]:
+                delivery_evidence_items.append(
+                    "registro do pedido"
+                )
+            if delivery_delay_evidence_details["payment_receipt"]:
+                delivery_evidence_items.append(
+                    "comprovante de pagamento"
+                )
+            if delivery_delay_evidence_details[
+                "delivery_deadline_record"
+            ]:
+                delivery_evidence_items.append(
+                    "comprovante do prazo de entrega"
+                )
+            if delivery_delay_evidence_details["tracking_code"]:
+                delivery_evidence_items.append(
+                    "código de rastreio"
+                )
+            if delivery_delay_evidence_details["protocols"]:
+                delivery_evidence_items.append("protocolos")
+            if delivery_delay_evidence_details["messages"]:
+                delivery_evidence_items.append("mensagens")
+            if delivery_delay_evidence_details[
+                "delivery_attempt_records"
+            ]:
+                delivery_evidence_items.append(
+                    "registros de tentativa de entrega"
+                )
+            if delivery_delay_evidence_details[
+                "partial_delivery_records"
+            ]:
+                delivery_evidence_items.append(
+                    "registros de entrega parcial"
+                )
+
+            if not delivery_evidence_items:
+                delivery_evidence_items.append(
+                    "elementos efetivamente disponíveis sobre o atraso "
+                    "ou a falha de entrega"
+                )
+
+            evidence_parts.append(
+                "Para o atraso ou a falha de entrega, devem ser "
+                "preservados e examinados somente os elementos "
+                "efetivamente informados no caso: "
+                + ", ".join(delivery_evidence_items)
+                + "."
+            )
+
         if consumer_evidence_scopes["health_plan"]:
             health_evidence_items = []
 
@@ -5038,9 +5280,15 @@ def _editor_all_blocks_ready_response(
         has_cancellation_not_respected_evidence = consumer_evidence_scopes[
             "cancellation_not_respected"
         ]
+        has_delivery_delay_evidence = consumer_evidence_scopes[
+            "delivery_delay"
+        ]
         has_additional_general_evidence_issue = any(
             (
-                general_contract_evidence_details["non_delivery"],
+                (
+                    general_contract_evidence_details["non_delivery"]
+                    and not has_delivery_delay_evidence
+                ),
                 (
                     general_contract_evidence_details["cancellation"]
                     and not has_cancellation_not_respected_evidence
@@ -5057,6 +5305,7 @@ def _editor_all_blocks_ready_response(
             (
                 not has_offer_publicity_evidence
                 and not has_cancellation_not_respected_evidence
+                and not has_delivery_delay_evidence
             )
             or has_additional_general_evidence_issue
         ):
@@ -5077,18 +5326,26 @@ def _editor_all_blocks_ready_response(
             if (
                 general_contract_evidence_details["order"]
                 and not has_offer_publicity_evidence
+                and not has_delivery_delay_evidence
             ):
                 general_evidence_items.append("pedido")
             if (
                 general_contract_evidence_details["payment"]
                 and not has_offer_publicity_evidence
+                and not has_delivery_delay_evidence
             ):
                 general_evidence_items.append(
                     "comprovante de pagamento"
                 )
-            if general_contract_evidence_details["tracking"]:
+            if (
+                general_contract_evidence_details["tracking"]
+                and not has_delivery_delay_evidence
+            ):
                 general_evidence_items.append("rastreamento")
-            if general_contract_evidence_details["delivery_records"]:
+            if (
+                general_contract_evidence_details["delivery_records"]
+                and not has_delivery_delay_evidence
+            ):
                 general_evidence_items.append(
                     "registros de entrega"
                 )
@@ -5096,12 +5353,14 @@ def _editor_all_blocks_ready_response(
                 general_contract_evidence_details["protocols"]
                 and not has_offer_publicity_evidence
                 and not has_cancellation_not_respected_evidence
+                and not has_delivery_delay_evidence
             ):
                 general_evidence_items.append("protocolos")
             if (
                 general_contract_evidence_details["messages"]
                 and not has_offer_publicity_evidence
                 and not has_cancellation_not_respected_evidence
+                and not has_delivery_delay_evidence
             ):
                 general_evidence_items.append("mensagens")
             if (
