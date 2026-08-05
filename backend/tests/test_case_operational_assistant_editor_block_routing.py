@@ -4054,6 +4054,126 @@ def test_editor_all_blocks_ready_consumer_cancellation_not_respected_does_not_in
     assert "pedido de reembolso" not in provas
 
 
+
+def test_editor_all_blocks_ready_consumer_delivery_delay_is_separate_from_general_contract_fallback():
+    response = _consumer_scope_ready_response(
+        "CONS-ENTREGA-ATRASADA-001",
+        "Prazo vencido e pedido não entregue",
+        "Ação consumerista por atraso ou falha de entrega",
+        (
+            "O consumidor realizou uma compra com prazo de entrega informado no pedido, "
+            "mas o prazo venceu e a entrega não foi concluída. Possui registro do pedido, "
+            "comprovante de pagamento, comprovante do prazo de entrega, código de rastreio, "
+            "protocolos e mensagens. Pretende a entrega do pedido quando ainda útil e "
+            "juridicamente cabível, sem inventar datas, valores, entrega parcial, tentativa "
+            "de entrega, cancelamento, reembolso, danos ou documentos não informados."
+        ),
+    )
+
+    fundamentacao = _consumer_scope_block(
+        response,
+        "BLOCO 4 — Fundamentação preliminar",
+        "BLOCO 5 — Pedidos",
+    )
+    pedidos = _consumer_scope_block(
+        response,
+        "BLOCO 5 — Pedidos",
+        "BLOCO 6 — Provas e requerimentos",
+    )
+    provas = _consumer_scope_block(
+        response,
+        "BLOCO 6 — Provas e requerimentos",
+        "BLOCO 7 — Fechamento e conferência final",
+    )
+
+    assert response["metadata"]["action_specialization_kind"] == (
+        "consumer_universal_action_scope_claim"
+    )
+
+    assert "atraso ou falha de entrega relatada" in fundamentacao
+    assert "registro do pedido" in fundamentacao
+    assert "comprovante de pagamento" in fundamentacao
+    assert "prazo de entrega informado" in fundamentacao
+    assert "código de rastreio" in fundamentacao
+    assert "protocolos" in fundamentacao
+    assert "mensagens" in fundamentacao
+    assert "solicitação de cancelamento" not in fundamentacao
+    assert "conteúdo anunciado" not in fundamentacao
+
+    assert "entrega do pedido quando ainda útil e juridicamente cabível" in pedidos
+    assert "cancelamento da contratação" not in pedidos
+    assert "restituição dos valores" not in pedidos
+    assert "cumprimento da oferta" not in pedidos
+    assert "medida contratual compatível" not in pedidos
+
+    assert "registro do pedido" in provas
+    assert "comprovante de pagamento" in provas
+    assert "comprovante do prazo de entrega" in provas
+    assert "código de rastreio" in provas
+    assert "protocolos" in provas
+    assert "mensagens" in provas
+    assert "registros de tentativa de entrega" not in provas
+    assert "registros de entrega parcial" not in provas
+    assert "solicitação de cancelamento" not in provas
+    assert "pedido de reembolso" not in provas
+    assert "publicidade" not in provas
+
+
+def test_editor_all_blocks_ready_consumer_delivery_delay_does_not_infer_unreported_documents_or_remedies():
+    response = _consumer_scope_ready_response(
+        "CONS-ENTREGA-ATRASADA-MINIMO-001",
+        "Pedido não entregue no prazo",
+        "Ação consumerista por atraso de entrega",
+        (
+            "O consumidor relata que o prazo de entrega venceu e o pedido ainda não foi entregue. "
+            "Pretende a análise das medidas juridicamente cabíveis, sem inventar fatos, documentos, "
+            "datas, valores ou prejuízos não informados."
+        ),
+    )
+
+    fundamentacao = _consumer_scope_block(
+        response,
+        "BLOCO 4 — Fundamentação preliminar",
+        "BLOCO 5 — Pedidos",
+    )
+    pedidos = _consumer_scope_block(
+        response,
+        "BLOCO 5 — Pedidos",
+        "BLOCO 6 — Provas e requerimentos",
+    )
+    provas = _consumer_scope_block(
+        response,
+        "BLOCO 6 — Provas e requerimentos",
+        "BLOCO 7 — Fechamento e conferência final",
+    )
+
+    assert "atraso ou falha de entrega relatada" in fundamentacao
+    assert "registro do pedido" not in fundamentacao
+    assert "comprovante de pagamento" not in fundamentacao
+    assert "prazo de entrega informado" not in fundamentacao
+    assert "código de rastreio" not in fundamentacao
+    assert "protocolos de atendimento" not in fundamentacao
+    assert "mensagens disponíveis" not in fundamentacao
+
+    assert "entrega do pedido quando ainda útil e juridicamente cabível" in pedidos
+    assert "cancelamento da contratação" not in pedidos
+    assert "restituição dos valores" not in pedidos
+    assert "cumprimento da oferta" not in pedidos
+    assert "obrigação específica expressamente indicada" not in pedidos
+
+    assert "elementos efetivamente disponíveis sobre o atraso ou a falha de entrega" in provas
+    assert "registro do pedido" not in provas
+    assert "comprovante de pagamento" not in provas
+    assert "comprovante do prazo de entrega" not in provas
+    assert "código de rastreio" not in provas
+    assert "protocolos" not in provas
+    assert "mensagens" not in provas
+    assert "registros de tentativa de entrega" not in provas
+    assert "registros de entrega parcial" not in provas
+    assert "solicitação de cancelamento" not in provas
+    assert "pedido de reembolso" not in provas
+
+
 def test_editor_all_blocks_ready_consumer_service_not_rendered_is_separate_from_defective_service():
     response = _consumer_scope_ready_response(
         "CONS-SERVICO-NAO-PRESTADO-001",
