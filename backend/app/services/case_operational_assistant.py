@@ -2354,6 +2354,21 @@ def _detect_consumer_editor_scopes(normalized_text: str) -> dict[str, bool]:
         "assistência técnica",
         "assistencia tecnica",
     )
+    warranty_failure_markers = (
+        "falha de garantia",
+        "garantia não cumprida",
+        "garantia nao cumprida",
+        "garantia não atendida",
+        "garantia nao atendida",
+        "garantia não solucionada",
+        "garantia nao solucionada",
+        "defeito persistiu após o reparo",
+        "defeito persistiu apos o reparo",
+        "defeito persistiu após a tentativa de reparo",
+        "defeito persistiu apos a tentativa de reparo",
+        "produto não foi reparado em garantia",
+        "produto nao foi reparado em garantia",
+    )
     defective_service_markers = (
         "serviço defeituoso",
         "servico defeituoso",
@@ -2503,8 +2518,14 @@ def _detect_consumer_editor_scopes(normalized_text: str) -> dict[str, bool]:
         and _editor_text_has_any(normalized_text, wrongful_charge_markers),
         "negative_listing": is_consumer
         and _editor_text_has_any(normalized_text, negative_listing_markers),
+        "warranty_failure": is_consumer
+        and _editor_text_has_any(normalized_text, warranty_failure_markers),
         "defective_product": is_consumer
-        and _editor_text_has_any(normalized_text, defective_product_markers),
+        and _editor_text_has_any(normalized_text, defective_product_markers)
+        and not _editor_text_has_any(
+            normalized_text,
+            warranty_failure_markers,
+        ),
         "defective_service": is_consumer
         and _editor_text_has_any(normalized_text, defective_service_markers),
         "service_not_rendered": is_consumer
@@ -3135,6 +3156,122 @@ def _detect_cancellation_not_respected_editor_details(
     }
 
 
+def _detect_warranty_failure_editor_details(
+    normalized_text: str,
+) -> dict[str, bool]:
+    affirmative_text = normalized_text
+    for caution_marker in (
+        "sem inventar",
+        "sem presumir",
+    ):
+        affirmative_text = affirmative_text.split(
+            caution_marker,
+            1,
+        )[0]
+
+    return {
+        "invoice": _editor_text_has_any(
+            affirmative_text,
+            (
+                "possui nota fiscal",
+                "apresentou nota fiscal",
+                "há nota fiscal",
+                "ha nota fiscal",
+                "nota fiscal disponível",
+                "nota fiscal disponivel",
+            ),
+        ),
+        "warranty_certificate": _editor_text_has_any(
+            affirmative_text,
+            (
+                "possui certificado de garantia",
+                "há certificado de garantia",
+                "ha certificado de garantia",
+                "certificado de garantia",
+                "termo de garantia",
+            ),
+        ),
+        "service_orders": _editor_text_has_any(
+            affirmative_text,
+            (
+                "possui ordem de serviço",
+                "possui ordens de serviço",
+                "há ordem de serviço",
+                "ha ordem de serviço",
+                "ordem de serviço",
+                "ordens de serviço",
+            ),
+        ),
+        "technical_assistance": _editor_text_has_any(
+            affirmative_text,
+            (
+                "acionou a assistência técnica",
+                "acionou a assistencia tecnica",
+                "atendimento da assistência técnica",
+                "atendimento da assistencia tecnica",
+                "registros da assistência técnica",
+                "registros da assistencia tecnica",
+                "assistência técnica",
+                "assistencia tecnica",
+            ),
+        ),
+        "repair_attempt_records": _editor_text_has_any(
+            affirmative_text,
+            (
+                "defeito persistiu após a tentativa de reparo",
+                "defeito persistiu apos a tentativa de reparo",
+                "defeito persistiu após o reparo",
+                "defeito persistiu apos o reparo",
+                "tentativa de reparo",
+                "tentativas de reparo",
+                "registro do reparo",
+                "registros do reparo",
+            ),
+        ),
+        "protocols": _editor_text_has_any(
+            affirmative_text,
+            (
+                "protocolo",
+                "protocolos",
+            ),
+        ),
+        "messages": _editor_text_has_any(
+            affirmative_text,
+            (
+                "mensagem",
+                "mensagens",
+            ),
+        ),
+        "photos": _editor_text_has_any(
+            affirmative_text,
+            (
+                "fotografia",
+                "fotografias",
+                "foto",
+                "fotos",
+            ),
+        ),
+        "videos": _editor_text_has_any(
+            affirmative_text,
+            (
+                "vídeo",
+                "vídeos",
+                "video",
+                "videos",
+            ),
+        ),
+        "technical_report": _editor_text_has_any(
+            affirmative_text,
+            (
+                "laudo técnico",
+                "laudo tecnico",
+                "relatório técnico",
+                "relatorio tecnico",
+            ),
+        ),
+    }
+
+
 def _detect_delivery_delay_editor_details(
     normalized_text: str,
 ) -> dict[str, bool]:
@@ -3369,6 +3506,9 @@ def _build_editor_all_blocks_action_specialization(
         normalized
     )
     negative_listing_details = _detect_negative_listing_editor_details(
+        normalized
+    )
+    warranty_failure_details = _detect_warranty_failure_editor_details(
         normalized
     )
     service_not_rendered_details = (
@@ -3823,6 +3963,7 @@ def _build_editor_all_blocks_action_specialization(
         has_banking_fraud = consumer_scopes["banking_fraud"]
         has_wrongful_charge = consumer_scopes["wrongful_charge"]
         has_negative_listing = consumer_scopes["negative_listing"]
+        has_warranty_failure = consumer_scopes["warranty_failure"]
         has_defective_product = consumer_scopes["defective_product"]
         has_defective_service = consumer_scopes["defective_service"]
         has_service_not_rendered = consumer_scopes["service_not_rendered"]
@@ -3970,6 +4111,60 @@ def _build_editor_all_blocks_action_specialization(
             request_parts.append(
                 "Requer-se a retirada ou suspensão da anotação indevida, a declaração de inexistência do débito quando cabível "
                 "e a exibição dos documentos que originaram a inscrição."
+            )
+
+        if has_warranty_failure:
+            warranty_foundation_items = [
+                "a falha de garantia relatada",
+            ]
+
+            if warranty_failure_details["invoice"]:
+                warranty_foundation_items.append("a nota fiscal")
+            if warranty_failure_details["warranty_certificate"]:
+                warranty_foundation_items.append(
+                    "o certificado de garantia"
+                )
+            if warranty_failure_details["service_orders"]:
+                warranty_foundation_items.append(
+                    "as ordens de serviço"
+                )
+            if warranty_failure_details["technical_assistance"]:
+                warranty_foundation_items.append(
+                    "os atendimentos da assistência técnica"
+                )
+            if warranty_failure_details["repair_attempt_records"]:
+                warranty_foundation_items.append(
+                    "a tentativa de reparo informada"
+                )
+            if warranty_failure_details["protocols"]:
+                warranty_foundation_items.append(
+                    "os protocolos de atendimento"
+                )
+            if warranty_failure_details["messages"]:
+                warranty_foundation_items.append(
+                    "as mensagens disponíveis"
+                )
+            if warranty_failure_details["photos"]:
+                warranty_foundation_items.append("as fotografias")
+            if warranty_failure_details["videos"]:
+                warranty_foundation_items.append("os vídeos")
+            if warranty_failure_details["technical_report"]:
+                warranty_foundation_items.append(
+                    "o laudo técnico informado"
+                )
+
+            foundation_parts.append(
+                "Devem ser examinados "
+                + ", ".join(warranty_foundation_items)
+                + ", a atuação do fornecedor após o acionamento da garantia "
+                "e a efetiva solução do defeito, somente nos limites dos "
+                "fatos e documentos efetivamente informados."
+            )
+            request_parts.append(
+                "Requer-se o cumprimento adequado da garantia, mediante a "
+                "medida juridicamente cabível e sustentada pela prova, "
+                "limitada aos fatos, documentos e providências efetivamente "
+                "informados no caso."
             )
 
         if has_defective_product:
@@ -4308,6 +4503,7 @@ def _build_editor_all_blocks_action_specialization(
                 has_banking_fraud,
                 has_wrongful_charge,
                 has_negative_listing,
+                has_warranty_failure,
                 has_defective_product,
                 has_defective_service,
                 has_service_not_rendered,
@@ -4851,6 +5047,11 @@ def _editor_all_blocks_ready_response(
                 consumer_evidence_normalized
             )
         )
+        warranty_failure_evidence_details = (
+            _detect_warranty_failure_editor_details(
+                consumer_evidence_normalized
+            )
+        )
         service_not_rendered_evidence_details = (
             _detect_service_not_rendered_editor_details(
                 consumer_evidence_normalized
@@ -5038,6 +5239,49 @@ def _editor_all_blocks_ready_response(
                 "Para a negativação, devem ser preservados e examinados somente os elementos "
                 "efetivamente informados no caso: "
                 f"{negative_listing_evidence_text}."
+            )
+
+        if consumer_evidence_scopes["warranty_failure"]:
+            warranty_evidence_items = []
+
+            if warranty_failure_evidence_details["invoice"]:
+                warranty_evidence_items.append("nota fiscal")
+            if warranty_failure_evidence_details["warranty_certificate"]:
+                warranty_evidence_items.append(
+                    "certificado de garantia"
+                )
+            if warranty_failure_evidence_details["service_orders"]:
+                warranty_evidence_items.append("ordens de serviço")
+            if warranty_failure_evidence_details["technical_assistance"]:
+                warranty_evidence_items.append(
+                    "registros da assistência técnica"
+                )
+            if warranty_failure_evidence_details["repair_attempt_records"]:
+                warranty_evidence_items.append(
+                    "registros da tentativa de reparo"
+                )
+            if warranty_failure_evidence_details["protocols"]:
+                warranty_evidence_items.append("protocolos")
+            if warranty_failure_evidence_details["messages"]:
+                warranty_evidence_items.append("mensagens")
+            if warranty_failure_evidence_details["photos"]:
+                warranty_evidence_items.append("fotografias")
+            if warranty_failure_evidence_details["videos"]:
+                warranty_evidence_items.append("vídeos")
+            if warranty_failure_evidence_details["technical_report"]:
+                warranty_evidence_items.append("laudo técnico")
+
+            if not warranty_evidence_items:
+                warranty_evidence_items.append(
+                    "elementos efetivamente disponíveis sobre a falha "
+                    "de garantia"
+                )
+
+            evidence_parts.append(
+                "Para a falha de garantia, devem ser preservados e examinados "
+                "somente os elementos efetivamente informados no caso: "
+                + ", ".join(warranty_evidence_items)
+                + "."
             )
 
         if consumer_evidence_scopes["defective_product"]:
@@ -5268,6 +5512,7 @@ def _editor_all_blocks_ready_response(
                 consumer_evidence_scopes["banking_fraud"],
                 consumer_evidence_scopes["wrongful_charge"],
                 consumer_evidence_scopes["negative_listing"],
+                consumer_evidence_scopes["warranty_failure"],
                 consumer_evidence_scopes["defective_product"],
                 consumer_evidence_scopes["defective_service"],
                 consumer_evidence_scopes["service_not_rendered"],
