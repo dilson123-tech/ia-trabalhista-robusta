@@ -4174,6 +4174,134 @@ def test_editor_all_blocks_ready_consumer_delivery_delay_does_not_infer_unreport
     assert "pedido de reembolso" not in provas
 
 
+def test_editor_all_blocks_ready_consumer_warranty_failure_is_separate_from_defective_product_scope():
+    response = _consumer_scope_ready_response(
+        "CONS-GARANTIA-FALHA-001",
+        "Garantia acionada e defeito não solucionado",
+        "Ação consumerista por falha de garantia",
+        (
+            "A consumidora comprou um eletrodoméstico que apresentou defeito durante a garantia. "
+            "Acionou a garantia e a assistência técnica, mas o defeito persistiu após a tentativa "
+            "de reparo. Possui nota fiscal, certificado de garantia, ordens de serviço, protocolos, "
+            "mensagens, fotografias e vídeos. Pretende o cumprimento adequado da garantia, sem "
+            "inventar laudo técnico, nova tentativa de reparo, substituição do produto, restituição "
+            "do preço, abatimento proporcional, danos, urgência, datas, valores ou documentos "
+            "não informados."
+        ),
+    )
+
+    fundamentacao = _consumer_scope_block(
+        response,
+        "BLOCO 4 — Fundamentação preliminar",
+        "BLOCO 5 — Pedidos",
+    )
+    pedidos = _consumer_scope_block(
+        response,
+        "BLOCO 5 — Pedidos",
+        "BLOCO 6 — Provas e requerimentos",
+    )
+    provas = _consumer_scope_block(
+        response,
+        "BLOCO 6 — Provas e requerimentos",
+        "BLOCO 7 — Fechamento e conferência final",
+    )
+
+    assert response["metadata"]["action_specialization_kind"] == (
+        "consumer_universal_action_scope_claim"
+    )
+
+    assert "falha de garantia relatada" in fundamentacao
+    assert "nota fiscal" in fundamentacao
+    assert "certificado de garantia" in fundamentacao
+    assert "ordens de serviço" in fundamentacao
+    assert "protocolos" in fundamentacao
+    assert "mensagens" in fundamentacao
+    assert "fotografias" in fundamentacao
+    assert "vídeos" in fundamentacao
+    assert "tentativa de reparo" in fundamentacao
+    assert "oferta" not in fundamentacao
+    assert "finalidade anunciada" not in fundamentacao
+
+    assert "cumprimento adequado da garantia" in pedidos
+    assert "substituição do produto" not in pedidos
+    assert "restituição do preço" not in pedidos
+    assert "abatimento proporcional" not in pedidos
+    assert "medida contratual compatível" not in pedidos
+
+    assert "nota fiscal" in provas
+    assert "certificado de garantia" in provas
+    assert "ordens de serviço" in provas
+    assert "protocolos" in provas
+    assert "mensagens" in provas
+    assert "fotografias" in provas
+    assert "vídeos" in provas
+    assert "registros da tentativa de reparo" in provas
+    assert "laudo técnico" not in provas
+    assert "manual" not in provas
+    assert "oferta" not in provas
+    assert "próprio produto" not in provas
+
+
+def test_editor_all_blocks_ready_consumer_warranty_failure_does_not_infer_unreported_documents_or_remedies():
+    response = _consumer_scope_ready_response(
+        "CONS-GARANTIA-FALHA-MINIMO-001",
+        "Falha não solucionada durante a garantia",
+        "Ação consumerista por falha de garantia",
+        (
+            "O consumidor relata que o produto apresentou defeito durante a garantia e que o "
+            "fornecedor não solucionou a falha. Pretende a análise das medidas juridicamente "
+            "cabíveis, sem inventar nota fiscal, certificado de garantia, ordem de serviço, "
+            "assistência técnica, tentativa de reparo, protocolos, mensagens, fotografias, vídeos, "
+            "laudo técnico, substituição, restituição, abatimento, danos, datas ou valores."
+        ),
+    )
+
+    fundamentacao = _consumer_scope_block(
+        response,
+        "BLOCO 4 — Fundamentação preliminar",
+        "BLOCO 5 — Pedidos",
+    )
+    pedidos = _consumer_scope_block(
+        response,
+        "BLOCO 5 — Pedidos",
+        "BLOCO 6 — Provas e requerimentos",
+    )
+    provas = _consumer_scope_block(
+        response,
+        "BLOCO 6 — Provas e requerimentos",
+        "BLOCO 7 — Fechamento e conferência final",
+    )
+
+    assert "falha de garantia relatada" in fundamentacao
+    assert "nota fiscal" not in fundamentacao
+    assert "certificado de garantia" not in fundamentacao
+    assert "ordens de serviço" not in fundamentacao
+    assert "assistência técnica" not in fundamentacao
+    assert "tentativa de reparo" not in fundamentacao
+    assert "protocolos" not in fundamentacao
+    assert "mensagens" not in fundamentacao
+    assert "fotografias" not in fundamentacao
+    assert "vídeos" not in fundamentacao
+
+    assert "cumprimento adequado da garantia" in pedidos
+    assert "substituição do produto" not in pedidos
+    assert "restituição do preço" not in pedidos
+    assert "abatimento proporcional" not in pedidos
+    assert "medida contratual compatível" not in pedidos
+
+    assert "elementos efetivamente disponíveis sobre a falha de garantia" in provas
+    assert "nota fiscal" not in provas
+    assert "certificado de garantia" not in provas
+    assert "ordens de serviço" not in provas
+    assert "assistência técnica" not in provas
+    assert "registros da tentativa de reparo" not in provas
+    assert "protocolos" not in provas
+    assert "mensagens" not in provas
+    assert "fotografias" not in provas
+    assert "vídeos" not in provas
+    assert "laudo técnico" not in provas
+
+
 def test_editor_all_blocks_ready_consumer_service_not_rendered_is_separate_from_defective_service():
     response = _consumer_scope_ready_response(
         "CONS-SERVICO-NAO-PRESTADO-001",
