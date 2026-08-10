@@ -4302,6 +4302,136 @@ def test_editor_all_blocks_ready_consumer_warranty_failure_does_not_infer_unrepo
     assert "laudo técnico" not in provas
 
 
+def test_editor_all_blocks_ready_consumer_telecom_is_separate_from_defective_service():
+    response = _consumer_scope_ready_response(
+        "CONS-TELECOM-001",
+        "Falha persistente em serviço de telefonia e internet",
+        "Ação consumerista por falha em serviço de telecomunicações",
+        (
+            "A consumidora relata falha na prestação do serviço de telefonia e internet banda larga, "
+            "com quedas de sinal e períodos de internet indisponível. Possui contrato do plano, "
+            "faturas, protocolos, mensagens, testes de velocidade e registros de suporte técnico. "
+            "Também solicitou portabilidade. Pretende a regularização adequada do serviço e a análise "
+            "do pedido de portabilidade, sem inventar ordem de serviço, comprovante de pagamento, "
+            "cancelamento, restituição, danos, urgência, datas, valores ou outros documentos."
+        ),
+    )
+
+    fundamentacao = _consumer_scope_block(
+        response,
+        "BLOCO 4 — Fundamentação preliminar",
+        "BLOCO 5 — Pedidos",
+    )
+    pedidos = _consumer_scope_block(
+        response,
+        "BLOCO 5 — Pedidos",
+        "BLOCO 6 — Provas e requerimentos",
+    )
+    provas = _consumer_scope_block(
+        response,
+        "BLOCO 6 — Provas e requerimentos",
+        "BLOCO 7 — Fechamento e conferência final",
+    )
+
+    assert response["metadata"]["action_specialization_kind"] == (
+        "consumer_universal_action_scope_claim"
+    )
+
+    assert "falha no serviço de telecomunicações relatada" in fundamentacao
+    assert "contrato ou plano informado" in fundamentacao
+    assert "faturas informadas" in fundamentacao
+    assert "protocolos de atendimento" in fundamentacao
+    assert "mensagens disponíveis" in fundamentacao
+    assert "registros da falha ou interrupção do serviço" in fundamentacao
+    assert "testes ou medições de velocidade" in fundamentacao
+    assert "registros de suporte ou atendimento técnico" in fundamentacao
+    assert "pedido de portabilidade informado" in fundamentacao
+    assert "resultado prometido" not in fundamentacao
+    assert "tentativas de correção" not in fundamentacao
+
+    assert "regularização adequada do serviço de telecomunicações" in pedidos
+    assert "pedido de portabilidade expressamente informado" in pedidos
+    assert "refazimento adequado do serviço" not in pedidos
+    assert "restituição dos valores incompatíveis" not in pedidos
+
+    assert "contrato ou registro do plano contratado" in provas
+    assert "faturas" in provas
+    assert "protocolos" in provas
+    assert "mensagens" in provas
+    assert "registros da falha ou interrupção do serviço" in provas
+    assert "testes ou medições de velocidade" in provas
+    assert "registros de suporte ou atendimento técnico" in provas
+    assert "registro do pedido de portabilidade" in provas
+    assert "ordem de serviço" not in provas
+    assert "comprovantes de pagamento" not in provas
+    assert "registros do resultado prometido" not in provas
+    assert "evidências da execução" not in provas
+    assert "tentativas de correção" not in provas
+
+
+def test_editor_all_blocks_ready_consumer_telecom_does_not_infer_unreported_documents_or_remedies():
+    response = _consumer_scope_ready_response(
+        "CONS-TELECOM-MINIMO-001",
+        "Falha em serviço de telefonia",
+        "Ação consumerista por falha em serviço de telecomunicações",
+        (
+            "O consumidor relata falha na prestação do serviço de telefonia e informa que a prestadora "
+            "não solucionou o problema. Pretende a análise das medidas juridicamente cabíveis, sem "
+            "inventar contrato, plano, faturas, protocolos, mensagens, registros de interrupção, "
+            "testes de velocidade, suporte técnico, portabilidade, cancelamento, restituição, danos, "
+            "urgência, datas ou valores."
+        ),
+    )
+
+    fundamentacao = _consumer_scope_block(
+        response,
+        "BLOCO 4 — Fundamentação preliminar",
+        "BLOCO 5 — Pedidos",
+    )
+    pedidos = _consumer_scope_block(
+        response,
+        "BLOCO 5 — Pedidos",
+        "BLOCO 6 — Provas e requerimentos",
+    )
+    provas = _consumer_scope_block(
+        response,
+        "BLOCO 6 — Provas e requerimentos",
+        "BLOCO 7 — Fechamento e conferência final",
+    )
+
+    assert "falha no serviço de telecomunicações relatada" in fundamentacao
+    assert "contrato ou plano informado" not in fundamentacao
+    assert "faturas informadas" not in fundamentacao
+    assert "protocolos de atendimento" not in fundamentacao
+    assert "mensagens disponíveis" not in fundamentacao
+    assert "registros da falha ou interrupção do serviço" not in fundamentacao
+    assert "testes ou medições de velocidade" not in fundamentacao
+    assert "registros de suporte ou atendimento técnico" not in fundamentacao
+    assert "pedido de portabilidade informado" not in fundamentacao
+    assert "resultado prometido" not in fundamentacao
+    assert "tentativas de correção" not in fundamentacao
+
+    assert "regularização adequada do serviço de telecomunicações" in pedidos
+    assert "pedido de portabilidade expressamente informado" not in pedidos
+    assert "refazimento adequado do serviço" not in pedidos
+    assert "restituição dos valores incompatíveis" not in pedidos
+
+    assert (
+        "elementos efetivamente disponíveis sobre a falha no serviço de telecomunicações"
+        in provas
+    )
+    assert "contrato ou registro do plano contratado" not in provas
+    assert "faturas" not in provas
+    assert "protocolos" not in provas
+    assert "mensagens" not in provas
+    assert "registros da falha ou interrupção do serviço" not in provas
+    assert "testes ou medições de velocidade" not in provas
+    assert "registros de suporte ou atendimento técnico" not in provas
+    assert "registro do pedido de portabilidade" not in provas
+    assert "ordem de serviço" not in provas
+    assert "comprovantes de pagamento" not in provas
+
+
 def test_editor_all_blocks_ready_consumer_service_not_rendered_is_separate_from_defective_service():
     response = _consumer_scope_ready_response(
         "CONS-SERVICO-NAO-PRESTADO-001",
