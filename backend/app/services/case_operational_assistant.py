@@ -2369,6 +2369,24 @@ def _detect_consumer_editor_scopes(normalized_text: str) -> dict[str, bool]:
         "produto não foi reparado em garantia",
         "produto nao foi reparado em garantia",
     )
+    telecom_markers = (
+        "telefonia",
+        "telecomunicações",
+        "telecomunicacoes",
+        "operadora de telefonia",
+        "serviço de telefonia",
+        "servico de telefonia",
+        "linha telefônica",
+        "linha telefonica",
+        "telefonia móvel",
+        "telefonia movel",
+        "internet móvel",
+        "internet movel",
+        "banda larga",
+        "serviço de internet",
+        "servico de internet",
+        "portabilidade",
+    )
     defective_service_markers = (
         "serviço defeituoso",
         "servico defeituoso",
@@ -2526,8 +2544,11 @@ def _detect_consumer_editor_scopes(normalized_text: str) -> dict[str, bool]:
             normalized_text,
             warranty_failure_markers,
         ),
+        "telecom": is_consumer
+        and _editor_text_has_any(normalized_text, telecom_markers),
         "defective_service": is_consumer
-        and _editor_text_has_any(normalized_text, defective_service_markers),
+        and _editor_text_has_any(normalized_text, defective_service_markers)
+        and not _editor_text_has_any(normalized_text, telecom_markers),
         "service_not_rendered": is_consumer
         and _editor_text_has_any(normalized_text, service_not_rendered_markers),
         "offer_publicity": is_consumer
@@ -3272,6 +3293,117 @@ def _detect_warranty_failure_editor_details(
     }
 
 
+def _detect_telecom_editor_details(
+    normalized_text: str,
+) -> dict[str, bool]:
+    affirmative_text = normalized_text
+    for caution_marker in (
+        "sem inventar",
+        "sem presumir",
+    ):
+        affirmative_text = affirmative_text.split(
+            caution_marker,
+            1,
+        )[0]
+
+    return {
+        "contract_or_plan": _editor_text_has_any(
+            affirmative_text,
+            (
+                "possui contrato",
+                "há contrato",
+                "ha contrato",
+                "contrato de telefonia",
+                "contrato do plano",
+                "plano contratado",
+                "plano de telefonia",
+                "plano de internet",
+            ),
+        ),
+        "invoices": _editor_text_has_any(
+            affirmative_text,
+            (
+                "possui fatura",
+                "possui faturas",
+                "fatura",
+                "faturas",
+                "fatura disponível",
+                "fatura disponivel",
+                "faturas disponíveis",
+                "faturas disponiveis",
+                "conta telefônica",
+                "conta telefonica",
+                "contas da operadora",
+            ),
+        ),
+        "protocols": _editor_text_has_any(
+            affirmative_text,
+            (
+                "protocolo",
+                "protocolos",
+            ),
+        ),
+        "messages": _editor_text_has_any(
+            affirmative_text,
+            (
+                "mensagem",
+                "mensagens",
+            ),
+        ),
+        "service_failure_records": _editor_text_has_any(
+            affirmative_text,
+            (
+                "interrupção do serviço",
+                "interrupcao do servico",
+                "serviço interrompido",
+                "servico interrompido",
+                "sem sinal",
+                "queda de sinal",
+                "falha de sinal",
+                "internet sem funcionar",
+                "internet indisponível",
+                "internet indisponivel",
+                "serviço indisponível",
+                "servico indisponivel",
+            ),
+        ),
+        "speed_tests": _editor_text_has_any(
+            affirmative_text,
+            (
+                "teste de velocidade",
+                "testes de velocidade",
+                "medição de velocidade",
+                "medicao de velocidade",
+                "medições de velocidade",
+                "medicoes de velocidade",
+            ),
+        ),
+        "technical_support": _editor_text_has_any(
+            affirmative_text,
+            (
+                "atendimento técnico",
+                "atendimento tecnico",
+                "suporte técnico",
+                "suporte tecnico",
+                "visita técnica",
+                "visita tecnica",
+                "visitas técnicas",
+                "visitas tecnicas",
+            ),
+        ),
+        "portability_request": _editor_text_has_any(
+            affirmative_text,
+            (
+                "pedido de portabilidade",
+                "solicitou portabilidade",
+                "solicitação de portabilidade",
+                "solicitacao de portabilidade",
+                "portabilidade solicitada",
+            ),
+        ),
+    }
+
+
 def _detect_delivery_delay_editor_details(
     normalized_text: str,
 ) -> dict[str, bool]:
@@ -3511,6 +3643,7 @@ def _build_editor_all_blocks_action_specialization(
     warranty_failure_details = _detect_warranty_failure_editor_details(
         normalized
     )
+    telecom_details = _detect_telecom_editor_details(normalized)
     service_not_rendered_details = (
         _detect_service_not_rendered_editor_details(normalized)
     )
@@ -3964,6 +4097,7 @@ def _build_editor_all_blocks_action_specialization(
         has_wrongful_charge = consumer_scopes["wrongful_charge"]
         has_negative_listing = consumer_scopes["negative_listing"]
         has_warranty_failure = consumer_scopes["warranty_failure"]
+        has_telecom = consumer_scopes["telecom"]
         has_defective_product = consumer_scopes["defective_product"]
         has_defective_service = consumer_scopes["defective_service"]
         has_service_not_rendered = consumer_scopes["service_not_rendered"]
@@ -4166,6 +4300,65 @@ def _build_editor_all_blocks_action_specialization(
                 "limitada aos fatos, documentos e providências efetivamente "
                 "informados no caso."
             )
+
+        if has_telecom:
+            telecom_foundation_items = [
+                "a falha no serviço de telecomunicações relatada",
+            ]
+
+            if telecom_details["contract_or_plan"]:
+                telecom_foundation_items.append(
+                    "o contrato ou plano informado"
+                )
+            if telecom_details["invoices"]:
+                telecom_foundation_items.append(
+                    "as faturas informadas"
+                )
+            if telecom_details["protocols"]:
+                telecom_foundation_items.append(
+                    "os protocolos de atendimento"
+                )
+            if telecom_details["messages"]:
+                telecom_foundation_items.append(
+                    "as mensagens disponíveis"
+                )
+            if telecom_details["service_failure_records"]:
+                telecom_foundation_items.append(
+                    "os registros da falha ou interrupção do serviço"
+                )
+            if telecom_details["speed_tests"]:
+                telecom_foundation_items.append(
+                    "os testes ou medições de velocidade"
+                )
+            if telecom_details["technical_support"]:
+                telecom_foundation_items.append(
+                    "os registros de suporte ou atendimento técnico"
+                )
+            if telecom_details["portability_request"]:
+                telecom_foundation_items.append(
+                    "o pedido de portabilidade informado"
+                )
+
+            foundation_parts.append(
+                "Devem ser examinados "
+                + ", ".join(telecom_foundation_items)
+                + ", a atuação da prestadora e a efetiva adequação do serviço, "
+                "somente nos limites dos fatos e documentos efetivamente informados."
+            )
+
+            telecom_request = (
+                "Requer-se a adoção da medida juridicamente cabível para a "
+                "regularização adequada do serviço de telecomunicações, "
+                "limitada aos fatos, documentos e providências efetivamente "
+                "informados no caso"
+            )
+
+            if telecom_details["portability_request"]:
+                telecom_request += (
+                    ", inclusive quanto ao pedido de portabilidade expressamente informado"
+                )
+
+            request_parts.append(telecom_request + ".")
 
         if has_defective_product:
             foundation_parts.append(
@@ -4504,6 +4697,7 @@ def _build_editor_all_blocks_action_specialization(
                 has_wrongful_charge,
                 has_negative_listing,
                 has_warranty_failure,
+                has_telecom,
                 has_defective_product,
                 has_defective_service,
                 has_service_not_rendered,
@@ -5052,6 +5246,9 @@ def _editor_all_blocks_ready_response(
                 consumer_evidence_normalized
             )
         )
+        telecom_evidence_details = _detect_telecom_editor_details(
+            consumer_evidence_normalized
+        )
         service_not_rendered_evidence_details = (
             _detect_service_not_rendered_editor_details(
                 consumer_evidence_normalized
@@ -5284,6 +5481,50 @@ def _editor_all_blocks_ready_response(
                 + "."
             )
 
+        if consumer_evidence_scopes["telecom"]:
+            telecom_evidence_items = []
+
+            if telecom_evidence_details["contract_or_plan"]:
+                telecom_evidence_items.append(
+                    "contrato ou registro do plano contratado"
+                )
+            if telecom_evidence_details["invoices"]:
+                telecom_evidence_items.append("faturas")
+            if telecom_evidence_details["protocols"]:
+                telecom_evidence_items.append("protocolos")
+            if telecom_evidence_details["messages"]:
+                telecom_evidence_items.append("mensagens")
+            if telecom_evidence_details["service_failure_records"]:
+                telecom_evidence_items.append(
+                    "registros da falha ou interrupção do serviço"
+                )
+            if telecom_evidence_details["speed_tests"]:
+                telecom_evidence_items.append(
+                    "testes ou medições de velocidade"
+                )
+            if telecom_evidence_details["technical_support"]:
+                telecom_evidence_items.append(
+                    "registros de suporte ou atendimento técnico"
+                )
+            if telecom_evidence_details["portability_request"]:
+                telecom_evidence_items.append(
+                    "registro do pedido de portabilidade"
+                )
+
+            if not telecom_evidence_items:
+                telecom_evidence_items.append(
+                    "elementos efetivamente disponíveis sobre a falha "
+                    "no serviço de telecomunicações"
+                )
+
+            evidence_parts.append(
+                "Para a falha no serviço de telecomunicações, devem ser "
+                "preservados e examinados somente os elementos efetivamente "
+                "informados no caso: "
+                + ", ".join(telecom_evidence_items)
+                + "."
+            )
+
         if consumer_evidence_scopes["defective_product"]:
             evidence_parts.append(
                 "Para produto defeituoso ou com vício, devem ser juntados nota fiscal, certificado de garantia, oferta, manual, fotografias, vídeos, "
@@ -5513,6 +5754,7 @@ def _editor_all_blocks_ready_response(
                 consumer_evidence_scopes["wrongful_charge"],
                 consumer_evidence_scopes["negative_listing"],
                 consumer_evidence_scopes["warranty_failure"],
+                consumer_evidence_scopes["telecom"],
                 consumer_evidence_scopes["defective_product"],
                 consumer_evidence_scopes["defective_service"],
                 consumer_evidence_scopes["service_not_rendered"],
