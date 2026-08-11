@@ -302,6 +302,8 @@ A `v0.2.44` separou falha de garantia da rota geral de produto defeituoso ou com
 
 A `v0.2.45` criou especialização própria para falha em serviços de telecomunicações, separada da rota genérica de serviço defeituoso. A entrega passou a tratar contrato ou plano, faturas, protocolos, mensagens, registros de falha ou interrupção, testes de velocidade, suporte técnico e portabilidade somente quando efetivamente informados, com fundamentação, pedido e provas condicionais. Os cenários completo e mínimo foram validados em navegador sem presumir documentos, cancelamento, restituição, danos, urgência, datas, valores ou providências não relatadas.
 
+A `v0.2.46` criou especialização própria para falha no fornecimento de energia elétrica, separada das rotas genéricas de serviço defeituoso e serviço não prestado. A entrega passou a tratar unidade consumidora, faturas, protocolos, mensagens, registros de interrupção, medidor, vistoria técnica, aviso de corte e religação somente quando efetivamente informados, com fundamentação, pedido e provas condicionais. Os cenários completo e mínimo foram validados em navegador sem presumir documentos, cobrança indevida, negativação, restituição, danos, urgência, datas, valores ou providências não relatadas. A detecção de energia elétrica, cobrança indevida e negativação também passou a desconsiderar ocorrências presentes apenas após cláusulas de cautela como `sem inventar` ou `sem presumir`.
+
 A área possui especialização transversal de endereçamento, qualificação, fundamentação, pedidos e provas nos escopos prioritários. As rotas bancárias prioritárias possuem validação combinada e isolada. Permanecem parciais os subtipos consumeristas ainda genéricos.
 
 | Tipo de ação ou tema | Operacional / checklist | Editor especializado | Status geral | Entregas principais | Lacuna atual |
@@ -323,7 +325,7 @@ A área possui especialização transversal de endereçamento, qualificação, f
 | Atraso na entrega | ✅ | ✅ | ✅ | `v0.2.34`, `v0.2.36`, `v0.2.37`, `v0.2.43` | Validação real concluída nos cenários completo e mínimo; documentos, tentativas, entrega parcial, cancelamento, reembolso e danos somente quando efetivamente informados |
 | Falha de garantia | ✅ | ✅ | ✅ | `v0.2.34`, `v0.2.36`, `v0.2.37`, `v0.2.38`, `v0.2.44` | Validação real concluída nos cenários completo e mínimo; documentos, reparos, soluções, danos e urgência somente quando efetivamente informados |
 | Telefonia                                         |                       ✅ |                    ✅ |            ✅ | `v0.2.45`                                                                  | Validação real concluída nos cenários completo e mínimo; contrato, plano, faturas, protocolos, registros de falha, testes, suporte, portabilidade, danos e demais medidas somente quando efetivamente informados |
-| Energia elétrica | 🟡 | 🔴 | 🟡 | Base geral de consumo | Criar especialização quando priorizada |
+| Energia elétrica | ✅ | ✅ | ✅ | `v0.2.46` | Validação real concluída nos cenários completo e mínimo; unidade consumidora, faturas, protocolos, interrupção, medidor, vistoria, aviso de corte, religação, cobrança, negativação, danos e demais medidas somente quando efetivamente informados |
 | Seguro | 🔴 | 🔴 | 🔴 | Sem entrega específica | Criar cobertura contratual própria |
 | Turismo, companhia aérea ou hospedagem | 🔴 | 🔴 | 🔴 | Sem entrega específica | Criar pacote próprio |
 | Superendividamento | 🔴 | 🔴 | 🔴 | Sem entrega específica | Exige fluxo próprio e cautelas específicas |
@@ -332,13 +334,13 @@ A área possui especialização transversal de endereçamento, qualificação, f
 
 #### Próximo pacote recomendado
 
-A `v0.2.45` concluiu a especialização e a validação real de telefonia, preservando a rota geral de serviço defeituoso para os casos que não pertençam ao escopo específico de telecomunicações.
+A `v0.2.46` concluiu a especialização e a validação real de energia elétrica, preservando as rotas genéricas de serviço defeituoso e serviço não prestado para os casos que não pertençam ao escopo específico de fornecimento de energia.
 
 Próximos ciclos recomendados:
 
-1. criar especialização própria para energia elétrica;
-2. preservar as regressões que impedem documentos, cancelamento, restituição, danos, urgência, portabilidade e outras medidas não informadas;
-3. manter telefonia isolada da rota genérica de serviço defeituoso.
+1. criar especialização consumerista própria para seguro;
+2. preservar as regressões que impedem documentos, cobrança, negativação, restituição, danos, urgência, religação e outras medidas não informadas;
+3. manter telefonia e energia elétrica isoladas das rotas genéricas incompatíveis.
 
 ---
 
@@ -550,7 +552,6 @@ A prioridade deve considerar ganho jurídico, fechamento de lacunas existentes e
 
 1. Provas específicas de horas extras e intervalo.
 2. Provas, partes e endereçamento da cobrança contratual.
-3. Especialização consumerista de energia elétrica.
 
 ### Prioridade 2 — transformar módulos operacionais em Editor especializado
 
@@ -578,12 +579,11 @@ A prioridade deve considerar ganho jurídico, fechamento de lacunas existentes e
 ### Prioridade 5 — novas famílias consumeristas e cíveis
 
 1. Seguro.
-2. Energia elétrica.
-3. Turismo.
-4. Superendividamento.
-5. Dados pessoais e LGPD.
-6. Possessório e imobiliário.
-7. Sucessões.
+2. Turismo.
+3. Superendividamento.
+4. Dados pessoais e LGPD.
+5. Possessório e imobiliário.
+6. Sucessões.
 
 ---
 
@@ -689,6 +689,7 @@ A matriz antiga em `docs/LEGAL_MODULE_COVERAGE_MATRIX_V1.md` não deve ser apaga
 | 2026-08-05 | `v0.2.43` | Especialização de atraso ou falha de entrega, com fundamentação, pedido e provas condicionais, isolamento do fallback contratual e validação real dos cenários completo e mínimo |
 | 2026-08-05 | `v0.2.44` | Especialização de falha de garantia, com fundamentação, pedido e provas condicionais, isolamento da rota geral de produto defeituoso e validação real dos cenários completo e mínimo |
 | 2026-08-10 | `v0.2.45` | Especialização de telefonia e telecomunicações, com fundamentação, pedido e provas condicionais, isolamento da rota geral de serviço defeituoso e validação real dos cenários completo e mínimo |
+| 2026-08-10 | `v0.2.46` | Especialização de energia elétrica, com fundamentação, pedido e provas condicionais, isolamento das rotas genéricas de serviço defeituoso e serviço não prestado, proteção contra falsos escopos em cláusulas negativas e validação real dos cenários completo e mínimo |
 
 A cada nova tag jurídica:
 
