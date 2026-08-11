@@ -2387,6 +2387,21 @@ def _detect_consumer_editor_scopes(normalized_text: str) -> dict[str, bool]:
         "servico de internet",
         "portabilidade",
     )
+    electricity_markers = (
+        "energia elétrica",
+        "energia eletrica",
+        "fornecimento de energia elétrica",
+        "fornecimento de energia eletrica",
+        "fornecimento de energia",
+        "serviço de energia elétrica",
+        "servico de energia eletrica",
+        "concessionária de energia",
+        "concessionaria de energia",
+        "unidade consumidora",
+        "conta de luz",
+        "religação",
+        "religacao",
+    )
     defective_service_markers = (
         "serviço defeituoso",
         "servico defeituoso",
@@ -2528,14 +2543,30 @@ def _detect_consumer_editor_scopes(normalized_text: str) -> dict[str, bool]:
         consumer_context_markers,
     )
 
+    affirmative_scope_text = normalized_text
+    for caution_marker in (
+        "sem inventar",
+        "sem presumir",
+    ):
+        affirmative_scope_text = affirmative_scope_text.split(
+            caution_marker,
+            1,
+        )[0]
+
     return {
         "is_consumer": is_consumer,
         "banking_fraud": is_consumer
         and _editor_text_has_any(normalized_text, banking_fraud_markers),
         "wrongful_charge": is_consumer
-        and _editor_text_has_any(normalized_text, wrongful_charge_markers),
+        and _editor_text_has_any(
+            affirmative_scope_text,
+            wrongful_charge_markers,
+        ),
         "negative_listing": is_consumer
-        and _editor_text_has_any(normalized_text, negative_listing_markers),
+        and _editor_text_has_any(
+            affirmative_scope_text,
+            negative_listing_markers,
+        ),
         "warranty_failure": is_consumer
         and _editor_text_has_any(normalized_text, warranty_failure_markers),
         "defective_product": is_consumer
@@ -2546,11 +2577,24 @@ def _detect_consumer_editor_scopes(normalized_text: str) -> dict[str, bool]:
         ),
         "telecom": is_consumer
         and _editor_text_has_any(normalized_text, telecom_markers),
+        "electricity": is_consumer
+        and _editor_text_has_any(
+            affirmative_scope_text,
+            electricity_markers,
+        ),
         "defective_service": is_consumer
         and _editor_text_has_any(normalized_text, defective_service_markers)
-        and not _editor_text_has_any(normalized_text, telecom_markers),
+        and not _editor_text_has_any(normalized_text, telecom_markers)
+        and not _editor_text_has_any(
+            affirmative_scope_text,
+            electricity_markers,
+        ),
         "service_not_rendered": is_consumer
-        and _editor_text_has_any(normalized_text, service_not_rendered_markers),
+        and _editor_text_has_any(normalized_text, service_not_rendered_markers)
+        and not _editor_text_has_any(
+            affirmative_scope_text,
+            electricity_markers,
+        ),
         "offer_publicity": is_consumer
         and _editor_text_has_any(normalized_text, offer_publicity_markers),
         "cancellation_not_respected": is_consumer
@@ -3404,6 +3448,115 @@ def _detect_telecom_editor_details(
     }
 
 
+
+def _detect_electricity_editor_details(
+    normalized_text: str,
+) -> dict[str, bool]:
+    affirmative_text = normalized_text
+    for caution_marker in (
+        "sem inventar",
+        "sem presumir",
+    ):
+        affirmative_text = affirmative_text.split(
+            caution_marker,
+            1,
+        )[0]
+
+    return {
+        "consumer_unit": _editor_text_has_any(
+            affirmative_text,
+            (
+                "unidade consumidora",
+                "identificação da unidade consumidora",
+                "identificacao da unidade consumidora",
+                "número da unidade consumidora",
+                "numero da unidade consumidora",
+            ),
+        ),
+        "invoices": _editor_text_has_any(
+            affirmative_text,
+            (
+                "fatura",
+                "faturas",
+                "conta de luz",
+                "contas de luz",
+                "conta de energia",
+                "contas de energia",
+            ),
+        ),
+        "protocols": _editor_text_has_any(
+            affirmative_text,
+            (
+                "protocolo",
+                "protocolos",
+            ),
+        ),
+        "messages": _editor_text_has_any(
+            affirmative_text,
+            (
+                "mensagem",
+                "mensagens",
+            ),
+        ),
+        "interruption_records": _editor_text_has_any(
+            affirmative_text,
+            (
+                "registro da interrupção",
+                "registro da interrupcao",
+                "registros da interrupção",
+                "registros da interrupcao",
+                "registro de interrupção",
+                "registro de interrupcao",
+                "registros de interrupção",
+                "registros de interrupcao",
+            ),
+        ),
+        "meter_records": _editor_text_has_any(
+            affirmative_text,
+            (
+                "fotografia do medidor",
+                "fotografias do medidor",
+                "foto do medidor",
+                "fotos do medidor",
+                "registro do medidor",
+                "registros do medidor",
+            ),
+        ),
+        "technical_inspection": _editor_text_has_any(
+            affirmative_text,
+            (
+                "relatório de vistoria técnica",
+                "relatorio de vistoria tecnica",
+                "registro de vistoria técnica",
+                "registro de vistoria tecnica",
+                "vistoria técnica",
+                "vistoria tecnica",
+            ),
+        ),
+        "cut_notice": _editor_text_has_any(
+            affirmative_text,
+            (
+                "aviso de corte",
+                "notificação de corte",
+                "notificacao de corte",
+            ),
+        ),
+        "reconnection_request": _editor_text_has_any(
+            affirmative_text,
+            (
+                "pedido de religação",
+                "pedido de religacao",
+                "solicitou religação",
+                "solicitou religacao",
+                "solicitação de religação",
+                "solicitacao de religacao",
+                "religação solicitada",
+                "religacao solicitada",
+            ),
+        ),
+    }
+
+
 def _detect_delivery_delay_editor_details(
     normalized_text: str,
 ) -> dict[str, bool]:
@@ -3644,6 +3797,7 @@ def _build_editor_all_blocks_action_specialization(
         normalized
     )
     telecom_details = _detect_telecom_editor_details(normalized)
+    electricity_details = _detect_electricity_editor_details(normalized)
     service_not_rendered_details = (
         _detect_service_not_rendered_editor_details(normalized)
     )
@@ -4098,6 +4252,7 @@ def _build_editor_all_blocks_action_specialization(
         has_negative_listing = consumer_scopes["negative_listing"]
         has_warranty_failure = consumer_scopes["warranty_failure"]
         has_telecom = consumer_scopes["telecom"]
+        has_electricity = consumer_scopes["electricity"]
         has_defective_product = consumer_scopes["defective_product"]
         has_defective_service = consumer_scopes["defective_service"]
         has_service_not_rendered = consumer_scopes["service_not_rendered"]
@@ -4359,6 +4514,69 @@ def _build_editor_all_blocks_action_specialization(
                 )
 
             request_parts.append(telecom_request + ".")
+
+        if has_electricity:
+            electricity_foundation_items = [
+                "a falha no fornecimento de energia elétrica relatada",
+            ]
+
+            if electricity_details["consumer_unit"]:
+                electricity_foundation_items.append(
+                    "a identificação da unidade consumidora"
+                )
+            if electricity_details["invoices"]:
+                electricity_foundation_items.append(
+                    "as faturas informadas"
+                )
+            if electricity_details["protocols"]:
+                electricity_foundation_items.append(
+                    "os protocolos de atendimento"
+                )
+            if electricity_details["messages"]:
+                electricity_foundation_items.append(
+                    "as mensagens disponíveis"
+                )
+            if electricity_details["interruption_records"]:
+                electricity_foundation_items.append(
+                    "os registros da interrupção do fornecimento"
+                )
+            if electricity_details["meter_records"]:
+                electricity_foundation_items.append(
+                    "as fotografias ou registros do medidor"
+                )
+            if electricity_details["technical_inspection"]:
+                electricity_foundation_items.append(
+                    "o relatório ou registro de vistoria técnica"
+                )
+            if electricity_details["cut_notice"]:
+                electricity_foundation_items.append(
+                    "o aviso de corte informado"
+                )
+            if electricity_details["reconnection_request"]:
+                electricity_foundation_items.append(
+                    "o pedido de religação informado"
+                )
+
+            foundation_parts.append(
+                "Devem ser examinados "
+                + ", ".join(electricity_foundation_items)
+                + ", a atuação da concessionária e a efetiva adequação do fornecimento, "
+                "somente nos limites dos fatos e documentos efetivamente informados."
+            )
+
+            electricity_request = (
+                "Requer-se a adoção da medida juridicamente cabível para a "
+                "regularização adequada do fornecimento de energia elétrica, "
+                "limitada aos fatos, documentos e providências efetivamente "
+                "informados no caso"
+            )
+
+            if electricity_details["reconnection_request"]:
+                electricity_request += (
+                    ", inclusive quanto ao pedido de religação expressamente informado"
+                )
+
+            request_parts.append(electricity_request + ".")
 
         if has_defective_product:
             foundation_parts.append(
@@ -4698,6 +4916,7 @@ def _build_editor_all_blocks_action_specialization(
                 has_negative_listing,
                 has_warranty_failure,
                 has_telecom,
+                has_electricity,
                 has_defective_product,
                 has_defective_service,
                 has_service_not_rendered,
@@ -5249,6 +5468,9 @@ def _editor_all_blocks_ready_response(
         telecom_evidence_details = _detect_telecom_editor_details(
             consumer_evidence_normalized
         )
+        electricity_evidence_details = _detect_electricity_editor_details(
+            consumer_evidence_normalized
+        )
         service_not_rendered_evidence_details = (
             _detect_service_not_rendered_editor_details(
                 consumer_evidence_normalized
@@ -5525,6 +5747,54 @@ def _editor_all_blocks_ready_response(
                 + "."
             )
 
+        if consumer_evidence_scopes["electricity"]:
+            electricity_evidence_items = []
+
+            if electricity_evidence_details["consumer_unit"]:
+                electricity_evidence_items.append(
+                    "identificação da unidade consumidora"
+                )
+            if electricity_evidence_details["invoices"]:
+                electricity_evidence_items.append("faturas")
+            if electricity_evidence_details["protocols"]:
+                electricity_evidence_items.append("protocolos")
+            if electricity_evidence_details["messages"]:
+                electricity_evidence_items.append("mensagens")
+            if electricity_evidence_details["interruption_records"]:
+                electricity_evidence_items.append(
+                    "registros da interrupção do fornecimento"
+                )
+            if electricity_evidence_details["meter_records"]:
+                electricity_evidence_items.append(
+                    "fotografias ou registros do medidor"
+                )
+            if electricity_evidence_details["technical_inspection"]:
+                electricity_evidence_items.append(
+                    "relatório ou registro de vistoria técnica"
+                )
+            if electricity_evidence_details["cut_notice"]:
+                electricity_evidence_items.append(
+                    "aviso de corte"
+                )
+            if electricity_evidence_details["reconnection_request"]:
+                electricity_evidence_items.append(
+                    "registro do pedido de religação"
+                )
+
+            if not electricity_evidence_items:
+                electricity_evidence_items.append(
+                    "elementos efetivamente disponíveis sobre a falha "
+                    "no fornecimento de energia elétrica"
+                )
+
+            evidence_parts.append(
+                "Para a falha no fornecimento de energia elétrica, devem ser "
+                "preservados e examinados somente os elementos efetivamente "
+                "informados no caso: "
+                + ", ".join(electricity_evidence_items)
+                + "."
+            )
+
         if consumer_evidence_scopes["defective_product"]:
             evidence_parts.append(
                 "Para produto defeituoso ou com vício, devem ser juntados nota fiscal, certificado de garantia, oferta, manual, fotografias, vídeos, "
@@ -5755,6 +6025,7 @@ def _editor_all_blocks_ready_response(
                 consumer_evidence_scopes["negative_listing"],
                 consumer_evidence_scopes["warranty_failure"],
                 consumer_evidence_scopes["telecom"],
+                consumer_evidence_scopes["electricity"],
                 consumer_evidence_scopes["defective_product"],
                 consumer_evidence_scopes["defective_service"],
                 consumer_evidence_scopes["service_not_rendered"],

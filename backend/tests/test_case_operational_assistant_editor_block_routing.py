@@ -4432,6 +4432,190 @@ def test_editor_all_blocks_ready_consumer_telecom_does_not_infer_unreported_docu
     assert "comprovantes de pagamento" not in provas
 
 
+
+def test_editor_all_blocks_ready_consumer_electricity_is_separate_from_generic_service_routes():
+    response = _consumer_scope_ready_response(
+        "CONS-ENERGIA-001",
+        "Falha e interrupção no fornecimento de energia elétrica",
+        "Ação consumerista por falha no fornecimento de energia elétrica",
+        (
+            "A consumidora relata falha na prestação do serviço de fornecimento de energia elétrica, "
+            "com interrupção do fornecimento e período em que o serviço não foi prestado. "
+            "Possui identificação da unidade consumidora, faturas, protocolos, mensagens, "
+            "registros da interrupção, fotografias do medidor e relatório de vistoria técnica. "
+            "Também solicitou religação. Pretende a regularização adequada do fornecimento e a análise "
+            "do pedido de religação, sem inventar aviso de corte, comprovante de pagamento, "
+            "cobrança indevida, negativação, restituição, danos, urgência, datas, valores "
+            "ou outros documentos."
+        ),
+    )
+
+    fundamentacao = _consumer_scope_block(
+        response,
+        "BLOCO 4 — Fundamentação preliminar",
+        "BLOCO 5 — Pedidos",
+    )
+    pedidos = _consumer_scope_block(
+        response,
+        "BLOCO 5 — Pedidos",
+        "BLOCO 6 — Provas e requerimentos",
+    )
+    provas = _consumer_scope_block(
+        response,
+        "BLOCO 6 — Provas e requerimentos",
+        "BLOCO 7 — Fechamento e conferência final",
+    )
+
+    assert response["metadata"]["action_specialization_kind"] == (
+        "consumer_universal_action_scope_claim"
+    )
+
+    assert "falha no fornecimento de energia elétrica relatada" in fundamentacao
+    assert "identificação da unidade consumidora" in fundamentacao
+    assert "faturas informadas" in fundamentacao
+    assert "protocolos de atendimento" in fundamentacao
+    assert "mensagens disponíveis" in fundamentacao
+    assert "registros da interrupção do fornecimento" in fundamentacao
+    assert "fotografias ou registros do medidor" in fundamentacao
+    assert "relatório ou registro de vistoria técnica" in fundamentacao
+    assert "pedido de religação informado" in fundamentacao
+
+    assert "resultado prometido" not in fundamentacao
+    assert "tentativas de correção" not in fundamentacao
+    assert "ausência de execução do serviço" not in fundamentacao
+
+    assert "regularização adequada do fornecimento de energia elétrica" in pedidos
+    assert "pedido de religação expressamente informado" in pedidos
+    assert "refazimento adequado do serviço" not in pedidos
+    assert "resolução da contratação" not in pedidos
+    assert "restituição dos valores incompatíveis" not in pedidos
+
+    assert "identificação da unidade consumidora" in provas
+    assert "faturas" in provas
+    assert "protocolos" in provas
+    assert "mensagens" in provas
+    assert "registros da interrupção do fornecimento" in provas
+    assert "fotografias ou registros do medidor" in provas
+    assert "relatório ou registro de vistoria técnica" in provas
+    assert "registro do pedido de religação" in provas
+
+    assert "aviso de corte" not in provas
+    assert "comprovante de pagamento" not in provas
+    assert "ordem de serviço" not in provas
+    assert "registros do resultado prometido" not in provas
+    assert "evidências da execução" not in provas
+    assert "tentativas de correção" not in provas
+
+
+def test_editor_all_blocks_ready_consumer_electricity_does_not_infer_unreported_documents_or_remedies():
+    response = _consumer_scope_ready_response(
+        "CONS-ENERGIA-MINIMO-001",
+        "Falha no fornecimento de energia elétrica",
+        "Ação consumerista por falha no fornecimento de energia elétrica",
+        (
+            "O consumidor relata falha na prestação do serviço de energia elétrica, com interrupção "
+            "do fornecimento, e informa que a concessionária não solucionou o problema. Pretende "
+            "a análise das medidas juridicamente cabíveis, sem inventar faturas, protocolos, mensagens, "
+            "unidade consumidora, registros de interrupção, fotografias do medidor, vistoria técnica, "
+            "aviso de corte, religação, cobrança indevida, negativação, restituição, danos, urgência, "
+            "datas ou valores."
+        ),
+    )
+
+    fundamentacao = _consumer_scope_block(
+        response,
+        "BLOCO 4 — Fundamentação preliminar",
+        "BLOCO 5 — Pedidos",
+    )
+    pedidos = _consumer_scope_block(
+        response,
+        "BLOCO 5 — Pedidos",
+        "BLOCO 6 — Provas e requerimentos",
+    )
+    provas = _consumer_scope_block(
+        response,
+        "BLOCO 6 — Provas e requerimentos",
+        "BLOCO 7 — Fechamento e conferência final",
+    )
+
+    assert "falha no fornecimento de energia elétrica relatada" in fundamentacao
+    assert "identificação da unidade consumidora" not in fundamentacao
+    assert "faturas informadas" not in fundamentacao
+    assert "protocolos de atendimento" not in fundamentacao
+    assert "mensagens disponíveis" not in fundamentacao
+    assert "registros da interrupção do fornecimento" not in fundamentacao
+    assert "fotografias ou registros do medidor" not in fundamentacao
+    assert "relatório ou registro de vistoria técnica" not in fundamentacao
+    assert "pedido de religação informado" not in fundamentacao
+
+    assert "resultado prometido" not in fundamentacao
+    assert "tentativas de correção" not in fundamentacao
+    assert "ausência de execução do serviço" not in fundamentacao
+
+    assert "regularização adequada do fornecimento de energia elétrica" in pedidos
+    assert "pedido de religação expressamente informado" not in pedidos
+    assert "refazimento adequado do serviço" not in pedidos
+    assert "resolução da contratação" not in pedidos
+    assert "restituição dos valores incompatíveis" not in pedidos
+
+    assert (
+        "elementos efetivamente disponíveis sobre a falha no fornecimento de energia elétrica"
+        in provas
+    )
+    assert "identificação da unidade consumidora" not in provas
+    assert "faturas" not in provas
+    assert "protocolos" not in provas
+    assert "mensagens" not in provas
+    assert "registros da interrupção do fornecimento" not in provas
+    assert "fotografias ou registros do medidor" not in provas
+    assert "relatório ou registro de vistoria técnica" not in provas
+    assert "registro do pedido de religação" not in provas
+    assert "aviso de corte" not in provas
+    assert "comprovante de pagamento" not in provas
+
+
+
+def test_editor_all_blocks_ready_consumer_electricity_negative_markers_do_not_hijack_generic_service():
+    response = _consumer_scope_ready_response(
+        "CONS-SERVICO-GENERICO-ENERGIA-NEGATIVA-001",
+        "Falha em serviço contratado",
+        "Ação consumerista por falha na prestação do serviço",
+        (
+            "O consumidor relata falha na prestação do serviço contratado e pretende "
+            "a correção adequada conforme os fatos disponíveis, sem inventar energia elétrica, "
+            "unidade consumidora, conta de luz, religação ou outros fatos não relatados."
+        ),
+    )
+
+    fundamentacao = _consumer_scope_block(
+        response,
+        "BLOCO 4 — Fundamentação preliminar",
+        "BLOCO 5 — Pedidos",
+    )
+    pedidos = _consumer_scope_block(
+        response,
+        "BLOCO 5 — Pedidos",
+        "BLOCO 6 — Provas e requerimentos",
+    )
+    provas = _consumer_scope_block(
+        response,
+        "BLOCO 6 — Provas e requerimentos",
+        "BLOCO 7 — Fechamento e conferência final",
+    )
+
+    assert "serviço contratado" in fundamentacao
+    assert "resultado prometido" in fundamentacao
+    assert "falha no fornecimento de energia elétrica relatada" not in fundamentacao
+
+    assert "cumprimento ou refazimento adequado do serviço" in pedidos
+    assert "regularização adequada do fornecimento de energia elétrica" not in pedidos
+    assert "pedido de religação expressamente informado" not in pedidos
+
+    assert "para serviço defeituoso ou incompleto" in provas
+    assert "para a falha no fornecimento de energia elétrica" not in provas
+    assert "registro do pedido de religação" not in provas
+
+
 def test_editor_all_blocks_ready_consumer_service_not_rendered_is_separate_from_defective_service():
     response = _consumer_scope_ready_response(
         "CONS-SERVICO-NAO-PRESTADO-001",
