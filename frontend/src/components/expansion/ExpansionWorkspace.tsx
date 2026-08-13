@@ -12,6 +12,7 @@ type ExpansionWorkspaceProps = {
   forcedModule?: ExpansionModule
   forcedModuleRequestId?: number
   pieceReadyRequestId?: number
+  showAdvancedTools?: boolean
 }
 
 const moduleLabels: Record<ExpansionModule, string> = {
@@ -28,13 +29,28 @@ export function ExpansionWorkspace({
   forcedModule,
   forcedModuleRequestId,
   pieceReadyRequestId,
+  showAdvancedTools = false,
 }: ExpansionWorkspaceProps) {
   const [activeModule, setActiveModule] = useState<ExpansionModule | null>(null)
+  const [handledPieceReadyRequestId, setHandledPieceReadyRequestId] = useState(0)
 
   useEffect(() => {
     if (!forcedModule) return
     setActiveModule(forcedModule)
   }, [forcedModule, forcedModuleRequestId])
+
+  if (!showAdvancedTools) {
+    return (
+      <EditorModulePanel
+        token={token}
+        selectedCaseId={selectedCaseId}
+        selectedCaseArea={selectedCaseArea}
+        pieceReadyRequestId={pieceReadyRequestId}
+          handledPieceReadyRequestId={handledPieceReadyRequestId}
+          onPieceReadyRequestHandled={setHandledPieceReadyRequestId}
+      />
+    )
+  }
 
   return (
     <>
@@ -92,6 +108,8 @@ export function ExpansionWorkspace({
               selectedCaseId={selectedCaseId}
               selectedCaseArea={selectedCaseArea}
               pieceReadyRequestId={pieceReadyRequestId}
+          handledPieceReadyRequestId={handledPieceReadyRequestId}
+          onPieceReadyRequestHandled={setHandledPieceReadyRequestId}
             />
           ) : null}
 

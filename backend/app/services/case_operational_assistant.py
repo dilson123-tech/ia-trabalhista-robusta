@@ -1923,7 +1923,7 @@ def _build_editor_block_revision(
             )
         else:
             narrative_close = (
-                "A narrativa permanece sujeita à validação documental e revisão profissional, especialmente quanto à confirmação dos fatos relatados, documentos disponíveis, datas relevantes, partes envolvidas, comunicações, valores informados, danos alegados e pontos ainda pendentes de prova."
+                "A narrativa permanece sujeita à validação documental e revisão profissional, especialmente quanto à confirmação dos fatos relatados, documentos disponíveis, datas relevantes, partes envolvidas, comunicações, valores informados e pontos ainda pendentes de prova."
             )
 
         if narrative_close.lower() not in revised.lower():
@@ -2150,6 +2150,8 @@ def _build_resumo_fatico_source_body(source_text: str) -> str:
             "Provas existentes ou indicadas",
             "Provas indicadas",
             "Documentos existentes",
+            "Documentos disponíveis",
+            "Documentos disponiveis",
             "Documentos pendentes",
             "Documentos/provas",
             "Checklist",
@@ -2170,6 +2172,8 @@ def _build_resumo_fatico_source_body(source_text: str) -> str:
             "Valor da causa",
             "Tutela de urgência",
             "Estratégia jurídica",
+            "O caso ainda está em montagem inicial",
+            "Antes de qualquer medida",
         ),
     )
 
@@ -3819,7 +3823,7 @@ def _build_editor_all_blocks_action_specialization(
         return (
             "cobranca_contratual_without_moral_damage",
             (
-                "A fundamentação preliminar deve se concentrar na cobrança contratual do saldo em aberto, "
+                "A fundamentação preliminar da ação de cobrança contratual deve se concentrar no saldo em aberto, "
                 "considerando o inadimplemento da parte contratante, a execução integral ou substancial dos serviços, "
                 "o pagamento parcial já realizado, o saldo contratual ainda em aberto e a necessidade de apuração do valor principal. "
                 "Devem ser avaliados contrato, proposta, ordem de serviço, notas, comprovantes de pagamento, mensagens, planilha de cálculo, "
@@ -3833,6 +3837,55 @@ def _build_editor_all_blocks_action_specialization(
                 "Requer-se ainda a preservação e juntada das provas documentais disponíveis, especialmente contrato, proposta, ordem de serviço, "
                 "notas, recibos, comprovantes de pagamento, mensagens e planilha de cálculo. "
                 "Os pedidos finais, valor da causa, índice de correção, termo inicial dos juros e demais requerimentos devem ser definidos pelo advogado."
+            ),
+        )
+
+    criminal_liberdade_markers = (
+        "liberdade provisória",
+        "liberdade provisoria",
+        "liberdade_provisoria",
+        "pedido de liberdade provisória",
+        "pedido de liberdade provisoria",
+    )
+    if _editor_text_has_any(normalized, criminal_liberdade_markers):
+        return (
+            "criminal_liberdade_provisoria_claim",
+            (
+                "A fundamentação preliminar do pedido de liberdade provisória deve permanecer vinculada aos fatos efetivamente relatados "
+                "sobre a prisão em flagrante, a audiência de custódia e a decisão que manteve ou examinou a custódia, quando esses elementos estiverem confirmados no caso. "
+                "Devem ser avaliadas pelo advogado responsável a legalidade e a necessidade concreta da prisão, bem como a eventual adequação "
+                "de medidas cautelares diversas da prisão, sem presumir circunstâncias pessoais, requisitos legais, culpa, inocência ou resultado favorável. "
+                "Competência, cabimento, base legal específica, situação processual atual e extensão da tese defensiva devem ser confirmados antes do protocolo."
+            ),
+            (
+                "No pedido de liberdade provisória, e somente após revisão do advogado responsável, poderá ser requerida a concessão da liberdade, "
+                "com ou sem medidas cautelares diversas da prisão, conforme os fatos comprovados, a decisão de custódia e os requisitos jurídicos efetivamente aplicáveis. "
+                "Subsidiariedade, condições eventualmente impostas e demais requerimentos defensivos devem ser definidos pelo advogado, "
+                "sem afirmar previamente que os requisitos para soltura estão preenchidos."
+            ),
+        )
+
+    criminal_resposta_acusacao_markers = (
+        "resposta à acusação",
+        "resposta a acusação",
+        "resposta a acusacao",
+        "resposta_acusacao",
+    )
+    if _editor_text_has_any(normalized, criminal_resposta_acusacao_markers):
+        return (
+            "criminal_resposta_acusacao_claim",
+            (
+                "A fundamentação preliminar da resposta à acusação deve organizar a denúncia e a imputação efetivamente constantes do processo, "
+                "as preliminares eventualmente identificadas, a análise de justa causa, materialidade, autoria, nulidades e demais questões defensivas pertinentes, "
+                "sempre de acordo com os autos e com a revisão do advogado responsável. "
+                "As provas disponíveis, a indicação de testemunhas e qualquer tese defensiva devem ser conferidas antes de sua utilização, "
+                "sem presumir fatos, versões, nulidades, ausência de justa causa, culpa ou inocência."
+            ),
+            (
+                "Na resposta à acusação, os pedidos defensivos e os requerimentos probatórios devem ser formulados somente conforme os fatos, "
+                "a denúncia, a imputação, as provas disponíveis e a estratégia confirmada pelo advogado. "
+                "Eventuais preliminares, produção de provas, testemunhas, absolvição sumária ou outras medidas defensivas somente devem ser requeridas "
+                "quando houver suporte jurídico e fático confirmado nos autos, sem antecipar conclusão sobre o mérito."
             ),
         )
 
@@ -3928,27 +3981,155 @@ def _build_editor_all_blocks_action_specialization(
     if _editor_text_has_any(normalized, labor_markers) and _editor_text_has_any(
         normalized, labor_hours_markers
     ):
+        interval_markers = (
+            "intervalo intrajornada",
+            "supressão parcial de intervalo",
+            "supressao parcial de intervalo",
+            "supressão total de intervalo",
+            "supressao total de intervalo",
+            "intervalo suprimido",
+        )
+        unregistered_markers = (
+            "sem registro",
+            "sem carteira assinada",
+            "sem anotação na ctps",
+            "sem anotacao na ctps",
+            "não registrado",
+            "nao registrado",
+            "reconhecimento de vínculo",
+            "reconhecimento de vinculo",
+        )
+        unpaid_termination_markers = (
+            "sem receber as verbas rescisórias",
+            "sem receber as verbas rescisorias",
+            "verbas rescisórias não pagas",
+            "verbas rescisorias nao pagas",
+            "verbas rescisórias em aberto",
+            "verbas rescisorias em aberto",
+        )
+
+        has_interval_claim = _editor_text_has_any(normalized, interval_markers)
+        has_unregistered_claim = _editor_text_has_any(normalized, unregistered_markers)
+        has_unpaid_termination_claim = _editor_text_has_any(
+            normalized, unpaid_termination_markers
+        )
+
+        foundation_parts = [
+            (
+                "A fundamentação preliminar deve se concentrar na reclamação trabalhista relacionada à jornada de trabalho "
+                "e às horas extras efetivamente relatadas, com apuração da jornada comprovável, adicional aplicável e reflexos "
+                "estritamente compatíveis com os fatos narrados e a prova disponível."
+            )
+        ]
+
+        if has_interval_claim:
+            foundation_parts.append(
+                "Como também houve relato específico sobre intervalo intrajornada, deverá ser examinada a eventual supressão "
+                "total ou parcial do intervalo, sem presumir período, duração ou frequência além do que puder ser comprovado."
+            )
+
+        if has_unregistered_claim:
+            foundation_parts.append(
+                "Também deverá ser examinado o relato de trabalho sem registro e a possível pretensão de reconhecimento do vínculo "
+                "de emprego ou regularização registral, condicionados à confirmação dos requisitos jurídicos e da prova do caso."
+            )
+
+        if has_unpaid_termination_claim:
+            foundation_parts.append(
+                "O relato de dispensa sem recebimento das verbas rescisórias também deve ser analisado, com identificação das "
+                "parcelas efetivamente devidas, pagas ou pendentes após conferência documental."
+            )
+
+        reported_evidence = []
+        if "whatsapp" in normalized:
+            reported_evidence.append("conversas no WhatsApp")
+        if "comprovantes de pagamento" in normalized:
+            reported_evidence.append("comprovantes de pagamento")
+        if "controle de ponto" in normalized or "controles de ponto" in normalized:
+            reported_evidence.append("controles de ponto")
+        if "holerite" in normalized or "holerites" in normalized:
+            reported_evidence.append("holerites")
+        if "trct" in normalized:
+            reported_evidence.append("TRCT")
+        if "extrato analítico do fgts" in normalized or "extrato analitico do fgts" in normalized:
+            reported_evidence.append("extrato analítico do FGTS")
+        if "mensagens com gestor" in normalized:
+            reported_evidence.append("mensagens com gestor")
+
+        if reported_evidence:
+            foundation_parts.append(
+                "Entre os elementos expressamente mencionados no caso, devem ser considerados "
+                + ", ".join(reported_evidence)
+                + ", sem presumir a existência de outros documentos não informados."
+            )
+
+        foundation_parts.append(
+            "Controles de jornada, documentos salariais, documentos rescisórios, normas coletivas e outros registros "
+            "podem ser avaliados ou requeridos quando pertinentes, mas sua existência não deve ser presumida. "
+            "A base legal específica, competência da Justiça do Trabalho, rito, prescrição, liquidação e extensão final "
+            "dos pedidos permanecem sujeitos à revisão do advogado responsável."
+        )
+
+        request_parts = [
+            (
+                "Diante do exposto, e sem prejuízo de adequação pelo advogado responsável, requer-se a notificação da reclamada "
+                "e, conforme a prova produzida, a condenação ao pagamento das horas extras efetivamente demonstradas, "
+                "com o adicional legal, contratual ou normativo aplicável e os reflexos juridicamente cabíveis."
+            )
+        ]
+
+        if has_interval_claim:
+            request_parts.append(
+                "Quanto ao intervalo intrajornada especificamente relatado, requer-se, se comprovada a supressão total ou parcial, "
+                "a parcela correspondente nos limites fáticos e jurídicos confirmados no processo."
+            )
+
+        if has_unregistered_claim:
+            request_parts.append(
+                "Quanto ao trabalho sem registro relatado, requer-se, se confirmados os pressupostos legais e probatórios, "
+                "o reconhecimento do vínculo de emprego e as providências registrais cabíveis."
+            )
+
+        if has_unpaid_termination_claim:
+            request_parts.append(
+                "Quanto à dispensa sem quitação relatada, requer-se o pagamento das verbas rescisórias efetivamente devidas "
+                "e não pagas, após conferência das parcelas, datas e documentos pertinentes."
+            )
+
+        reported_reflexes = []
+        if "dsr" in normalized:
+            reported_reflexes.append("DSR")
+        if "férias" in normalized or "ferias" in normalized:
+            reported_reflexes.append("férias")
+        if "13º salário" in normalized or "13o salário" in normalized or "13º" in normalized:
+            reported_reflexes.append("13º salário")
+        if "fgts" in normalized:
+            reported_reflexes.append("FGTS")
+        if (
+            ("verbas rescisórias" in normalized or "verbas rescisorias" in normalized)
+            and not has_unpaid_termination_claim
+        ):
+            reported_reflexes.append("verbas rescisórias")
+
+        if reported_reflexes:
+            request_parts.append(
+                "Quanto aos reflexos expressamente mencionados no relato, requer-se sua apuração e pagamento, "
+                "se juridicamente cabíveis e comprovados, abrangendo "
+                + ", ".join(reported_reflexes)
+                + ", sem ampliação automática para parcelas não informadas."
+            )
+
+        request_parts.append(
+            "Requer-se a preservação e juntada das provas efetivamente disponíveis e, quando necessário, a exibição ou obtenção "
+            "dos documentos pertinentes à relação de emprego, jornada e rescisão. "
+            "Os pedidos finais, valores, reflexos, critérios de cálculo, honorários, justiça gratuita se cabível e demais "
+            "requerimentos devem ser definidos pelo advogado responsável."
+        )
+
         return (
             "labor_hours_interval_claim",
-            (
-                "A fundamentação preliminar deve se concentrar na reclamação trabalhista relacionada à jornada de trabalho, "
-                "horas extras, eventual divergência entre jornada efetiva e registros formais, supressão total ou parcial do intervalo intrajornada "
-                "e reflexos trabalhistas decorrentes. "
-                "Devem ser avaliados controles de ponto, holerites, TRCT, extrato analítico do FGTS, mensagens com gestor, documentos rescisórios, "
-                "eventuais normas coletivas, depoimento do reclamante, preposto da empresa e testemunhas. "
-                "A análise deve considerar diferenças de horas extras, adicional aplicável, reflexos em DSR, férias acrescidas de um terço, 13º salário, FGTS, "
-                "verbas rescisórias e demais parcelas estritamente compatíveis com os fatos relatados e os documentos disponíveis. "
-                "A base legal específica, competência da Justiça do Trabalho, rito, prescrição, liquidação e extensão final dos pedidos permanecem sujeitos à revisão do advogado responsável."
-            ),
-            (
-                "Diante do exposto, e sem prejuízo de adequação pelo advogado responsável, requer-se a notificação da reclamada, "
-                "o reconhecimento das diferenças de jornada comprovadas, a condenação ao pagamento de horas extras e do intervalo intrajornada suprimido, "
-                "com adicional legal, contratual ou normativo aplicável, conforme apuração em liquidação. "
-                "Requer-se também o pagamento dos reflexos cabíveis em DSR, férias acrescidas de um terço, 13º salário, FGTS e verbas rescisórias, "
-                "além da juntada e preservação dos documentos essenciais da relação de emprego, especialmente controles de ponto, holerites, TRCT, extrato analítico do FGTS, "
-                "mensagens com gestor e demais registros de jornada. "
-                "Os pedidos finais, valores, reflexos, critérios de cálculo, honorários, justiça gratuita se cabível e demais requerimentos devem ser definidos pelo advogado responsável."
-            ),
+            " ".join(foundation_parts),
+            " ".join(request_parts),
         )
 
 
@@ -5309,6 +5490,19 @@ def _editor_all_blocks_ready_response(
             if item
         )
 
+    criminal_action_specialization_kinds = {
+        "criminal_liberdade_provisoria_claim",
+        "criminal_resposta_acusacao_claim",
+    }
+    if action_specialization_kind in criminal_action_specialization_kinds:
+        enderecamento = (
+            "EXCELENTÍSSIMO(A) SENHOR(A) DOUTOR(A) JUIZ(A) DO JUÍZO CRIMINAL COMPETENTE "
+            "DE [LOCALIDADE A CONFIRMAR PELO ADVOGADO].\n\n"
+            "O advogado responsável deverá confirmar, antes do protocolo, a competência material e territorial, "
+            "o juízo competente, eventual prevenção, a situação processual atual e a adequação da medida criminal "
+            "conforme os autos e os fatos efetivamente confirmados."
+        )
+
     family_action_specialization_kinds = {
         "family_support_guardianship_claim",
     }
@@ -5356,6 +5550,49 @@ def _editor_all_blocks_ready_response(
                     return f"{target_label}:{cleaned[len(source_label):]}"
             return f"{target_label}: {cleaned}"
 
+        labor_source_normalized = " ".join(
+            str(value or "")
+            for value in (
+                source_body,
+                getattr(case, "title", ""),
+                getattr(case, "description", ""),
+                getattr(case, "legal_area", ""),
+                getattr(case, "action_type", ""),
+            )
+        ).lower()
+
+        reported_labor_documents: list[str] = []
+        labor_document_markers = (
+            (("ctps",), "CTPS"),
+            (("trct",), "TRCT"),
+            (("folhas de pagamento", "folha de pagamento", "holerites", "holerite"), "folhas de pagamento"),
+            (("contrato de trabalho",), "contrato de trabalho"),
+            (("procuração", "procuracao"), "procuração"),
+            (("comprovante de endereço", "comprovante de endereco"), "comprovante de endereço"),
+        )
+
+        for markers, label in labor_document_markers:
+            if any(marker in labor_source_normalized for marker in markers):
+                reported_labor_documents.append(label)
+
+        if reported_labor_documents:
+            reported_documents_text = ", ".join(reported_labor_documents)
+            claimant_fallback = (
+                "Reclamante: a confirmar, conforme dados de identificação e elementos efetivamente disponíveis no caso, "
+                f"incluindo os documentos relatados: {reported_documents_text}."
+            )
+            defendant_fallback = (
+                "Reclamada: a confirmar, conforme dados de identificação, cadastro e elementos efetivamente disponíveis no caso, "
+                f"incluindo os documentos relatados: {reported_documents_text}."
+            )
+        else:
+            claimant_fallback = (
+                "Reclamante: a confirmar, conforme dados de identificação e elementos efetivamente disponíveis no caso."
+            )
+            defendant_fallback = (
+                "Reclamada: a confirmar, conforme dados de identificação, cadastro e elementos efetivamente disponíveis no caso."
+            )
+
         qualificacao = "\n\n".join(
             item
             for item in (
@@ -5363,13 +5600,13 @@ def _editor_all_blocks_ready_response(
                     parte_autora or business_parte_autora,
                     ("Parte autora:", "Autor:", "Autora:"),
                     "Reclamante",
-                    "Reclamante: a confirmar, conforme documentos pessoais, comprovante de endereço, CTPS, contrato de trabalho, procuração e cadastro do caso.",
+                    claimant_fallback,
                 ),
                 _labor_party_label(
                     parte_re or business_parte_re,
                     ("Parte ré:", "Parte re:", "Ré:", "Re:", "Requerida:", "Requerido:"),
                     "Reclamada",
-                    "Reclamada: a confirmar, conforme contrato de trabalho, CTPS, TRCT, folhas de pagamento, documentos da relação de emprego, cadastro público e revisão do advogado.",
+                    defendant_fallback,
                 ),
             )
             if item
@@ -5414,6 +5651,126 @@ def _editor_all_blocks_ready_response(
             "expedição de ofícios para obtenção de informações escolares, médicas ou de renda, exibição de documentos e juntada posterior de novos elementos. "
             "Devem ser preservados o segredo de justiça, a intervenção do Ministério Público nas hipóteses legais "
             "e o melhor interesse da criança ou adolescente."
+        )
+    elif action_specialization_kind in criminal_action_specialization_kinds:
+        criminal_evidence_normalized = _normalize_editor_detection_text(
+            source_body,
+            *(editor_context["case_context"].values()),
+        )
+
+        reported_criminal_evidence = []
+
+        criminal_evidence_markers = (
+            ("boletim de ocorrência", ("boletim de ocorrência", "boletim de ocorrencia")),
+            ("auto de prisão em flagrante", ("auto de prisão em flagrante", "auto de prisao em flagrante")),
+            ("nota de culpa", ("nota de culpa",)),
+            ("ata de audiência de custódia", ("ata de audiência de custódia", "ata de audiencia de custodia")),
+            ("comprovante de residência", ("comprovante de residência", "comprovante de residencia")),
+            ("documentos pessoais", ("documentos pessoais",)),
+            ("denúncia", ("denúncia", "denuncia")),
+            ("decisão de recebimento", ("decisão de recebimento", "decisao de recebimento")),
+            ("mandado de citação", ("mandado de citação", "mandado de citacao")),
+            ("certidões", ("certidões", "certidoes")),
+            ("procuração", ("procuração", "procuracao")),
+            ("conversas digitais", ("conversas digitais",)),
+        )
+
+        for label, markers in criminal_evidence_markers:
+            if any(marker in criminal_evidence_normalized for marker in markers):
+                reported_criminal_evidence.append(label)
+
+        if reported_criminal_evidence:
+            reported_criminal_evidence_text = (
+                "Entre as provas disponíveis expressamente informadas no caso, devem ser conferidos e preservados "
+                + ", ".join(reported_criminal_evidence)
+                + ". "
+            )
+        else:
+            reported_criminal_evidence_text = (
+                "As provas disponíveis deverão ser identificadas e conferidas diretamente nos autos pelo advogado responsável. "
+            )
+
+        has_reported_witness = (
+            "testemunha conhecida" in criminal_evidence_normalized
+            or "indicação inicial de testemunhas" in criminal_evidence_normalized
+            or "indicacao inicial de testemunhas" in criminal_evidence_normalized
+            or "rol de testemunhas" in criminal_evidence_normalized
+        )
+
+        witness_text = (
+            "Há referência a testemunha ou testemunhas no relato, cuja identidade, pertinência e efetivo conhecimento dos fatos "
+            "devem ser confirmados antes de qualquer inclusão em rol ou requerimento probatório. "
+            if has_reported_witness
+            else
+            "Não se presume a existência de testemunhas; eventual prova testemunhal dependerá de confirmação pelo advogado e pelos autos. "
+        )
+
+        provas = (
+            reported_criminal_evidence_text
+            + witness_text
+            + "Nenhum documento, depoimento, conteúdo de prova, circunstância da prisão, imputação ou versão dos fatos deve ser inventado ou presumido. "
+            "Exibição, juntada posterior, perícia, diligências, expedição de ofícios e demais requerimentos probatórios somente devem ser formulados "
+            "quando houver pertinência com os autos e revisão do advogado responsável."
+        )
+    elif action_specialization_kind == "labor_hours_interval_claim":
+        labor_evidence_normalized = _normalize_editor_detection_text(
+            source_body,
+            *(editor_context["case_context"].values()),
+        )
+
+        reported_labor_evidence = []
+
+        if "whatsapp" in labor_evidence_normalized:
+            reported_labor_evidence.append("conversas no WhatsApp")
+
+        if "comprovantes de pagamento" in labor_evidence_normalized:
+            reported_labor_evidence.append("comprovantes de pagamento")
+
+        if (
+            "controle de ponto" in labor_evidence_normalized
+            or "controles de ponto" in labor_evidence_normalized
+            or "cartões de ponto" in labor_evidence_normalized
+            or "cartoes de ponto" in labor_evidence_normalized
+        ):
+            reported_labor_evidence.append("controles ou registros de jornada")
+
+        if "holerite" in labor_evidence_normalized or "holerites" in labor_evidence_normalized:
+            reported_labor_evidence.append("holerites")
+
+        if "trct" in labor_evidence_normalized:
+            reported_labor_evidence.append("TRCT")
+
+        if (
+            "extrato analítico do fgts" in labor_evidence_normalized
+            or "extrato analitico do fgts" in labor_evidence_normalized
+        ):
+            reported_labor_evidence.append("extrato analítico do FGTS")
+
+        if "mensagens com gestor" in labor_evidence_normalized:
+            reported_labor_evidence.append("mensagens com gestor")
+
+        if reported_labor_evidence:
+            reported_evidence_text = (
+                "Entre as provas expressamente relatadas no caso, devem ser preservados e juntados "
+                + ", ".join(reported_labor_evidence)
+                + ". "
+            )
+        else:
+            reported_evidence_text = (
+                "Até o momento, não foram identificadas provas específicas expressamente informadas no relato. "
+            )
+
+        provas = (
+            reported_evidence_text
+            + "A existência de CTPS anotada, controles ou registros de jornada, documentos salariais, "
+            "documentos rescisórios, extrato do FGTS, normas coletivas e demais registros da relação de emprego "
+            "não se presume. Quando existentes, pertinentes ou mantidos pela parte empregadora, esses elementos "
+            "podem ser requeridos, exibidos, obtidos ou posteriormente juntados, conforme avaliação do advogado. "
+            "A prova testemunhal pode ser utilizada com testemunhas a confirmar, especialmente para fatos relativos "
+            "à prestação de serviços, jornada, ausência de registro e circunstâncias da rescisão, sem atribuir previamente "
+            "a qualquer pessoa conhecimento sobre fatos ainda não confirmados. "
+            "Depoimento pessoal, expedição de ofícios, exibição de documentos e outras medidas probatórias devem ser "
+            "definidos somente quando compatíveis com os fatos relatados e a estratégia processual revisada pelo advogado."
         )
     elif action_specialization_kind == "labor_health_risk_premium_claim":
         provas = (
@@ -6162,6 +6519,14 @@ def _editor_all_blocks_ready_response(
         "Devem ser confirmados dados formais das partes, comarca, competência, rito, valor da causa, documentos essenciais, provas mínimas, datas relevantes, estratégia processual, pedidos finais e eventual urgência. "
         "Onde houver informação incompleta, divergente ou sem documento, deve constar a expressão “a confirmar” ou equivalente prudente."
     )
+
+    if action_specialization_kind in criminal_action_specialization_kinds:
+        fechamento = (
+            fechamento
+            + " Esta minuta não representa promessa de resultado e não afirma culpa ou inocência. "
+            "Este conteúdo não deve ser usado externamente sem revisão do advogado responsável. "
+            "Nenhuma prova deve ser inventada, presumida ou atribuída às partes ou testemunhas sem confirmação nos autos."
+        )
 
     blocks = (
         ("BLOCO 1 — Endereçamento", enderecamento),

@@ -70,6 +70,7 @@ type CaseCardProps = {
   token: string
   selectedCaseId: number | null
   assistantDestinationRequest?: AssistantDestinationRequest | null
+  showAdvancedTools?: boolean
   getStatusLabel: (status: string) => string
   isArchiving: boolean
   isAnalyzing: boolean
@@ -114,6 +115,7 @@ export function CaseCard({
   token,
   selectedCaseId,
   assistantDestinationRequest,
+  showAdvancedTools = false,
   getStatusLabel,
   isArchiving,
   isAnalyzing,
@@ -425,7 +427,9 @@ export function CaseCard({
         ) : null}
       </div>
 
-      <div
+      {showAdvancedTools ? (
+          <>
+        <div
         style={{
           marginTop: '12px',
           padding: '12px',
@@ -592,7 +596,10 @@ export function CaseCard({
       >
         <CaseTimelinePanel token={token} caseId={caso.id} />
       </div>
-      <div className="case-card__actions">
+                </>
+        ) : null}
+
+        <div className="case-card__actions">
         {!isArchived ? (
           <>
             <button
@@ -604,7 +611,9 @@ export function CaseCard({
               {isArchiving ? 'Arquivando...' : 'Arquivar'}
             </button>
 
-            <button
+            {showAdvancedTools ? (
+                <>
+                  <button
               type="button"
               onClick={() => onAnalyze(caso.id)}
               disabled={analysisLoading}
@@ -640,7 +649,10 @@ export function CaseCard({
               {isLoadingPdf ? 'Abrindo PDF...' : 'PDF Executivo'}
             </button>
 
-            {caso.client_whatsapp ? (
+                            </>
+              ) : null}
+
+              {caso.client_whatsapp ? (
               <>
                 <a
                   href={`https://wa.me/${caso.client_whatsapp}?text=${encodeURIComponent(

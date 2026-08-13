@@ -8,8 +8,11 @@ client = TestClient(app)
 
 
 def _auth_headers(monkeypatch):
+    from app.api.v1.routes import cases as cases_routes
+
     monkeypatch.setattr(settings, "ALLOW_SEED_ADMIN", True)
     monkeypatch.setattr(settings, "ADMIN_SEED_TOKEN", "test-seed-token")
+    monkeypatch.setattr(cases_routes, "enforce_plan_limits", lambda *args, **kwargs: None)
 
     seed_payload = {
         "username": f"admin_appeal_{uuid.uuid4().hex[:8]}@example.com",

@@ -45,7 +45,15 @@ type CaseOperationalAssistantPanelProps = {
   token: string
   caseId: number | null
   caseLabel?: string | null
+  showAdvancedTools?: boolean
   onDestinationClick?: (destination: string, suggestedText?: string, label?: string) => void
+  onInitialCaseDraft?: (draft: {
+    case_number: string
+    title: string
+    description: string
+    legal_area: string
+    action_type: string
+  }) => void
 }
 
 const destinationLabels: Record<string, string> = {
@@ -263,10 +271,6 @@ function buildInitialCaseTitle(message: string, area: string): string {
 }
 
 function buildInitialCaseNumber(area: string, message = ''): string {
-  if (isVehicleDealerPixCase(message)) {
-    return /quintino/i.test(message) ? 'VEICULO-QUINTINO-PIX-001' : 'VEICULO-REVENDEDORA-PIX-001'
-  }
-
   const normalized = area
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
@@ -275,16 +279,38 @@ function buildInitialCaseNumber(area: string, message = ''): string {
     .replace(/^-|-$/g, '')
     .slice(0, 18)
 
-  return `${normalized || 'CASO'}-001`
+  const base = isVehicleDealerPixCase(message)
+    ? (/quintino/i.test(message) ? 'VEICULO-QUINTINO-PIX' : 'VEICULO-REVENDEDORA-PIX')
+    : (normalized || 'CASO')
+
+  const now = new Date()
+  const stamp = [
+    now.getFullYear(),
+    String(now.getMonth() + 1).padStart(2, '0'),
+    String(now.getDate()).padStart(2, '0'),
+    '-',
+    String(now.getHours()).padStart(2, '0'),
+    String(now.getMinutes()).padStart(2, '0'),
+    String(now.getSeconds()).padStart(2, '0'),
+  ].join('')
+
+  return `${base}-${stamp}`
 }
 
 function buildInitialCaseDescription(message: string): string {
   const cleaned = normalizeInitialCaseText(message).replace(/[.!?]+$/, '')
 
-  return `Relato inicial do cliente: ${cleaned}. O caso ainda está em montagem inicial e depende de conferência dos dados do cliente, documentos, provas, datas, pessoas envolvidas, valores e urgências. Antes de qualquer medida, recomenda-se organizar a linha do tempo, criar checklist de provas, identificar anexos/documentos necessários, levantar testemunhas/depoentes e atualizar o dossiê interno.`
+  return `Relato inicial do cliente: ${cleaned}. Informações sujeitas à conferência do advogado antes da geração e do uso da minuta.`
 }
 
-export function CaseOperationalAssistantPanel({ token, caseId, caseLabel, onDestinationClick }: CaseOperationalAssistantPanelProps) {
+export function CaseOperationalAssistantPanel({
+  token,
+  caseId,
+  caseLabel,
+  showAdvancedTools = false,
+  onDestinationClick,
+  onInitialCaseDraft,
+}: CaseOperationalAssistantPanelProps) {
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -321,10 +347,18 @@ export function CaseOperationalAssistantPanel({ token, caseId, caseLabel, onDest
       const initialCaseNumber = buildInitialCaseNumber(initialArea, cleanedMessage)
       const initialDescription = extractInitialCaseDescription(cleanedMessage) || buildInitialCaseDescription(cleanedMessage)
 
+      onInitialCaseDraft?.({
+        case_number: initialCaseNumber,
+        title: initialTitle,
+        description: initialDescription,
+        legal_area: initialArea,
+        action_type: initialActionType,
+      })
+
       setResponse({
         case_id: 0,
         assistant_mode: 'initial_case_setup',
-        summary: 'Entendi. Vou transformar seu relato em um roteiro de preenchimento para montar o caso dentro do sistema.',
+        summary: 'Entendi. Já organizei seu relato e preenchi automaticamente os campos principais do Novo Caso.',
         rewritten_input: cleanedMessage,
         suggested_actions: [
           {
@@ -344,7 +378,7 @@ ${initialActionType}
 
 Descrição inicial:
 ${initialDescription}`,
-            reason: 'Este bloco já organiza o relato informal em campos prontos para copiar no formulário “+ Novo Caso”.',
+            reason: 'Este bloco organiza o relato e os campos principais já são aplicados automaticamente ao formulário “+ Novo Caso”.',
             priority: 'alta',
           },
           {
@@ -377,8 +411,8 @@ ${initialDescription}`,
           },
         ],
         next_steps: [
-          'Clique em “Abrir Novo caso”.',
-          'Copie os campos sugeridos para o formulário.',
+          'Confira os campos preenchidos automaticamente pela IA.',
+          'Complete apenas os dados do cliente e ajustes necessários.',
           'Salve o caso.',
           'Depois volte ao Copiloto com o caso em foco para montar Linha do Tempo, Checklist, Anexos, Testemunhas e Dossiê.',
         ],
@@ -430,7 +464,7 @@ ${initialDescription}`,
             IA assistente operacional do caso
           </h2>
           <p className="insight-description" style={{ maxWidth: '920px' }}>
-            Escreva aqui qualquer informação do caso. A IA orienta onde aplicar: linha do tempo, checklist, anexos, testemunhas, dossiê, análise ou minuta.
+            Conte o caso com suas palavras. A IA organiza as informações, identifica os pontos relevantes e prepara a estrutura inicial para revisão do advogado.
           </p>
         </div>
 
@@ -452,6 +486,7 @@ ${initialDescription}`,
           <strong>Contexto:</strong> {caseLabel || 'Modo montagem inicial: descreva o caso e eu te ajudo a organizar antes de cadastrar.'}
         </p>
 
+          {showAdvancedTools ? (
         <div
           style={{
             border: '1px solid rgba(250,204,21,0.22)',
@@ -507,6 +542,7 @@ ${initialDescription}`,
             {ALL_BLOCKS_READY_MINUTA_PROMPT}
           </pre>
         </div>
+        ) : null}
 
         <textarea
           value={message}
@@ -635,7 +671,7 @@ ${initialDescription}`,
         </div>
       ) : (
         <p style={{ margin: '12px 0 0 0', fontSize: '0.9rem', opacity: 0.78 }}>
-          A V1 não salva nada automaticamente. Ela orienta o advogado, organiza a informação e evita que ele se perca no painel.
+          A IA organiza o relato e prepara o caso para conferência. O advogado revisa os dados antes de salvar e gerar a minuta.
         </p>
       )}
     </section>

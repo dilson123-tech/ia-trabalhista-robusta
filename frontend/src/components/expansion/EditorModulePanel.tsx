@@ -112,6 +112,8 @@ type EditorModulePanelProps = {
   selectedCaseId: number | null
   selectedCaseArea?: string | null
   pieceReadyRequestId?: number
+  handledPieceReadyRequestId?: number
+  onPieceReadyRequestHandled?: (requestId: number) => void
 }
 
 type EditableDocumentVersion = EditableDocumentDetail['versions'][number]
@@ -206,7 +208,14 @@ function getSectionIdentifier(section: EditableSection) {
 
 const API_BASE_URL = (import.meta.env.VITE_API_URL ?? 'http://127.0.0.1:8099/api/v1').replace(/\/$/, '')
 
-export function EditorModulePanel({ token, selectedCaseId, selectedCaseArea, pieceReadyRequestId }: EditorModulePanelProps) {
+export function EditorModulePanel({
+  token,
+  selectedCaseId,
+  selectedCaseArea,
+  pieceReadyRequestId,
+  handledPieceReadyRequestId,
+  onPieceReadyRequestHandled,
+}: EditorModulePanelProps) {
   const [documents, setDocuments] = useState<EditableDocumentItem[]>([])
   const [selectedDocumentId, setSelectedDocumentId] = useState<number | null>(null)
   const [selectedDocument, setSelectedDocument] = useState<EditableDocumentDetail | null>(null)
@@ -293,11 +302,20 @@ export function EditorModulePanel({ token, selectedCaseId, selectedCaseArea, pie
     setEditingError('')
     setEditingSuccess('')
 
-    try {
-      let documentId = selectedDocumentId ?? documents[0]?.id ?? null
-      let createdDetail: EditableDocumentDetail | null = null
+      try {
+        const persistedDocuments = await listEditableDocumentsForCase(token, selectedCaseId)
+        setDocuments(persistedDocuments)
 
-      if (!documentId) {
+        const selectedDocumentStillExists =
+          selectedDocumentId !== null &&
+          persistedDocuments.some((document) => document.id === selectedDocumentId)
+
+        let documentId = selectedDocumentStillExists
+          ? selectedDocumentId
+          : persistedDocuments[0]?.id ?? null
+        let createdDetail: EditableDocumentDetail | null = null
+
+        if (!documentId) {
         createdDetail = await createEditableDocument(token, {
           case_id: selectedCaseId,
           area: normalizeEditorArea(selectedCaseArea),
@@ -551,14 +569,18 @@ export function EditorModulePanel({ token, selectedCaseId, selectedCaseArea, pie
 
   useEffect(() => {
     if (!pieceReadyRequestId) return
+    if (handledPieceReadyRequestId === pieceReadyRequestId) return
     if (handledPieceReadyRequestRef.current === pieceReadyRequestId) return
     if (!token.trim() || !selectedCaseId) return
     if (loadingList || loadingDetail || createLoading || assistedDraftLoading) return
 
     handledPieceReadyRequestRef.current = pieceReadyRequestId
+    onPieceReadyRequestHandled?.(pieceReadyRequestId)
     void handleGenerateReadyPiece()
   }, [
     pieceReadyRequestId,
+    handledPieceReadyRequestId,
+    onPieceReadyRequestHandled,
     token,
     selectedCaseId,
     loadingList,
@@ -1114,17 +1136,17 @@ export function EditorModulePanel({ token, selectedCaseId, selectedCaseArea, pie
       <section className="insight-card">
         <div className="insight-head">
           <div>
-            <p className="insight-kicker">Editor Jurídico Vivo</p>
-            <h2 className="insight-title">Peça editável por blocos</h2>
+            <p className="insight-kicker">Revisão da minuta</p>
+            <h2 className="insight-title">Editor da peça</h2>
             <p className="insight-description">
-              Selecione um caso no fluxo principal para abrir a camada de edição estruturada.
+              Crie ou selecione um caso para revisar a minuta preparada pela IA.
             </p>
           </div>
           <span className="insight-badge">Aguardando caso</span>
         </div>
 
         <p className="insight-empty">
-          A expansão continua leve: o editor só aprofunda quando existe um caso em contexto.
+          Quando houver um caso em foco, a minuta aparecerá aqui para conferência e edição.
         </p>
       </section>
     )
@@ -1134,10 +1156,10 @@ export function EditorModulePanel({ token, selectedCaseId, selectedCaseArea, pie
     <section className="insight-card">
       <div className="insight-head">
         <div>
-          <p className="insight-kicker">Editor Jurídico Vivo</p>
-          <h2 className="insight-title">Peça editável por blocos</h2>
+          <p className="insight-kicker">Revisão da minuta</p>
+          <h2 className="insight-title">Editor da peça</h2>
           <p className="insight-description">
-            Lista real de documentos editáveis do caso, com detalhe, versão atual, blocos estruturados e comparação visual.
+            Revise, ajuste e confira a minuta do caso antes de qualquer uso externo.
           </p>
         </div>
         <span className="insight-badge">Caso em foco: #{selectedCaseId}</span>
