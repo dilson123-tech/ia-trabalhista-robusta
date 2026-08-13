@@ -2479,8 +2479,10 @@ Comece direto pelo BLOCO 1.
 
     assert "reclamante:" in normalized_qualificacao
     assert "reclamada:" in normalized_qualificacao
-    assert "ctps" in normalized_qualificacao
-    assert "contrato de trabalho" in normalized_qualificacao
+    assert "ctps" not in normalized_qualificacao
+    assert "trct" not in normalized_qualificacao
+    assert "folhas de pagamento" not in normalized_qualificacao
+    assert "contrato de trabalho" not in normalized_qualificacao
 
     forbidden_civil_heading_markers = (
         "juiz(a) de direito",
@@ -4713,3 +4715,205 @@ def test_editor_all_blocks_ready_consumer_service_not_rendered_does_not_infer_un
     assert "mensagens" not in provas
     assert "evidências da execução" not in provas
     assert "tentativas de correção" not in provas
+
+
+def test_editor_all_blocks_ready_labor_hours_does_not_invent_interval_and_keeps_reported_claims():
+    message = """
+Gere todos os blocos principais da minuta preliminar deste caso em formato de texto pronto para copiar e colar no Editor/minuta.
+
+Entregue somente os blocos finais, separados por títulos exatamente assim:
+
+BLOCO 1 — Endereçamento
+BLOCO 2 — Qualificação das partes
+BLOCO 3 — Resumo Fático
+BLOCO 4 — Fundamentação preliminar
+BLOCO 5 — Pedidos
+BLOCO 6 — Provas e requerimentos
+BLOCO 7 — Fechamento e conferência final
+
+Não invente dados. Use linguagem prudente.
+
+Comece direto pelo BLOCO 1.
+"""
+
+    response = _fallback_response(
+        case=_fake_case(
+            case_number="TRAB-HORAS-SEM-INTERVALO-001",
+            title="Possível vínculo trabalhista, horas extras e provas digitais",
+            legal_area="Trabalhista",
+            action_type="Reclamação trabalhista / reconhecimento de vínculo e verbas",
+            description=(
+                "Cliente trabalhou sem registro por dois anos, fazia horas extras todos os dias, "
+                "foi dispensado sem receber as verbas rescisórias e possui conversas no WhatsApp "
+                "e comprovantes de pagamento."
+            ),
+        ),
+        message=message,
+        context={},
+        timeline=[],
+    )
+
+    rewritten = response["rewritten_input"]
+    normalized = " ".join(rewritten.split()).lower()
+
+    qualificacao = rewritten.split("BLOCO 2 — Qualificação das partes", 1)[1].split(
+        "BLOCO 3 — Resumo Fático", 1
+    )[0]
+    resumo = rewritten.split("BLOCO 3 — Resumo Fático", 1)[1].split(
+        "BLOCO 4 — Fundamentação preliminar", 1
+    )[0]
+
+    normalized_qualificacao = " ".join(qualificacao.split()).lower()
+    normalized_resumo = " ".join(resumo.split()).lower()
+
+    assert response["assistant_mode"] == "editor_all_blocks_ready"
+    assert response["metadata"]["action_specialization_kind"] == "labor_hours_interval_claim"
+
+    # Fatos e pretensões efetivamente informados devem permanecer representados.
+    assert "sem registro" in normalized
+    assert "horas extras" in normalized
+    assert "verbas rescisórias" in normalized
+    assert "whatsapp" in normalized
+    assert "comprovantes de pagamento" in normalized
+
+    # A ausência de registro e o tipo de ação não podem ser apagados pela
+    # especialização de jornada.
+    assert "vínculo" in normalized or "registro" in normalized
+
+    # Horas extras, isoladamente, não autorizam inventar supressão de intervalo.
+    forbidden_unreported_markers = (
+        "intervalo intrajornada",
+        "intervalo suprimido",
+        "supressão parcial de intervalo",
+        "supressão total de intervalo",
+        "mensagens com gestor",
+        "das 7h às 19h",
+        "segunda a sábado",
+    )
+    for marker in forbidden_unreported_markers:
+        assert marker not in normalized
+
+    # A qualificação não deve enumerar documentos trabalhistas que não foram relatados.
+    forbidden_unreported_qualification_documents = (
+        "ctps",
+        "trct",
+        "contrato de trabalho",
+        "folhas de pagamento",
+        "procuração",
+    )
+    for marker in forbidden_unreported_qualification_documents:
+        assert marker not in normalized_qualificacao
+
+    # O resumo não deve introduzir categoria de dano que o cliente não informou.
+    assert "danos alegados" not in normalized_resumo
+
+
+def test_editor_all_blocks_ready_resumo_fatico_removes_initial_case_operational_guidance():
+    message = """
+Gere todos os blocos principais da minuta preliminar deste caso em formato de texto pronto para copiar e colar no Editor/minuta.
+
+BLOCO 1 — Endereçamento
+BLOCO 2 — Qualificação das partes
+BLOCO 3 — Resumo Fático
+BLOCO 4 — Fundamentação preliminar
+BLOCO 5 — Pedidos
+BLOCO 6 — Provas e requerimentos
+BLOCO 7 — Fechamento e conferência final
+
+Não invente dados. Use linguagem prudente.
+Comece direto pelo BLOCO 1.
+"""
+
+    response = _fallback_response(
+        case=_fake_case(
+            case_number="TRAB-RESUMO-LIMPO-001",
+            title="Possível vínculo trabalhista, horas extras e provas digitais",
+            legal_area="Trabalhista",
+            action_type="Reclamação trabalhista / reconhecimento de vínculo e verbas",
+            description=(
+                "Relato inicial do cliente: Cliente trabalhou sem registro por dois anos, "
+                "fazia horas extras todos os dias, foi dispensado sem receber as verbas rescisórias "
+                "e possui conversas no WhatsApp e comprovantes de pagamento. "
+                "O caso ainda está em montagem inicial e depende de conferência dos dados do cliente, "
+                "documentos, provas, datas, pessoas envolvidas, valores e urgências. "
+                "Antes de qualquer medida, recomenda-se organizar a linha do tempo, criar"
+            ),
+        ),
+        message=message,
+        context={},
+        timeline=[],
+    )
+
+    rewritten = response["rewritten_input"]
+    resumo = rewritten.split("BLOCO 3 — Resumo Fático", 1)[1].split(
+        "BLOCO 4 — Fundamentação preliminar", 1
+    )[0]
+    normalized = " ".join(resumo.split()).lower()
+
+    assert "trabalhou sem registro por dois anos" in normalized
+    assert "horas extras todos os dias" in normalized
+    assert "verbas rescisórias" in normalized
+    assert "whatsapp" in normalized
+    assert "comprovantes de pagamento" in normalized
+
+    assert "o caso ainda está em montagem inicial" not in normalized
+    assert "antes de qualquer medida" not in normalized
+    assert "organizar a linha do tempo" not in normalized
+
+
+def test_editor_all_blocks_ready_labor_hours_evidence_keeps_only_reported_or_conditional_proof():
+    message = """
+Gere todos os blocos principais da minuta preliminar deste caso em formato de texto pronto para copiar e colar no Editor/minuta.
+
+BLOCO 1 — Endereçamento
+BLOCO 2 — Qualificação das partes
+BLOCO 3 — Resumo Fático
+BLOCO 4 — Fundamentação preliminar
+BLOCO 5 — Pedidos
+BLOCO 6 — Provas e requerimentos
+BLOCO 7 — Fechamento e conferência final
+
+Não invente dados. Use linguagem prudente.
+Comece direto pelo BLOCO 1.
+"""
+
+    response = _fallback_response(
+        case=_fake_case(
+            case_number="TRAB-HORAS-PROVAS-SEGURAS-001",
+            title="Possível vínculo trabalhista, horas extras e provas digitais",
+            legal_area="Trabalhista",
+            action_type="Reclamação trabalhista / reconhecimento de vínculo e verbas",
+            description=(
+                "Cliente trabalhou sem registro por dois anos, fazia horas extras todos os dias, "
+                "foi dispensado sem receber as verbas rescisórias e possui conversas no WhatsApp "
+                "e comprovantes de pagamento."
+            ),
+        ),
+        message=message,
+        context={},
+        timeline=[],
+    )
+
+    rewritten = response["rewritten_input"]
+    provas = rewritten.split("BLOCO 6 — Provas e requerimentos", 1)[1].split(
+        "BLOCO 7 — Fechamento e conferência final", 1
+    )[0]
+    normalized = " ".join(provas.split()).lower()
+
+    # Provas efetivamente relatadas.
+    assert "whatsapp" in normalized
+    assert "comprovantes de pagamento" in normalized
+
+    # Outros documentos podem ser obtidos/requeridos, mas não presumidos existentes.
+    assert "não se presume" in normalized or "sem presumir" in normalized or "quando existentes" in normalized
+
+    forbidden_unreported_existing_proof = (
+        "contratos, recibos",
+        "áudios",
+        "vídeos",
+        "consultas oficiais",
+        "registros administrativos",
+        "mensagens com gestor",
+    )
+    for marker in forbidden_unreported_existing_proof:
+        assert marker not in normalized

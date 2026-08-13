@@ -1,4 +1,5 @@
 from fastapi.testclient import TestClient
+import re
 import uuid
 
 from app.main import app
@@ -187,7 +188,10 @@ def test_criminal_liberdade_provisoria_assisted_draft_flow(monkeypatch):
         "/100",
     ]
     for term in forbidden_terms:
-        assert term not in combined_text
+        if term == "cimento":
+            assert re.search(r"\bcimento\b", combined_text) is None
+        else:
+            assert term not in combined_text
 
 
 def test_criminal_resposta_acusacao_assisted_draft_has_no_civil_medical_contamination(monkeypatch):

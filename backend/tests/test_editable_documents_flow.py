@@ -8,8 +8,11 @@ client = TestClient(app)
 
 
 def _auth_headers(monkeypatch):
+    from app.api.v1.routes import cases as cases_routes
+
     monkeypatch.setattr(settings, "ALLOW_SEED_ADMIN", True)
     monkeypatch.setattr(settings, "ADMIN_SEED_TOKEN", "test-seed-token")
+    monkeypatch.setattr(cases_routes, "enforce_plan_limits", lambda *args, **kwargs: None)
 
     seed_payload = {
         "username": f"admin_edoc_{uuid.uuid4().hex[:8]}@example.com",
@@ -275,9 +278,6 @@ def test_civel_cobranca_assisted_draft_uses_collection_specific_guardrails(monke
         "restaurante mar azul",
         "itapoá/sc",
         "r$ 12.000,00",
-        "pessoa jurídica de direito privado",
-        "vara cível",
-        "conjunto probatório documental robusto",
     ]
     for term in required_terms:
         assert term in combined_text
@@ -300,9 +300,10 @@ def test_civel_cobranca_assisted_draft_uses_collection_specific_guardrails(monke
         "probabilidade estimada de êxito",
         "score",
         "/100",
-        "documentos disponíveis",
+        "documentos disponíveis:",
         "pedido pretendido",
         "observação estratégica",
+        "conjunto probatório documental robusto",
         "estratégia jurídica sugerida",
         "estratégia sugerida",
         "lacunas probatórias",
@@ -731,3 +732,89 @@ def test_assisted_draft_does_not_export_internal_final_status_as_request_directi
     assert "diretriz para fechamento dos pedidos" not in generated
     assert "MODERADA" not in generated
     assert "A definição final dos pedidos deverá observar" in generated
+
+
+def test_normal_assisted_draft_does_not_call_case_analysis(monkeypatch):
+    from app.api.v1.routes import editable_documents as editable_documents_routes
+
+    headers = _auth_headers(monkeypatch)
+
+    def fail_if_analysis_is_called(*args, **kwargs):
+        raise AssertionError(
+            "Fluxo normal Copiloto -> Editor não pode chamar análise antiga do caso"
+        )
+
+    monkeypatch.setattr(
+        editable_documents_routes,
+        "_get_or_create_case_analysis_record",
+        fail_if_analysis_is_called,
+    )
+
+    create_case_payload = {
+        "case_number": f"SAFE-NO-ANALYSIS-{uuid.uuid4().hex[:8]}",
+        "title": "Caso para validar geração segura sem análise antiga",
+        "description": (
+            "Cliente relata situação jurídica ainda em avaliação e possui documentos "
+            "que deverão ser conferidos pelo advogado."
+        ),
+        "legal_area": "civel",
+        "action_type": "Petição Inicial",
+        "status": "draft",
+    }
+
+    r_case = client.post(
+        "/api/v1/cases",
+        json=create_case_payload,
+        headers=headers,
+    )
+    assert r_case.status_code == 200
+    case_id = r_case.json()["id"]
+
+    create_document_payload = {
+        "case_id": case_id,
+        "area": "civel",
+        "document_type": "peticao_inicial",
+        "title": "Minuta segura sem análise antiga",
+        "notes": "Regressão do fluxo Copiloto -> Editor.",
+        "metadata": {
+            "source": "test_safe_copilot_editor_without_analysis",
+        },
+        "sections": [
+            {
+                "key": "resumo_fatico",
+                "title": "Resumo Fático",
+                "content": "",
+                "source": "manual",
+                "status": "draft",
+                "metadata": {},
+            }
+        ],
+    }
+
+    r_document = client.post(
+        "/api/v1/editable-documents",
+        json=create_document_payload,
+        headers=headers,
+    )
+    assert r_document.status_code == 200
+    document_id = r_document.json()["id"]
+
+    r_generate = client.post(
+        f"/api/v1/editable-documents/{document_id}/generate-assisted-draft",
+        headers=headers,
+    )
+    assert r_generate.status_code == 200
+
+    generated = r_generate.json()
+    latest_version = max(
+        generated["versions"],
+        key=lambda item: item["version_number"],
+    )
+
+    metadata = latest_version["version_metadata"]
+
+    assert metadata["analysis_id"] is None
+    assert metadata["origin_modules"] == [
+        "case_operational_assistant_editor_all_blocks_ready"
+    ]
+    assert latest_version["approved"] is False

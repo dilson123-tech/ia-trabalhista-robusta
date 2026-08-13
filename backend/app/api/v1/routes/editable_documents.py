@@ -31,11 +31,118 @@ from app.schemas.editable_document import (
 )
 from app.services.editor_export_service import build_editor_html, generate_editor_pdf
 from app.services.analysis_foundations import build_analysis_foundations
+from app.services.case_operational_assistant import build_case_operational_assistant_response
 
 router = APIRouter(
     prefix="/editable-documents",
     tags=["editable-documents"],
 )
+
+
+
+_SAFE_EDITOR_ALL_BLOCKS_MESSAGE = """
+Gere todos os blocos principais da minuta, separados por títulos exatamente assim:
+BLOCO 1 — Endereçamento
+BLOCO 2 — Qualificação das partes
+BLOCO 3 — Resumo Fático
+BLOCO 4 — Fundamentação preliminar
+BLOCO 5 — Pedidos
+BLOCO 6 — Provas e requerimentos
+BLOCO 7 — Fechamento e conferência final
+Comece direto pelo BLOCO 1.
+""".strip()
+
+
+def _build_safe_operational_assistant_sections(
+    db: Session,
+    case: Case,
+    current_user,
+) -> list[dict]:
+    response = build_case_operational_assistant_response(
+        db=db,
+        case=case,
+        current_user=current_user,
+        message=_SAFE_EDITOR_ALL_BLOCKS_MESSAGE,
+    )
+
+    if response.get("assistant_mode") != "editor_all_blocks_ready":
+        raise HTTPException(
+            status_code=500,
+            detail="Safe operational assistant did not return editor all-blocks response",
+        )
+
+    rewritten_input = str(response.get("rewritten_input") or "").strip()
+    if not rewritten_input:
+        raise HTTPException(
+            status_code=500,
+            detail="Safe operational assistant returned empty editor content",
+        )
+
+    heading_pattern = re.compile(
+        r"(?m)^BLOCO\s+([1-7])\s+[—-]\s+[^\n]+\s*$"
+    )
+    matches = list(heading_pattern.finditer(rewritten_input))
+
+    bodies: dict[int, str] = {}
+    for index, match in enumerate(matches):
+        block_number = int(match.group(1))
+        content_start = match.end()
+        content_end = (
+            matches[index + 1].start()
+            if index + 1 < len(matches)
+            else len(rewritten_input)
+        )
+        bodies[block_number] = rewritten_input[content_start:content_end].strip()
+
+    expected_blocks = {
+        1: ("enderecamento", "Endereçamento"),
+        2: ("qualificacao_partes", "Qualificação das Partes"),
+        3: ("resumo_fatico", "Resumo Fático"),
+        4: ("fundamentacao", "Fundamentação"),
+        5: ("pedidos", "Pedidos"),
+        6: ("provas_requerimentos", "Provas e Requerimentos"),
+        7: ("fechamento", "Fechamento"),
+    }
+
+    missing = [
+        number
+        for number in expected_blocks
+        if not bodies.get(number, "").strip()
+    ]
+    if missing:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Safe operational assistant omitted editor blocks: {missing}",
+        )
+
+    assistant_metadata = response.get("metadata") or {}
+    action_specialization_kind = assistant_metadata.get(
+        "action_specialization_kind"
+    )
+
+    sections = []
+    for number, (key, title) in expected_blocks.items():
+        sections.append(
+            {
+                "key": key,
+                "title": title,
+                "content": bodies[number],
+                # Mantém a origem assistida para preservar a trava
+                # de aprovação direta antes da revisão humana.
+                "source": "assisted_draft",
+                "status": "draft",
+                "metadata": {
+                    "generation_mode": "assisted_draft_from_analysis",
+                    "safe_generation_source": (
+                        "case_operational_assistant_editor_all_blocks_ready_v1"
+                    ),
+                    "action_specialization_kind": action_specialization_kind,
+                    "guardrail_status": "requires_professional_review",
+                },
+            }
+        )
+
+    return sections
 
 
 def _resolve_current_user_id(db: Session, current_user: dict) -> int | None:
@@ -5149,9 +5256,14 @@ def generate_assisted_draft(
             detail="Archived cases cannot generate assisted draft",
         )
 
-    analysis_record = _get_or_create_case_analysis_record(db=db, case=case, current_user=current_user)
+    analysis_record = None
 
     if _is_audiencia_estrategica_document_type(document.document_type):
+        analysis_record = _get_or_create_case_analysis_record(
+            db=db,
+            case=case,
+            current_user=current_user,
+        )
         assisted_sections = _build_audiencia_estrategica_sections(
             case,
             analysis_record,
@@ -5162,14 +5274,12 @@ def generate_assisted_draft(
         version_source = "audiencia_estrategica_from_analysis"
         version_generation_mode = "audiencia_estrategica_from_analysis"
     else:
-        assisted_sections = _build_assisted_sections(
-            db,
-            case,
-            analysis_record,
-            current_user["tenant_id"],
-            document_metadata=document.document_metadata or {},
+        assisted_sections = _build_safe_operational_assistant_sections(
+            db=db,
+            case=case,
+            current_user=current_user,
         )
-        version_notes = "Minuta assistida gerada a partir da análise do caso"
+        version_notes = "Minuta assistida gerada pelo Copiloto jurídico seguro"
         version_source = "assisted_draft_from_analysis"
         version_generation_mode = "assisted_draft_from_analysis"
 
@@ -5191,18 +5301,22 @@ def generate_assisted_draft(
         created_by_user_id=current_user_id,
         version_number=next_version_number,
         approved=False,
-        notes="Minuta assistida gerada a partir da análise do caso",
+        notes=version_notes,
         sections=assisted_sections,
         version_metadata={
             "source": "assisted_draft_from_analysis",
-            "analysis_id": analysis_record.id,
+            "analysis_id": analysis_record.id if analysis_record is not None else None,
             "case_id": case.id,
-            "origin_modules": [
-                "analysis",
-                "executive_summary",
-                "executive_decision",
-                "analysis_foundations",
-            ],
+            "origin_modules": (
+                [
+                    "analysis",
+                    "executive_summary",
+                    "executive_decision",
+                    "analysis_foundations",
+                ]
+                if analysis_record is not None
+                else ["case_operational_assistant_editor_all_blocks_ready"]
+            ),
         },
     )
     db.add(version)

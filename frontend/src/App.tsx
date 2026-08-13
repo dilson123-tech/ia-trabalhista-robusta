@@ -66,6 +66,7 @@ function App() {
   const [loaded, setLoaded] = useState(false)
   const [selectedCaseId, setSelectedCaseId] = useState<number | null>(null)
   const [activeFocusTab, setActiveFocusTab] = useState<'analysis' | 'summary' | 'report'>('analysis')
+  const [advancedMode, setAdvancedMode] = useState(false)
   const [analysisData, setAnalysisData] = useState<CaseAnalysisResponse | null>(null)
   const [analysisLoading, setAnalysisLoading] = useState(false)
   const [analysisError, setAnalysisError] = useState('')
@@ -272,6 +273,57 @@ function App() {
     }
 
     scrollTo('#case-workbench-anchor')
+  }
+
+  function handleAssistantInitialCaseDraft(draft: {
+    case_number: string
+    title: string
+    description: string
+    legal_area: string
+    action_type: string
+  }) {
+    const areaMap: Record<string, string> = {
+      trabalhista: 'trabalhista',
+      previdenciário: 'previdenciario',
+      previdenciario: 'previdenciario',
+      família: 'familia',
+      familia: 'familia',
+      consumidor: 'consumidor',
+      cível: 'civel',
+      civel: 'civel',
+      criminal: 'criminal',
+      empresarial: 'empresarial',
+      tributário: 'tributario',
+      tributario: 'tributario',
+      administrativo: 'administrativo',
+      imobiliário: 'imobiliario',
+      imobiliario: 'imobiliario',
+    }
+
+    const normalizedArea =
+      areaMap[draft.legal_area.trim().toLowerCase()] ?? 'outro'
+
+    setNewCaseForm((prev) => ({
+      ...prev,
+      case_number: draft.case_number,
+      title: draft.title,
+      description: draft.description,
+      legal_area: normalizedArea,
+      action_type: draft.action_type,
+    }))
+
+    setShowNewCaseForm(true)
+    setNewCaseError('')
+    setNewCaseSuccess(
+      'IA preencheu referência, título, descrição, área jurídica e tipo de ação. Confira e complete apenas os dados necessários.',
+    )
+
+    window.setTimeout(() => {
+      window.scrollTo({
+        top: 0,
+        behavior: 'smooth',
+      })
+    }, 80)
   }
 
   function sortCasesForDisplay(list: CaseItem[]) {
@@ -546,6 +598,22 @@ function App() {
     } finally {
       setAnalysisLoading(false)
     }
+  }
+
+  function handleGenerateProcessWithAI(caseId: number) {
+    setSelectedCaseId(caseId)
+    setPieceReadyNotice('Abrindo o Editor e gerando a minuta segura para revisão.')
+
+    setExpansionModuleTarget('editor')
+    setExpansionModuleRequestId((prev) => prev + 1)
+    setPieceReadyRequestId((prev) => prev + 1)
+
+    window.setTimeout(() => {
+      document.querySelector('#workspace-expansion-anchor')?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      })
+    }, 80)
   }
 
   async function handleLoadExecutiveSummary(caseId: number) {
@@ -1567,10 +1635,13 @@ function App() {
             token={token}
             caseId={selectedCaseId}
             caseLabel={selectedCase ? `${selectedCase.title} — ${selectedCase.case_number}` : null}
+            showAdvancedTools={advancedMode}
             onDestinationClick={handleAssistantDestinationClick}
+            onInitialCaseDraft={handleAssistantInitialCaseDraft}
           />
 
-        <section
+        {advancedMode ? (
+          <section
           className="insight-card"
           style={{
             marginBottom: '20px',
@@ -2220,6 +2291,9 @@ function App() {
                     </section>
                   </div>
             </section>
+        ) : null}
+
+
 
 
           <div id="workspace-expansion-anchor">
@@ -2227,6 +2301,7 @@ function App() {
             token={token}
             selectedCaseId={selectedCaseId}
             selectedCaseArea={selectedCase?.legal_area ?? null}
+            showAdvancedTools={advancedMode}
             forcedModule={expansionModuleTarget}
                 forcedModuleRequestId={expansionModuleRequestId}
             pieceReadyRequestId={pieceReadyRequestId}
@@ -2494,6 +2569,7 @@ function App() {
                   return (
                     <CaseCard
                       key={caso.id}
+                      showAdvancedTools={advancedMode}
                       caso={caso}
                         token={token}
                       selectedCaseId={selectedCaseId}
@@ -2577,9 +2653,9 @@ function App() {
               <div className="insight-head">
                 <div>
                   <p className="insight-kicker">Peça pronta</p>
-                  <h2 className="insight-title">Montagem guiada para protocolo</h2>
+                  <h2 className="insight-title">Gerar processo com IA</h2>
                   <p className="insight-description">
-                    Selecione um caso e gere a peça mastigada no Editor Jurídico Vivo com base na análise já produzida.
+                    A IA organiza o caso, monta a minuta segura no Editor e deixa a revisão final para o advogado.
                   </p>
                 </div>
                 <span className="insight-badge">
@@ -2602,15 +2678,7 @@ function App() {
                 type="button"
                 onClick={() => {
                   if (!selectedCaseId) return
-                  setExpansionModuleTarget('editor')
-                  setPieceReadyRequestId((prev) => prev + 1)
-                  setPieceReadyNotice('Abrindo o Editor Jurídico Vivo e preparando a peça pronta do caso selecionado.')
-                  window.setTimeout(() => {
-                    document.querySelector('.expansion-shell-card')?.scrollIntoView({
-                      behavior: 'smooth',
-                      block: 'start',
-                    })
-                  }, 50)
+                  handleGenerateProcessWithAI(selectedCaseId)
                 }}
                 disabled={!selectedCaseId}
                 style={{
@@ -2624,10 +2692,29 @@ function App() {
                   fontWeight: 700,
                 }}
               >
-                Gerar peça pronta
+                Gerar processo com IA
               </button>
-            </section>
+                          <div style={{ marginTop: '12px' }}>
+                <button
+                  type="button"
+                  onClick={() => setAdvancedMode((current) => !current)}
+                  style={{
+                    border: '1px solid rgba(148, 163, 184, 0.24)',
+                    borderRadius: '999px',
+                    padding: '8px 14px',
+                    background: 'transparent',
+                    color: 'var(--muted-text)',
+                    cursor: 'pointer',
+                    fontSize: '0.86rem',
+                    fontWeight: 600,
+                  }}
+                >
+                  {advancedMode ? 'Ocultar modo avançado' : 'Modo avançado'}
+                </button>
+              </div>
+</section>
 
+            {advancedMode ? (
             <CaseFocusPanel
               selectedCaseId={selectedCaseId}
               activeTab={activeFocusTab}
@@ -2644,6 +2731,7 @@ function App() {
               executivePdfError={executivePdfError}
               getRiskLabel={getRiskLabel}
             />
+            ) : null}
           </div>
         </section>
       </section>
