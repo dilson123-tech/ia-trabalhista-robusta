@@ -79,6 +79,7 @@ function App() {
   const [executivePdfLoading, setExecutivePdfLoading] = useState(false)
   const [executivePdfError, setExecutivePdfError] = useState('')
   const [showNewCaseForm, setShowNewCaseForm] = useState(false)
+  const [newCasePreparedByAssistant, setNewCasePreparedByAssistant] = useState(false)
   const [newCaseLoading, setNewCaseLoading] = useState(false)
   const [newCaseError, setNewCaseError] = useState('')
   const [newCaseSuccess, setNewCaseSuccess] = useState('')
@@ -210,6 +211,7 @@ function App() {
 
     const openNewCaseForm = () => {
       setShowNewCaseForm(true)
+      setNewCasePreparedByAssistant(false)
       setNewCaseError('')
       setNewCaseSuccess('Copiloto abriu a montagem inicial do caso. Preencha os dados básicos e salve o caso.')
 
@@ -313,9 +315,10 @@ function App() {
     }))
 
     setShowNewCaseForm(true)
+    setNewCasePreparedByAssistant(true)
     setNewCaseError('')
     setNewCaseSuccess(
-      'IA preencheu referência, título, descrição, área jurídica e tipo de ação. Confira e complete apenas os dados necessários.',
+      'A IA organizou o caso. Confira os dados essenciais do cliente e confirme para criar o caso e preparar a minuta.',
     )
 
     window.setTimeout(() => {
@@ -464,6 +467,7 @@ function App() {
     setExecutivePdfError('')
     setShowToken(false)
     setShowNewCaseForm(false)
+    setNewCasePreparedByAssistant(false)
     setNewCaseError('')
     setNewCaseSuccess('')
     setCaseActionError('')
@@ -1512,7 +1516,18 @@ function App() {
         client_whatsapp_consent: false,
         status: 'draft',
       })
-      setNewCaseSuccess(`Caso "${createdCase.title}" criado com sucesso.`)
+      setNewCaseSuccess(
+        newCasePreparedByAssistant
+          ? `Caso "${createdCase.title}" criado. Preparando a minuta para revisão.`
+          : `Caso "${createdCase.title}" criado com sucesso.`,
+      )
+
+      if (newCasePreparedByAssistant) {
+        setNewCasePreparedByAssistant(false)
+        window.setTimeout(() => {
+          handleGenerateProcessWithAI(createdCase.id)
+        }, 120)
+      }
     } catch (err) {
       const fallback = handleApiFailure(err, 'Não foi possível criar o novo caso.')
       if (fallback) {
@@ -1606,6 +1621,7 @@ function App() {
           showNewCaseForm={showNewCaseForm}
           onToggleNewCaseForm={() => {
             setShowNewCaseForm((prev) => !prev)
+            setNewCasePreparedByAssistant(false)
             setNewCaseError('')
             setNewCaseSuccess('')
           }}
@@ -1618,11 +1634,13 @@ function App() {
           }}
           error={error}
           newCaseForm={newCaseForm}
+          assistantPreparedCase={newCasePreparedByAssistant}
           onNewCaseFieldChange={handleNewCaseFieldChange}
           newCaseLoading={newCaseLoading}
           onCreateNewCase={handleCreateNewCase}
           onCancelNewCase={() => {
             setShowNewCaseForm(false)
+            setNewCasePreparedByAssistant(false)
             setNewCaseError('')
             setNewCaseSuccess('')
           }}
@@ -1637,6 +1655,14 @@ function App() {
             caseLabel={selectedCase ? `${selectedCase.title} — ${selectedCase.case_number}` : null}
             showAdvancedTools={advancedMode}
             onDestinationClick={handleAssistantDestinationClick}
+            onStartNewCase={() => {
+              setSelectedCaseId(null)
+              setShowNewCaseForm(false)
+              setNewCasePreparedByAssistant(false)
+              setNewCaseError('')
+              setNewCaseSuccess('')
+              setPieceReadyNotice('')
+            }}
             onInitialCaseDraft={handleAssistantInitialCaseDraft}
           />
 

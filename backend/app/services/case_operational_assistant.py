@@ -2185,6 +2185,98 @@ def _normalize_editor_detection_text(*values: Any) -> str:
     return " ".join(" ".join(str(value or "").lower().split()) for value in values)
 
 
+def _is_civil_payment_obligation_collection(
+    source_text: str,
+    context: dict[str, Any] | None = None,
+) -> bool:
+    context = context or {}
+    case_context = context.get("case_context") if isinstance(context, dict) else {}
+    case_context = case_context if isinstance(case_context, dict) else {}
+
+    normalized = _normalize_editor_detection_text(
+        source_text,
+        *(case_context.values()),
+    )
+
+    legal_area = str(case_context.get("legal_area") or "").strip().lower()
+    normalized_legal_area = (
+        legal_area
+        .replace("_", " ")
+        .replace("-", " ")
+    )
+    normalized_legal_area = " ".join(normalized_legal_area.split())
+
+    allowed_civil_areas = {
+        "",
+        "civel",
+        "cível",
+        "civil",
+    }
+
+    if normalized_legal_area not in allowed_civil_areas:
+        return False
+
+    collection_markers = (
+        "cobrança cível",
+        "cobranca civel",
+        "obrigação de pagamento não cumprida",
+        "obrigacao de pagamento nao cumprida",
+        "empréstimo",
+        "emprestimo",
+        "emprestou",
+        "prometeu devolver",
+        "prometeu pagar",
+        "dívida",
+        "divida",
+        "devedor",
+        "parcelas não pagas",
+        "parcelas nao pagas",
+        "nenhuma parcela foi paga",
+        "não foram pagas",
+        "nao foram pagas",
+    )
+    payment_markers = (
+        "pagamento",
+        "pagar",
+        "paga",
+        "pago",
+        "devolver",
+        "parcela",
+        "parcelas",
+        "valor",
+        "transferência",
+        "transferencia",
+        "pix",
+        "r$",
+    )
+    consumer_exclusions = (
+        "cobrança indevida",
+        "cobranca indevida",
+        "tarifa indevida",
+        "negativação",
+        "negativacao",
+        "consumidor",
+        "fornecedor",
+    )
+    service_contract_exclusions = (
+        "saldo contratual",
+        "ordem de serviço",
+        "ordem de servico",
+        "prestou serviços",
+        "prestou servicos",
+        "serviços de manutenção",
+        "servicos de manutencao",
+        "foi contratada pela empresa",
+    )
+
+    return (
+        any(marker in normalized for marker in collection_markers)
+        and any(marker in normalized for marker in payment_markers)
+        and not any(marker in normalized for marker in consumer_exclusions)
+        and not any(marker in normalized for marker in service_contract_exclusions)
+    )
+
+
 def _is_cobranca_contratual_without_moral_damage(
     source_text: str,
     context: dict[str, Any] | None = None,
@@ -3818,6 +3910,30 @@ def _build_editor_all_blocks_action_specialization(
     general_contract_details = _detect_general_consumer_contract_details(
         normalized
     )
+
+    if _is_civil_payment_obligation_collection(source_text, context):
+        return (
+            "civil_payment_obligation_collection_claim",
+            (
+                "A fundamentação preliminar da cobrança cível deve permanecer limitada à obrigação de pagamento "
+                "efetivamente relatada, ao valor informado, às condições de devolução ou pagamento narradas e ao "
+                "inadimplemento indicado no caso. Devem ser confrontadas somente as provas efetivamente disponíveis, "
+                "sem presumir contrato escrito, reconhecimento formal da dívida, datas adicionais de vencimento, "
+                "juros pactuados, multa, garantias, prejuízos ou outras obrigações não informadas. "
+                "A natureza jurídica da obrigação, sua exigibilidade, eventual prescrição, competência, rito, "
+                "correção monetária, juros legalmente aplicáveis e extensão final da pretensão devem ser confirmados "
+                "pelo advogado responsável após revisão dos fatos e documentos."
+            ),
+            (
+                "Diante do exposto, e sem prejuízo de adequação pelo advogado responsável, requer-se a citação da parte ré "
+                "e, se confirmadas a obrigação e a inadimplência pelos elementos disponíveis, a condenação ao pagamento "
+                "do valor efetivamente devido e comprovado, observadas somente as parcelas e condições relatadas no caso. "
+                "A incidência de correção monetária e juros deve seguir o regime jurídico que o advogado confirmar como aplicável, "
+                "sem presumir taxa, termo inicial ou encargo não informado. Requer-se a preservação e juntada apenas das provas "
+                "efetivamente disponíveis e pertinentes à obrigação narrada. Os pedidos finais, valor da causa, critérios de "
+                "atualização, custas, honorários e demais requerimentos devem ser definidos pelo advogado responsável."
+            ),
+        )
 
     if _is_cobranca_contratual_without_moral_damage(source_text, context):
         return (
@@ -5490,6 +5606,18 @@ def _editor_all_blocks_ready_response(
             if item
         )
 
+    if action_specialization_kind == "civil_payment_obligation_collection_claim":
+        qualificacao = "\n\n".join(
+            item
+            for item in (
+                parte_autora
+                or "Parte autora: a confirmar, conforme dados de identificação efetivamente disponíveis no caso.",
+                parte_re
+                or "Parte ré: a confirmar, conforme dados de identificação efetivamente disponíveis no caso.",
+            )
+            if item
+        )
+
     criminal_action_specialization_kinds = {
         "criminal_liberdade_provisoria_claim",
         "criminal_resposta_acusacao_claim",
@@ -5501,6 +5629,19 @@ def _editor_all_blocks_ready_response(
             "O advogado responsável deverá confirmar, antes do protocolo, a competência material e territorial, "
             "o juízo competente, eventual prevenção, a situação processual atual e a adequação da medida criminal "
             "conforme os autos e os fatos efetivamente confirmados."
+        )
+
+    if action_specialization_kind == "criminal_liberdade_provisoria_claim":
+        qualificacao = (
+            "Pessoa custodiada: a confirmar, conforme dados de identificação "
+            "efetivamente disponíveis no caso e nos autos."
+        )
+    elif action_specialization_kind == "criminal_resposta_acusacao_claim":
+        qualificacao = (
+            "Pessoa acusada: a confirmar, conforme dados de identificação "
+            "efetivamente disponíveis no caso e nos autos.\n\n"
+            "Órgão de acusação ou querelante: a confirmar conforme os autos, "
+            "sem presumir titularidade, natureza da ação penal ou polo processual."
         )
 
     family_action_specialization_kinds = {
@@ -5625,20 +5766,81 @@ def _editor_all_blocks_ready_response(
             + " A análise deve permanecer vinculada aos fatos relatados e aos documentos disponíveis no caso."
         )
 
-    if "documentos essenciais" not in pedidos.lower():
+    if (
+        action_specialization_kind != "civil_payment_obligation_collection_claim"
+        and action_specialization_kind not in criminal_action_specialization_kinds
+        and "documentos essenciais" not in pedidos.lower()
+    ):
         pedidos = (
             pedidos.rstrip()
             + " Requer-se também a exibição, preservação ou juntada dos documentos essenciais da relação jurídica discutida."
         )
 
-    if "pedidos finais" not in pedidos.lower():
+    if (
+        action_specialization_kind not in criminal_action_specialization_kinds
+        and "pedidos finais" not in pedidos.lower()
+    ):
         pedidos = (
             pedidos.rstrip()
             + " Os pedidos finais, valor da causa, custas, honorários, eventual urgência e demais requerimentos "
             "devem ser definidos pelo advogado responsável."
         )
 
-    if action_specialization_kind == "family_support_guardianship_claim":
+    if action_specialization_kind == "civil_payment_obligation_collection_claim":
+        civil_collection_evidence_normalized = _normalize_editor_detection_text(
+            source_body,
+            *(editor_context["case_context"].values()),
+        )
+
+        reported_civil_collection_evidence: list[str] = []
+
+        if "whatsapp" in civil_collection_evidence_normalized:
+            reported_civil_collection_evidence.append("conversas no WhatsApp")
+        elif _editor_text_has_any(
+            civil_collection_evidence_normalized,
+            ("mensagem", "mensagens", "print", "prints"),
+        ):
+            reported_civil_collection_evidence.append("mensagens efetivamente relatadas")
+
+        if _editor_text_has_any(
+            civil_collection_evidence_normalized,
+            (
+                "comprovante da transferência bancária",
+                "comprovante da transferencia bancaria",
+                "comprovante de transferência bancária",
+                "comprovante de transferencia bancaria",
+            ),
+        ):
+            reported_civil_collection_evidence.append("comprovante da transferência bancária")
+        elif _editor_text_has_any(
+            civil_collection_evidence_normalized,
+            ("comprovante pix", "comprovantes pix"),
+        ):
+            reported_civil_collection_evidence.append("comprovante Pix")
+        elif _editor_text_has_any(
+            civil_collection_evidence_normalized,
+            ("comprovante de pagamento", "comprovantes de pagamento"),
+        ):
+            reported_civil_collection_evidence.append("comprovante de pagamento")
+
+        if reported_civil_collection_evidence:
+            reported_evidence_text = (
+                "Entre as provas expressamente relatadas no caso, devem ser preservados e juntados "
+                + ", ".join(reported_civil_collection_evidence)
+                + ". "
+            )
+        else:
+            reported_evidence_text = (
+                "Não há prova documental específica que possa ser presumida além dos elementos efetivamente informados no caso. "
+            )
+
+        provas = (
+            reported_evidence_text
+            + "Outros documentos ou meios de prova somente devem ser incluídos se forem posteriormente apresentados, "
+            "confirmados e considerados pertinentes pelo advogado responsável. "
+            "Nenhum documento, comunicação, testemunho, registro ou conteúdo probatório deve ser inventado ou presumido."
+        )
+    elif action_specialization_kind == "family_support_guardianship_claim":
         provas = (
             "Protesta-se pela produção dos meios de prova pertinentes à demanda de Família, especialmente certidão de nascimento, "
             "documentos pessoais dos responsáveis, comprovante de residência, comprovantes das despesas da criança ou adolescente, "
@@ -6522,10 +6724,16 @@ def _editor_all_blocks_ready_response(
 
     if action_specialization_kind in criminal_action_specialization_kinds:
         fechamento = (
-            fechamento
-            + " Esta minuta não representa promessa de resultado e não afirma culpa ou inocência. "
+            "A presente minuta criminal é preliminar e deve ser revisada pelo advogado responsável "
+            "antes de qualquer protocolo ou uso externo. Devem ser confirmados os dados de identificação "
+            "da pessoa assistida, o juízo competente, a situação processual atual, o conteúdo dos autos e "
+            "das decisões efetivamente disponíveis, as datas relevantes, a medida processual cabível, "
+            "os fundamentos e os pedidos finais. Onde houver informação incompleta, divergente ou ainda "
+            "não confirmada nos autos, deve constar a expressão “a confirmar” ou equivalente prudente. "
+            "Esta minuta não representa promessa de resultado e não afirma culpa ou inocência. "
             "Este conteúdo não deve ser usado externamente sem revisão do advogado responsável. "
-            "Nenhuma prova deve ser inventada, presumida ou atribuída às partes ou testemunhas sem confirmação nos autos."
+            "Nenhuma prova deve ser inventada, presumida ou atribuída às partes ou testemunhas sem "
+            "confirmação nos autos."
         )
 
     blocks = (

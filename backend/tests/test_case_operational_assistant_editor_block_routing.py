@@ -2080,6 +2080,127 @@ Comece direto pelo BLOCO 1.
         assert marker not in normalized_pedidos
 
 
+def test_editor_all_blocks_ready_civil_payment_obligation_collection_keeps_only_reported_claims_and_evidence():
+    message = """
+Gere todos os blocos principais da minuta preliminar deste caso em formato de texto pronto para copiar e colar no Editor/minuta.
+
+Entregue somente os blocos finais, separados por títulos exatamente assim:
+
+BLOCO 1 — Endereçamento
+BLOCO 2 — Qualificação das partes
+BLOCO 3 — Resumo Fático
+BLOCO 4 — Fundamentação preliminar
+BLOCO 5 — Pedidos
+BLOCO 6 — Provas e requerimentos
+BLOCO 7 — Fechamento e conferência final
+
+Não traga checklist operacional, linha do tempo, anexos, testemunhas, análise, próximos passos, alertas ou explicações fora dos blocos.
+
+Não invente dados. Use linguagem prudente.
+
+Comece direto pelo BLOCO 1.
+"""
+
+    response = _fallback_response(
+        case=_fake_case(
+            case_number="CIVEL-COBRANCA-SIMPLES-001",
+            title="Cobrança cível por obrigação de pagamento não cumprida",
+            legal_area="cível",
+            action_type=(
+                "Cobrança cível / obrigação de pagamento não cumprida, "
+                "a confirmar conforme documentos"
+            ),
+            description=(
+                "Relato inicial do cliente: Cliente emprestou R$ 8.000,00 a um conhecido, "
+                "que prometeu devolver o valor em três parcelas. Nenhuma parcela foi paga. "
+                "O cliente possui conversas no WhatsApp sobre o empréstimo e comprovante "
+                "da transferência bancária. Informações sujeitas à conferência do advogado "
+                "antes da geração e do uso da minuta."
+            ),
+        ),
+        message=message,
+        context={},
+        timeline=[],
+    )
+
+    rewritten = response["rewritten_input"]
+
+    assert response["assistant_mode"] == "editor_all_blocks_ready"
+    assert response["metadata"]["action_specialization_kind"] == (
+        "civil_payment_obligation_collection_claim"
+    )
+
+    qualificacao = rewritten.split(
+        "BLOCO 2 — Qualificação das partes", 1
+    )[1].split("BLOCO 3 — Resumo Fático", 1)[0]
+    resumo = rewritten.split(
+        "BLOCO 3 — Resumo Fático", 1
+    )[1].split("BLOCO 4 — Fundamentação preliminar", 1)[0]
+    fundamentacao = rewritten.split(
+        "BLOCO 4 — Fundamentação preliminar", 1
+    )[1].split("BLOCO 5 — Pedidos", 1)[0]
+    pedidos = rewritten.split(
+        "BLOCO 5 — Pedidos", 1
+    )[1].split("BLOCO 6 — Provas e requerimentos", 1)[0]
+    provas = rewritten.split(
+        "BLOCO 6 — Provas e requerimentos", 1
+    )[1].split("BLOCO 7 — Fechamento e conferência final", 1)[0]
+
+    normalized_qualification = " ".join(qualificacao.split()).lower()
+    normalized_summary = " ".join(resumo.split()).lower()
+    normalized_foundation = " ".join(fundamentacao.split()).lower()
+    normalized_requests = " ".join(pedidos.split()).lower()
+    normalized_evidence = " ".join(provas.split()).lower()
+
+    assert "r$ 8.000,00" in normalized_summary
+    assert "três parcelas" in normalized_summary
+    assert "nenhuma parcela foi paga" in normalized_summary
+    assert "whatsapp" in normalized_summary
+    assert "transferência bancária" in normalized_summary
+
+    assert "obrigação de pagamento" in normalized_foundation
+    assert "inadimplemento" in normalized_foundation
+    assert "valor efetivamente devido e comprovado" in normalized_requests
+    assert "conversas no whatsapp" in normalized_evidence
+    assert "comprovante da transferência bancária" in normalized_evidence
+
+    forbidden_qualification_markers = (
+        "documentos pessoais",
+        "comprovante de endereço",
+        "procuração",
+        "contrato",
+        "cadastro público",
+    )
+    for marker in forbidden_qualification_markers:
+        assert marker not in normalized_qualification
+
+    forbidden_request_markers = (
+        "prestação de contas",
+        "obrigação de fazer",
+        "obrigação de não fazer",
+        "danos materiais",
+        "danos morais",
+        "tutela de urgência",
+        "exibição dos documentos essenciais",
+    )
+    for marker in forbidden_request_markers:
+        assert marker not in normalized_requests
+
+    forbidden_evidence_markers = (
+        "contrato",
+        "recibos",
+        "áudios",
+        "videos",
+        "vídeos",
+        "consultas oficiais",
+        "registros administrativos",
+        "depoimento pessoal",
+        "testemunhas",
+    )
+    for marker in forbidden_evidence_markers:
+        assert marker not in normalized_evidence
+
+
 def test_editor_all_blocks_ready_universal_action_specialization_router_keeps_consumer_vehicle_requests_specific():
     message = """
 Gere todos os blocos principais da minuta preliminar deste caso em formato de texto pronto para copiar e colar no Editor/minuta.
@@ -4916,4 +5037,182 @@ Comece direto pelo BLOCO 1.
         "mensagens com gestor",
     )
     for marker in forbidden_unreported_existing_proof:
+        assert marker not in normalized
+
+
+def test_editor_all_blocks_ready_criminal_liberdade_provisoria_removes_civil_fallbacks():
+    message = """
+Gere todos os blocos principais da minuta preliminar deste caso em formato de texto pronto para copiar e colar no Editor/minuta.
+
+BLOCO 1 — Endereçamento
+BLOCO 2 — Qualificação das partes
+BLOCO 3 — Resumo Fático
+BLOCO 4 — Fundamentação preliminar
+BLOCO 5 — Pedidos
+BLOCO 6 — Provas e requerimentos
+BLOCO 7 — Fechamento e conferência final
+
+Não invente dados. Use linguagem prudente.
+Comece direto pelo BLOCO 1.
+"""
+
+    response = _fallback_response(
+        case=_fake_case(
+            case_number="CRIM-LIBERDADE-PROVISORIA-001",
+            title="Pedido de liberdade provisória com situação processual a confirmar",
+            legal_area="Criminal",
+            action_type=(
+                "Pedido criminal de liberdade provisória, sujeito à confirmação "
+                "dos autos e requisitos aplicáveis"
+            ),
+            description=(
+                "Relato inicial do cliente: Cliente foi preso em flagrante após uma discussão. "
+                "A família informa que ele não possui antecedentes e tem endereço fixo. "
+                "Ainda não temos cópia do auto de prisão nem decisão da audiência de custódia. "
+                "Precisamos avaliar a possibilidade de liberdade provisória conforme os autos. "
+                "Informações sujeitas à conferência do advogado antes da geração e do uso da minuta."
+            ),
+        ),
+        message=message,
+        context={},
+        timeline=[],
+    )
+
+    rewritten = response["rewritten_input"]
+
+    qualificacao = rewritten.split("BLOCO 2 — Qualificação das partes", 1)[1].split(
+        "BLOCO 3 — Resumo Fático", 1
+    )[0]
+    fundamentacao = rewritten.split("BLOCO 4 — Fundamentação preliminar", 1)[1].split(
+        "BLOCO 5 — Pedidos", 1
+    )[0]
+    pedidos = rewritten.split("BLOCO 5 — Pedidos", 1)[1].split(
+        "BLOCO 6 — Provas e requerimentos", 1
+    )[0]
+    provas = rewritten.split("BLOCO 6 — Provas e requerimentos", 1)[1].split(
+        "BLOCO 7 — Fechamento e conferência final", 1
+    )[0]
+    fechamento = rewritten.split("BLOCO 7 — Fechamento e conferência final", 1)[1]
+
+    normalized_qualificacao = " ".join(qualificacao.split()).lower()
+    normalized_fundamentacao = " ".join(fundamentacao.split()).lower()
+    normalized_pedidos = " ".join(pedidos.split()).lower()
+    normalized_provas = " ".join(provas.split()).lower()
+    normalized_fechamento = " ".join(fechamento.split()).lower()
+
+    assert response["assistant_mode"] == "editor_all_blocks_ready"
+    assert (
+        response["metadata"]["action_specialization_kind"]
+        == "criminal_liberdade_provisoria_claim"
+    )
+
+    # O núcleo criminal deve permanecer prudente e vinculado aos autos.
+    assert "liberdade provisória" in normalized_pedidos
+    assert "fatos efetivamente relatados" in normalized_fundamentacao
+    assert "situação processual atual" in normalized_fundamentacao
+    assert "não afirma culpa ou inocência" in normalized_fechamento
+
+    # Não se pode transformar a falta de documentos em fato confirmado.
+    assert "audiência de custódia" in rewritten.lower()
+    assert "decisão" in rewritten.lower()
+    assert (
+        "quando esses elementos estiverem confirmados" in normalized_fundamentacao
+        or "quando confirmados" in normalized_fundamentacao
+    )
+
+    # A qualificação criminal não pode herdar o modelo cível genérico.
+    forbidden_qualification_markers = (
+        "parte autora",
+        "parte ré",
+        "contrato",
+        "documentos da relação jurídica",
+    )
+    for marker in forbidden_qualification_markers:
+        assert marker not in normalized_qualificacao
+
+    # O pedido criminal não pode receber requerimentos patrimoniais/cíveis automáticos.
+    forbidden_request_markers = (
+        "documentos essenciais da relação jurídica",
+        "valor da causa",
+        "custas",
+        "honorários",
+    )
+    for marker in forbidden_request_markers:
+        assert marker not in normalized_pedidos
+
+    # Provas devem continuar condicionais, sem catálogo genérico presumido.
+    assert "não se presume a existência de testemunhas" in normalized_provas
+    assert "deve ser inventado ou presumido" in normalized_provas
+
+    # O fechamento criminal deve falar em autos e situação processual,
+    # sem reaproveitar conferências próprias do template cível.
+    forbidden_closing_markers = (
+        "valor da causa",
+        "documentos essenciais",
+        "provas mínimas",
+    )
+    for marker in forbidden_closing_markers:
+        assert marker not in normalized_fechamento
+
+
+def test_editor_all_blocks_ready_criminal_with_payment_terms_does_not_route_to_civil_collection():
+    message = """
+Gere todos os blocos principais da minuta preliminar deste caso em formato de texto pronto para copiar e colar no Editor/minuta.
+
+BLOCO 1 — Endereçamento
+BLOCO 2 — Qualificação das partes
+BLOCO 3 — Resumo Fático
+BLOCO 4 — Fundamentação preliminar
+BLOCO 5 — Pedidos
+BLOCO 6 — Provas e requerimentos
+BLOCO 7 — Fechamento e conferência final
+
+Não invente dados. Use linguagem prudente.
+Comece direto pelo BLOCO 1.
+"""
+
+    response = _fallback_response(
+        case=_fake_case(
+            case_number="CRIM-LIBERDADE-DIVIDA-001",
+            title="Pedido de liberdade provisória com situação processual a confirmar",
+            legal_area="Criminal",
+            action_type=(
+                "Pedido criminal de liberdade provisória, sujeito à confirmação "
+                "dos autos e requisitos aplicáveis"
+            ),
+            description=(
+                "Cliente foi preso em flagrante após discussão relacionada a uma dívida. "
+                "O relato menciona valor de R$ 3.000,00, parcelas e promessa de pagamento, "
+                "mas a medida a ser avaliada é liberdade provisória conforme os autos. "
+                "Ainda não há decisão da audiência de custódia disponível."
+            ),
+        ),
+        message=message,
+        context={},
+        timeline=[],
+    )
+
+    rewritten = response["rewritten_input"]
+    normalized = " ".join(rewritten.split()).lower()
+
+    pedidos = rewritten.split("BLOCO 5 — Pedidos", 1)[1].split(
+        "BLOCO 6 — Provas e requerimentos", 1
+    )[0]
+    normalized_pedidos = " ".join(pedidos.split()).lower()
+
+    assert response["assistant_mode"] == "editor_all_blocks_ready"
+    assert (
+        response["metadata"]["action_specialization_kind"]
+        == "criminal_liberdade_provisoria_claim"
+    )
+
+    assert "liberdade provisória" in normalized_pedidos
+
+    forbidden_civil_collection_markers = (
+        "valor efetivamente devido e comprovado",
+        "obrigação de pagamento",
+        "cobrança cível",
+        "condenação ao pagamento",
+    )
+    for marker in forbidden_civil_collection_markers:
         assert marker not in normalized

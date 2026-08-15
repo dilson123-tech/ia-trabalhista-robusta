@@ -340,3 +340,165 @@ def test_criminal_resposta_acusacao_assisted_draft_has_no_civil_medical_contamin
     for term in forbidden_terms:
         assert term not in combined_text
 
+
+def test_criminal_quick_flow_repairs_legacy_trabalhista_document_area(monkeypatch):
+    headers = _auth_headers(monkeypatch)
+
+    create_case_payload = {
+        "case_number": f"CRIM-LEGACY-QUICK-{uuid.uuid4().hex[:8]}",
+        "title": "Pedido de liberdade provisória com situação processual a confirmar",
+        "description": (
+            "Cliente foi preso em flagrante após uma discussão. "
+            "Ainda não há cópia do auto de prisão nem decisão da audiência de custódia. "
+            "A defesa precisa avaliar a possibilidade de liberdade provisória conforme os autos."
+        ),
+        "legal_area": "criminal",
+        "action_type": "liberdade_provisoria",
+        "status": "draft",
+    }
+
+    r_case = client.post("/api/v1/cases", json=create_case_payload, headers=headers)
+    assert r_case.status_code == 200
+    case_id = r_case.json()["id"]
+
+    create_document_payload = {
+        "case_id": case_id,
+        "area": "trabalhista",
+        "document_type": "peticao_inicial",
+        "title": f"Peça pronta — Caso #{case_id}",
+        "notes": "Documento legado do fluxo rápido.",
+        "metadata": {
+            "source": "piece_ready_quick_flow",
+        },
+        "sections": [
+            {
+                "key": "resumo_fatico",
+                "title": "Resumo Fático",
+                "content": "",
+                "source": "manual",
+                "status": "draft",
+                "metadata": {},
+            },
+            {
+                "key": "fundamentacao",
+                "title": "Fundamentação",
+                "content": "",
+                "source": "manual",
+                "status": "draft",
+                "metadata": {},
+            },
+            {
+                "key": "pedidos",
+                "title": "Pedidos",
+                "content": "",
+                "source": "manual",
+                "status": "draft",
+                "metadata": {},
+            },
+        ],
+    }
+
+    r_create_doc = client.post(
+        "/api/v1/editable-documents",
+        json=create_document_payload,
+        headers=headers,
+    )
+    assert r_create_doc.status_code == 200
+    created = r_create_doc.json()
+    assert created["area"] == "trabalhista"
+    document_id = created["id"]
+
+    r_generate = client.post(
+        f"/api/v1/editable-documents/{document_id}/generate-assisted-draft",
+        headers=headers,
+    )
+    assert r_generate.status_code == 200
+
+    generated = r_generate.json()
+    assert generated["area"] == "criminal"
+    assert generated["document_metadata"]["source"] == "piece_ready_quick_flow"
+    assert generated["document_metadata"]["area_repaired_from"] == "trabalhista"
+    assert (
+        generated["document_metadata"]["area_repair_reason"]
+        == "legacy_piece_ready_quick_flow_criminal_fallback"
+    )
+
+
+def test_criminal_manual_document_area_is_not_repaired_automatically(monkeypatch):
+    headers = _auth_headers(monkeypatch)
+
+    create_case_payload = {
+        "case_number": f"CRIM-MANUAL-AREA-{uuid.uuid4().hex[:8]}",
+        "title": "Caso criminal com documento manual",
+        "description": (
+            "Caso criminal em análise. O documento foi criado manualmente pelo advogado "
+            "e sua área não deve ser alterada automaticamente pelo reparo de compatibilidade."
+        ),
+        "legal_area": "criminal",
+        "action_type": "a_confirmar",
+        "status": "draft",
+    }
+
+    r_case = client.post("/api/v1/cases", json=create_case_payload, headers=headers)
+    assert r_case.status_code == 200
+    case_id = r_case.json()["id"]
+
+    create_document_payload = {
+        "case_id": case_id,
+        "area": "trabalhista",
+        "document_type": "peticao_inicial",
+        "title": "Documento manual preservado",
+        "notes": "Documento criado manualmente para validar escopo do reparo.",
+        "metadata": {
+            "source": "frontend_expansion_shell",
+        },
+        "sections": [
+            {
+                "key": "resumo_fatico",
+                "title": "Resumo Fático",
+                "content": "",
+                "source": "manual",
+                "status": "draft",
+                "metadata": {},
+            },
+            {
+                "key": "fundamentacao",
+                "title": "Fundamentação",
+                "content": "",
+                "source": "manual",
+                "status": "draft",
+                "metadata": {},
+            },
+            {
+                "key": "pedidos",
+                "title": "Pedidos",
+                "content": "",
+                "source": "manual",
+                "status": "draft",
+                "metadata": {},
+            },
+        ],
+    }
+
+    r_create_doc = client.post(
+        "/api/v1/editable-documents",
+        json=create_document_payload,
+        headers=headers,
+    )
+    assert r_create_doc.status_code == 200
+    created = r_create_doc.json()
+    assert created["area"] == "trabalhista"
+    document_id = created["id"]
+
+    r_generate = client.post(
+        f"/api/v1/editable-documents/{document_id}/generate-assisted-draft",
+        headers=headers,
+    )
+    assert r_generate.status_code == 200
+
+    generated = r_generate.json()
+    assert generated["area"] == "trabalhista"
+    assert generated["document_metadata"]["source"] == "frontend_expansion_shell"
+    assert "area_repaired_from" not in generated["document_metadata"]
+    assert "area_repair_reason" not in generated["document_metadata"]
+

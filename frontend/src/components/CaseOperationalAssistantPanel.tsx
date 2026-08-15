@@ -47,6 +47,7 @@ type CaseOperationalAssistantPanelProps = {
   caseLabel?: string | null
   showAdvancedTools?: boolean
   onDestinationClick?: (destination: string, suggestedText?: string, label?: string) => void
+  onStartNewCase?: () => void
   onInitialCaseDraft?: (draft: {
     case_number: string
     title: string
@@ -180,6 +181,18 @@ function extractInitialCaseDescription(message: string): string {
   return normalizeInitialCaseText(message.slice(valueStart, valueEnd))
 }
 
+function isCivilCollectionCase(message: string): boolean {
+  const text = message.toLowerCase()
+
+  const obligationMarker =
+    /(empréstimo|emprestimo|emprestou|emprestado|dívida|divida|devedor|credor|inadimpl|parcela|parcelas|prometeu devolver|prometeu pagar|valor devido|não pagou|nao pagou|não foi pago|nao foi pago|nenhuma parcela foi paga|cobrança|cobranca)/.test(text)
+
+  const paymentMarker =
+    /(pagamento|pagar|pago|paga|devolver|devolução|devolucao|transferência|transferencia|pix|depósito|deposito|valor|r\$)/.test(text)
+
+  return obligationMarker && paymentMarker
+}
+
 function inferInitialCaseArea(message: string): string {
   const text = message.toLowerCase()
 
@@ -199,12 +212,28 @@ function inferInitialCaseArea(message: string): string {
     return 'consumidor'
   }
 
-  if (/(pátio|patio|carreta|veículo|veiculo|contrato|indenização|indenizacao|dano|responsabilidade civil|locação|locacao)/.test(text)) {
+  if (isCivilCollectionCase(message)) {
     return 'cível'
   }
 
-  if (/(furto|roubo|ameaça|ameaca|agressão|agressao|delegacia|boletim de ocorrência|bo|crime)/.test(text)) {
-    return 'cível / criminal'
+  const civilCustodyPropertyCase =
+    /(pátio|patio|carreta)/.test(text) &&
+    /(guarda|desapareceu|desaparecimento|sumiu|furto|roubo|responsabilidade)/.test(text)
+
+  if (civilCustodyPropertyCase) {
+    return 'cível'
+  }
+
+  if (
+    /(furto|roubo|ameaça|ameaca|agressão|agressao|delegacia|boletim de ocorrência|bo|crime|prisão|prisao|preso|flagrante|audiência de custódia|audiencia de custodia|denúncia|denuncia|acusação|acusacao|resposta à acusação|resposta a acusacao|liberdade provisória|liberdade provisoria)/.test(text)
+  ) {
+    return 'criminal'
+  }
+
+  if (
+    /(pátio|patio|carreta|veículo|veiculo|contrato|indenização|indenizacao|dano|responsabilidade civil|locação|locacao)/.test(text)
+  ) {
+    return 'cível'
   }
 
   return 'a definir'
@@ -231,6 +260,22 @@ function inferInitialActionType(message: string, area: string): string {
 
   if (area === 'consumidor') {
     return 'Ação consumerista / reparação por falha na prestação ou produto'
+  }
+
+  if (area === 'criminal') {
+    if (/(liberdade provisória|liberdade provisoria)/.test(text)) {
+      return 'Pedido criminal de liberdade provisória, sujeito à confirmação dos autos e requisitos aplicáveis'
+    }
+
+    if (/(resposta à acusação|resposta a acusacao|denúncia|denuncia|acusação|acusacao)/.test(text)) {
+      return 'Defesa criminal / resposta à acusação, sujeita à confirmação da fase processual e dos autos'
+    }
+
+    return 'Medida criminal a definir conforme fatos, autos e situação processual'
+  }
+
+  if (area === 'cível' && isCivilCollectionCase(message)) {
+    return 'Cobrança cível / obrigação de pagamento não cumprida, a confirmar conforme documentos'
   }
 
   if (/(pátio|patio|carreta|veículo|veiculo|guarda|furto|desapareceu|sumiu)/.test(text)) {
@@ -265,6 +310,22 @@ function buildInitialCaseTitle(message: string, area: string): string {
 
   if (area === 'consumidor') {
     return 'Falha de produto/serviço com documentos e mensagens'
+  }
+
+  if (area === 'criminal') {
+    if (/(liberdade provisória|liberdade provisoria)/.test(text)) {
+      return 'Pedido de liberdade provisória com situação processual a confirmar'
+    }
+
+    if (/(resposta à acusação|resposta a acusacao|denúncia|denuncia|acusação|acusacao)/.test(text)) {
+      return 'Defesa criminal com acusação e fase processual a confirmar'
+    }
+
+    return 'Questão criminal com fatos e situação processual a confirmar'
+  }
+
+  if (area === 'cível' && isCivilCollectionCase(message)) {
+    return 'Cobrança cível por obrigação de pagamento não cumprida'
   }
 
   return 'Caso em montagem inicial'
@@ -309,6 +370,7 @@ export function CaseOperationalAssistantPanel({
   caseLabel,
   showAdvancedTools = false,
   onDestinationClick,
+  onStartNewCase,
   onInitialCaseDraft,
 }: CaseOperationalAssistantPanelProps) {
   const [message, setMessage] = useState('')
@@ -363,11 +425,8 @@ export function CaseOperationalAssistantPanel({
         suggested_actions: [
           {
             destination: 'novo_caso',
-            label: '1. Preencher Novo Caso',
-            suggested_text: `Número do caso:
-${initialCaseNumber}
-
-Título:
+            label: 'Conferir e criar o caso',
+            suggested_text: `Caso identificado:
 ${initialTitle}
 
 Área provável:
@@ -376,51 +435,23 @@ ${initialArea}
 Tipo de ação:
 ${initialActionType}
 
-Descrição inicial:
+Relato organizado:
 ${initialDescription}`,
-            reason: 'Este bloco organiza o relato e os campos principais já são aplicados automaticamente ao formulário “+ Novo Caso”.',
+            reason: 'A IA já estruturou o relato. Confira os dados essenciais do cliente e confirme para criar o caso e preparar a minuta.',
             priority: 'alta',
-          },
-          {
-            destination: 'linha_do_tempo',
-            label: '2. Depois de criar o caso',
-            suggested_text: 'Ordem recomendada: Linha do Tempo → Checklist de provas → Anexos/provas → Testemunhas/depoentes → Dossiê interno → Análise do caso → Editor/minuta.',
-            reason: 'Essa sequência evita que o advogado se perca e garante que o caso seja montado antes da minuta.',
-            priority: 'alta',
-          },
-          {
-            destination: 'checklist',
-            label: '3. Documentos e provas para pedir',
-            suggested_text: 'Peça ao cliente todos os documentos citados no relato: contratos, comprovantes, prints, conversas, áudios, vídeos, fotos, laudos, boletins, notificações, decisões, recibos e qualquer registro de data, valor ou responsabilidade.',
-            reason: 'A prova precisa ser organizada desde o início para alimentar checklist, anexos, dossiê, análise e futura minuta.',
-            priority: 'alta',
-          },
-          {
-            destination: 'testemunhas',
-            label: '4. Pessoas e testemunhas para levantar',
-            suggested_text: 'Identifique quem participou, viu, recebeu mensagens, assinou documentos, acompanhou os fatos ou pode confirmar datas, valores, guarda, uso, dano, negativa, cobrança, prestação de serviço ou relação entre as partes.',
-            reason: 'Pessoas-chave ajudam a preencher testemunhas/depoentes e a validar a linha do tempo.',
-            priority: 'normal',
-          },
-          {
-            destination: 'dossie',
-            label: '5. Alertas antes de salvar',
-            suggested_text: 'Não acuse diretamente sem prova. Use linguagem técnica, como “relata”, “informa”, “alega”, “desaparecimento”, “possível falha”, “pendente de confirmação documental” e “responsabilidade a apurar”.',
-            reason: 'A montagem inicial deve ser prudente e revisada por advogado antes de virar peça ou estratégia.',
-            priority: 'normal',
           },
         ],
         next_steps: [
-          'Confira os campos preenchidos automaticamente pela IA.',
-          'Complete apenas os dados do cliente e ajustes necessários.',
-          'Salve o caso.',
-          'Depois volte ao Copiloto com o caso em foco para montar Linha do Tempo, Checklist, Anexos, Testemunhas e Dossiê.',
+          'Confira o resumo preparado pela IA.',
+          'Complete somente os dados essenciais do cliente e os ajustes que considerar necessários.',
+          'Clique em “Cadastrar e gerar minuta”.',
+          'Revise a minuta no Editor antes de qualquer uso externo.',
         ],
         warnings: [
-          'Modo montagem inicial: ainda não há caso aberto, então nenhuma informação foi salva.',
-          'Os campos sugeridos são rascunho operacional e exigem revisão humana.',
+          'Nenhum documento, prova, pedido, valor, data ou fato adicional deve ser presumido além do que foi informado.',
+          'A minuta gerada permanece sujeita à revisão do advogado responsável.',
         ],
-        disclaimer: 'Assistente operacional de apoio. Não substitui revisão jurídica profissional.',
+        disclaimer: 'Copiloto jurídico de apoio. A revisão profissional do advogado é obrigatória antes de qualquer protocolo ou uso externo.',
         metadata: {
           source: 'initial_case_setup_frontend_v2',
           initial_area: initialArea,
@@ -576,6 +607,23 @@ ${initialDescription}`,
           >
             {loading ? 'Analisando informação...' : 'Pedir orientação da IA'}
           </button>
+
+          {caseId ? (
+            <button
+              type="button"
+              onClick={() => {
+                setMessage('')
+                setResponse(null)
+                setError('')
+                onStartNewCase?.()
+              }}
+              disabled={loading}
+              className="case-card__action case-card__action--analysis"
+              style={{ padding: '11px 16px' }}
+            >
+              Iniciar novo caso com IA
+            </button>
+          ) : null}
 
           <button
             type="button"
