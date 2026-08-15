@@ -17,6 +17,7 @@ const EDITOR_SUPPORTED_AREAS = [
   { value: 'trabalhista', label: 'Trabalhista' },
   { value: 'civel', label: 'Cível' },
   { value: 'civil_ambiental', label: 'Civil/Ambiental' },
+  { value: 'criminal', label: 'Criminal' },
   { value: 'consumidor', label: 'Consumidor' },
   { value: 'previdenciario', label: 'Previdenciário' },
 ] as const

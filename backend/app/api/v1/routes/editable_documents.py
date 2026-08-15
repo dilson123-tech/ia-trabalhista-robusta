@@ -5256,6 +5256,26 @@ def generate_assisted_draft(
             detail="Archived cases cannot generate assisted draft",
         )
 
+    # Compatibilidade: versões anteriores do fluxo rápido podiam gravar
+    # documentos de casos criminais como "trabalhista" por fallback do frontend.
+    # O reparo é deliberadamente restrito ao quick flow para não alterar
+    # documentos criados manualmente pelo advogado.
+    document_metadata = document.document_metadata or {}
+    document_source = str(document_metadata.get("source") or "").strip().lower()
+    document_area = str(document.area or "").strip().lower()
+
+    if (
+        document_source == "piece_ready_quick_flow"
+        and _is_criminal_audiencia_area(getattr(case, "legal_area", None))
+        and document_area in {"trabalhista", "trabalho", "laboral"}
+    ):
+        document.area = "criminal"
+        document.document_metadata = {
+            **document_metadata,
+            "area_repaired_from": document_area,
+            "area_repair_reason": "legacy_piece_ready_quick_flow_criminal_fallback",
+        }
+
     analysis_record = None
 
     if _is_audiencia_estrategica_document_type(document.document_type):

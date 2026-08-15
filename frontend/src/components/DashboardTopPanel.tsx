@@ -19,6 +19,7 @@ type DashboardTopPanelProps = {
   onClearSessionAndGoToLogin: () => void
   error: string
   newCaseForm: NewCaseFormState
+  assistantPreparedCase?: boolean
   onNewCaseFieldChange: (
     field: 'case_number' | 'title' | 'description' | 'legal_area' | 'action_type' | 'client_name' | 'client_whatsapp' | 'client_whatsapp_consent' | 'status',
     value: string | boolean,
@@ -41,6 +42,7 @@ export function DashboardTopPanel({
   onClearSessionAndGoToLogin,
   error,
   newCaseForm,
+  assistantPreparedCase = false,
   onNewCaseFieldChange,
   newCaseLoading,
   onCreateNewCase,
@@ -163,16 +165,33 @@ export function DashboardTopPanel({
       {showNewCaseForm ? (
         <section className="section-card">
           <div className="section-head">
-            <h2 className="section-heading">Novo Caso</h2>
+            <h2 className="section-heading">
+              {assistantPreparedCase ? 'Confirmar caso preparado pela IA' : 'Novo Caso'}
+            </h2>
             <p className="section-description">
-              Cadastre um novo caso com número do processo ou referência interna para alimentar a esteira analítica e executiva.
+              {assistantPreparedCase
+                ? 'A IA já estruturou os dados técnicos. Confira o resumo e complete apenas os dados essenciais do cliente.'
+                : 'Cadastre um novo caso com número do processo ou referência interna.'}
             </p>
           </div>
 
           <div className="form-grid">
-            <input
-              className="form-control"
-              value={newCaseForm.case_number}
+            {assistantPreparedCase ? (
+              <article className="info-card" style={{ gridColumn: '1 / -1' }}>
+                <p className="info-text">
+                  <strong>Caso identificado:</strong> {newCaseForm.title}
+                </p>
+                <p className="body-text">{newCaseForm.description}</p>
+                <p className="body-text">
+                  <strong>Área:</strong> {newCaseForm.legal_area}
+                  {newCaseForm.action_type ? ` • ${newCaseForm.action_type}` : ''}
+                </p>
+              </article>
+            ) : (
+              <>
+                <input
+                  className="form-control"
+                  value={newCaseForm.case_number}
               onChange={(e) => onNewCaseFieldChange('case_number', e.target.value)}
               placeholder="Número do processo / referência do caso"
             />
@@ -210,12 +229,14 @@ export function DashboardTopPanel({
               <option value="outro">Outro</option>
             </select>
 
-            <input
-              className="form-control"
-              value={newCaseForm.action_type}
-              onChange={(e) => onNewCaseFieldChange('action_type', e.target.value)}
-              placeholder="Tipo de ação (opcional)"
-            />
+                <input
+                  className="form-control"
+                  value={newCaseForm.action_type}
+                  onChange={(e) => onNewCaseFieldChange('action_type', e.target.value)}
+                  placeholder="Tipo de ação (opcional)"
+                />
+              </>
+            )}
 
             <input
               className="form-control"
@@ -249,6 +270,7 @@ export function DashboardTopPanel({
             </label>
 
 
+            {!assistantPreparedCase ? (
             <select
               className="form-control"
               value={newCaseForm.status}
@@ -258,6 +280,7 @@ export function DashboardTopPanel({
               <option value="active">Ativo</option>
               <option value="review">Em revisão</option>
             </select>
+            ) : null}
 
             <div className="actions-row">
               <button
@@ -278,7 +301,11 @@ export function DashboardTopPanel({
                   !newCaseForm.title.trim()
                 }
               >
-                {newCaseLoading ? 'Criando caso...' : 'Cadastrar caso'}
+                {newCaseLoading
+                  ? 'Criando caso...'
+                  : assistantPreparedCase
+                    ? 'Cadastrar e gerar minuta'
+                    : 'Cadastrar caso'}
               </button>
 
               <button
