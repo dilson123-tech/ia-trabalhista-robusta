@@ -298,7 +298,7 @@ function inferInitialActionType(message: string, area: string): string {
       /(dados pessoais|tratamento de dados|banco de dados|lgpd|cadastro|perfil profissional|critério|criterio|critérios|criterios|compartilhamento)/.test(text)
 
     return hasDataTreatment
-      ? 'Obrigação de fazer / revisão de restrição profissional e tratamento de dados / responsabilidade civil, a confirmar conforme provas'
+      ? 'Obrigação de fazer / revisão de restrição profissional / dados e responsabilidade civil, a confirmar'
       : 'Obrigação de fazer / revisão de restrição profissional / responsabilidade civil, a confirmar conforme provas'
   }
 
