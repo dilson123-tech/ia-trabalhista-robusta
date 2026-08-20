@@ -1,5 +1,5 @@
 from datetime import datetime
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class CaseBase(BaseModel):
@@ -7,7 +7,7 @@ class CaseBase(BaseModel):
     title: str
     description: str | None = None
     legal_area: str | None = None
-    action_type: str | None = None
+    action_type: str | None = Field(default=None, max_length=120)
     client_name: str | None = None
     client_whatsapp: str | None = None
     client_whatsapp_consent: bool = False

@@ -124,3 +124,24 @@ def test_create_case_rejects_extra_slug_field(monkeypatch):
         "slug" in ".".join(str(part) for part in item.get("loc", []))
         for item in body["detail"]
     )
+
+def test_create_case_rejects_action_type_over_database_limit(monkeypatch):
+    headers = _auth_headers(monkeypatch)
+
+    create_payload = {
+        "case_number": f"ACTION-LENGTH-{uuid.uuid4()}",
+        "title": "Caso para validar limite do tipo de ação",
+        "description": "O payload deve ser rejeitado pelo schema antes da persistência.",
+        "action_type": "A" * 121,
+        "status": "draft",
+    }
+
+    response = client.post("/api/v1/cases", json=create_payload, headers=headers)
+
+    assert response.status_code == 422
+    body = response.json()
+    assert "detail" in body
+    assert any(
+        "action_type" in ".".join(str(part) for part in item.get("loc", []))
+        for item in body["detail"]
+    )
