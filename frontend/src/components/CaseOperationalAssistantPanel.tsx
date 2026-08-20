@@ -193,6 +193,21 @@ function isCivilCollectionCase(message: string): boolean {
   return obligationMarker && paymentMarker
 }
 
+function isCivilProfessionalRiskRestrictionCase(message: string): boolean {
+  const text = message.toLowerCase()
+
+  const professionalMarker =
+    /(motorista|motorista profissional|carregamento|carregamentos|frete|fretes|transportadora|atividade profissional|exercício da atividade|exercicio da atividade)/.test(text)
+
+  const restrictionMarker =
+    /(restrição|restricao|bloqueio|bloqueado|bloqueada|impedido|impedida|impedimento|não liberado|nao liberado|não consegue carregar|nao consegue carregar|impedido de realizar carregamentos)/.test(text)
+
+  const riskMarker =
+    /(análise de risco|analise de risco|gerenciadora de risco|gerenciamento de risco|seguradora|pesquisa de risco|consulta de risco|cadastro de risco)/.test(text)
+
+  return professionalMarker && restrictionMarker && riskMarker
+}
+
 function inferInitialCaseArea(message: string): string {
   const text = message.toLowerCase()
 
@@ -213,6 +228,10 @@ function inferInitialCaseArea(message: string): string {
   }
 
   if (isCivilCollectionCase(message)) {
+    return 'cível'
+  }
+
+  if (isCivilProfessionalRiskRestrictionCase(message)) {
     return 'cível'
   }
 
@@ -274,6 +293,15 @@ function inferInitialActionType(message: string, area: string): string {
     return 'Medida criminal a definir conforme fatos, autos e situação processual'
   }
 
+  if (area === 'cível' && isCivilProfessionalRiskRestrictionCase(message)) {
+    const hasDataTreatment =
+      /(dados pessoais|tratamento de dados|banco de dados|lgpd|cadastro|perfil profissional|critério|criterio|critérios|criterios|compartilhamento)/.test(text)
+
+    return hasDataTreatment
+      ? 'Obrigação de fazer / revisão de restrição profissional e tratamento de dados / responsabilidade civil, a confirmar conforme provas'
+      : 'Obrigação de fazer / revisão de restrição profissional / responsabilidade civil, a confirmar conforme provas'
+  }
+
   if (area === 'cível' && isCivilCollectionCase(message)) {
     return 'Cobrança cível / obrigação de pagamento não cumprida, a confirmar conforme documentos'
   }
@@ -290,6 +318,10 @@ function buildInitialCaseTitle(message: string, area: string): string {
 
   if (isVehicleDealerPixCase(message)) {
     return 'Retomada de veículo por revendedora após pagamento parcelado via Pix'
+  }
+
+  if (area === 'cível' && isCivilProfessionalRiskRestrictionCase(message)) {
+    return 'Restrição profissional de motorista por análise de risco a esclarecer'
   }
 
   if (/(pátio|patio|carreta)/.test(text)) {
