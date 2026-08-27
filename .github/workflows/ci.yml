@@ -167,6 +167,9 @@ jobs:
   backend-multicase-regression:
     runs-on: ubuntu-latest
 
+    env:
+      JWT_SECRET: dummy_jwt_secret_for_ci_which_is_long_enough_1234567890
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
