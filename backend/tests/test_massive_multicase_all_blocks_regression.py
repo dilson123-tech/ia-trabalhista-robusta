@@ -265,7 +265,7 @@ SCENARIOS = [
                 "dados e responsabilidade civil, a confirmar"
             ),
             "description": (
-                "Edson Estevão, motorista profissional e empregado CLT da Silvas Transportes Ltda., "
+                "Edson Estevão, motorista profissional e empregado CLT da Silva Transporte, "
                 "relata impedimentos para realizar carregamentos e viagens após análise de risco. "
                 "Segundo informado, a Raster retorna recusa ou não liberação para determinadas operações. "
                 "Edson recebe salário-base e valores vinculados às viagens realizadas, mas não é possível "
@@ -340,3 +340,24 @@ def test_massive_multicase_all_blocks_universal_contract(scenario):
             assert marker.lower() not in normalized_body, (
                 f"[{scenario['id']}] contaminação detectada em {title}: {marker}"
             )
+
+
+def test_civil_professional_risk_edson_uses_specific_specialization():
+    scenario = next(
+        item for item in SCENARIOS
+        if item["id"] == "civil_professional_risk_lgpd_edson"
+    )
+
+    case = fake_case(**scenario["case"])
+
+    response = _fallback_response(
+        case=case,
+        message=ALL_BLOCKS_MESSAGE,
+        context={},
+        timeline=[],
+    )
+
+    assert response["assistant_mode"] == "editor_all_blocks_ready"
+    assert response["metadata"]["action_specialization_kind"] == (
+        "civil_professional_risk_restriction_claim"
+    )

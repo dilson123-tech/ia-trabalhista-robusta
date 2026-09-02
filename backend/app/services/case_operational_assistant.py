@@ -5381,6 +5381,78 @@ def _build_editor_all_blocks_action_specialization(
             " ".join(request_parts),
         )
 
+    professional_risk_professional_markers = (
+        "motorista",
+        "motorista profissional",
+        "carregamento",
+        "carregamentos",
+        "frete",
+        "fretes",
+        "transportadora",
+        "atividade profissional",
+        "exercício da atividade",
+        "exercicio da atividade",
+    )
+    professional_risk_restriction_markers = (
+        "restrição",
+        "restricao",
+        "bloqueio",
+        "bloqueado",
+        "bloqueada",
+        "impedido",
+        "impedida",
+        "impedimento",
+        "não liberado",
+        "nao liberado",
+        "não liberação",
+        "nao liberacao",
+        "não consegue carregar",
+        "nao consegue carregar",
+    )
+    professional_risk_analysis_markers = (
+        "análise de risco",
+        "analise de risco",
+        "gerenciadora de risco",
+        "gerenciamento de risco",
+        "pesquisa de risco",
+        "consulta de risco",
+        "cadastro de risco",
+        "raster",
+    )
+
+    if (
+        _editor_text_has_any(normalized, professional_risk_professional_markers)
+        and _editor_text_has_any(normalized, professional_risk_restriction_markers)
+        and _editor_text_has_any(normalized, professional_risk_analysis_markers)
+    ):
+        return (
+            "civil_professional_risk_restriction_claim",
+            (
+                "A fundamentação preliminar deve se concentrar na restrição ou não liberação profissional "
+                "relatada no contexto de análise ou gerenciamento de risco, identificando somente os fatos "
+                "efetivamente informados, a repercussão concreta na atividade profissional e os dados ou "
+                "critérios cuja origem, atualização, tratamento ou compartilhamento ainda precisem ser esclarecidos. "
+                "Não se deve presumir que a análise de risco seja ilícita, que a decisão seja exclusivamente automatizada, "
+                "que exista erro cadastral, dano indenizável ou relação causal com ocorrência antiga sem suporte probatório. "
+                "Devem ser distinguidos dados efetivamente conhecidos, informações ainda não reveladas, registros existentes "
+                "e documentos ou gravações que dependam de conferência. Cabimento de obrigação de fazer, acesso, revisão, "
+                "correção, atualização, bloqueio de dados, responsabilidade civil, tutela de urgência e fundamentos de proteção "
+                "de dados devem permanecer sujeitos à confirmação documental e à revisão do advogado responsável."
+            ),
+            (
+                "Diante do exposto, e sem prejuízo de adequação pelo advogado responsável, requer-se a citação da parte ré "
+                "e, conforme o suporte fático e documental confirmado, a apresentação das informações necessárias para esclarecer "
+                "a origem, natureza, atualização, utilização e eventual compartilhamento dos dados relacionados à restrição profissional, "
+                "bem como o procedimento disponível para contestação ou revisão. "
+                "Requer-se, quando juridicamente cabível e após conferência das provas, a revisão da restrição e eventual correção, "
+                "atualização ou outra providência adequada sobre dados comprovadamente inexatos, desatualizados ou irregularmente tratados. "
+                "Eventual tutela de urgência, indenização por danos materiais, lucros cessantes ou danos morais somente deverá ser formulada "
+                "quando houver demonstração concreta dos requisitos legais, do prejuízo, do nexo causal e da prova disponível. "
+                "Não devem ser presumidos quantidade de viagens perdidas, valores, conteúdo de gravações, causa histórica da restrição "
+                "ou responsabilidade definitiva antes da instrução e da revisão profissional."
+            ),
+        )
+
     obligation_markers = (
         "obrigação de fazer",
         "obrigacao de fazer",
