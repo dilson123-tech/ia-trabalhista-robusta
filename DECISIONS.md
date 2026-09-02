@@ -94,6 +94,26 @@ sessão de implantação de governança, ou a um princípio já presente em
   intacta a branch de trabalho original
   (`fix/editor-civil-professional-risk-specialization-v1`) e os dois
   arquivos locais modificados nela.
+- **OPS-003** — Resolve `P-007`. A frente local
+  `fix/editor-civil-professional-risk-specialization-v1` (especialização de
+  restrição profissional / análise de risco / LGPD; commit original
+  `7771de0384d9c9bd56f6ecb62f855674a3d96ed6`) foi validada, integrada a
+  `main` via PR #306 (squash-merged; squash commit
+  `b9ca8a8141da1a582a0ee2842b9278652e1705f4`) e encerrada. `main` local e
+  `origin/main` foram posteriormente sincronizadas nesse mesmo hash. Antes
+  da remoção da branch, foi comprovada equivalência material de conteúdo
+  entre `main` e a branch remota (`git diff --exit-code` sem diferenças,
+  `TREE_EQUIVALENCE_EXIT=0`, nenhum arquivo divergente); a branch local e
+  remota `fix/editor-civil-professional-risk-specialization-v1` foram
+  removidas somente depois dessa comprovação. O PR #306 permanece
+  preservado no histórico do GitHub. Regressão direcionada da frente:
+  `108 passed, 0 failed`. Suíte global do backend no momento da validação:
+  `304 passed, 2 failed` em 306 testes; as duas falhas (divergência entre
+  configuração de limite de plano e expectativa do teste; ambiente
+  PostgreSQL local com usuário superuser bypassando RLS e estado
+  persistente entre execuções) foram diagnosticadas como externas a esta
+  frente, não foram misturadas no PR/commit, e permanecem trabalho
+  separado. Production não foi acessada durante o fechamento.
 
 ## E. Decisões jurídicas/processuais aprovadas
 
@@ -141,10 +161,11 @@ aberto até decisão humana explícita.
   das regras de segurança atualmente aprovadas exige decisão humana
   explícita, novo registro de decisão e aplicação da regra de
   supersessão/histórico (Seção G). **Status: pendente.**
-- **P-007 — Destino/fechamento da frente local atual:**
-  `fix/editor-civil-professional-risk-specialization-v1` (dois arquivos
-  modificados, não commitados: `case_operational_assistant.py` e
-  `test_massive_multicase_all_blocks_regression.py`). **Status: pendente.**
+- **P-007 — Destino/fechamento da frente local
+  `fix/editor-civil-professional-risk-specialization-v1`**, originalmente
+  existente com alterações em `case_operational_assistant.py` e
+  `test_massive_multicase_all_blocks_regression.py`. **Status: resolvido em
+  `OPS-003`.**
 - **P-008 — Tratamento/higiene dos arquivos `.env`/`.env.bak*`** e risco
   operacional relacionado, sem ler ou expor seus conteúdos. **Status:
   pendente.**
