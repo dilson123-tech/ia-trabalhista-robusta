@@ -12,12 +12,75 @@ partir deste arquivo.
 - **Contexto do checkpoint:** implantação inicial da governança persistente
   (`AGENTS.md` → `PROJECT_STATE.md` → `ROADMAP.md` → `ARCHITECTURE.md` →
   `DECISIONS.md` → `NEXT_STEP.md` → `CLAUDE.md`) neste repositório.
+- **Atualização registrada em:** 2026-09-02 — fechamento da frente de
+  produto `P-007` (código/produto integrado a `main` via PR #306; fechamento
+  documental integrado via PR #307) e decisão humana
+  sobre `P-002` (registrada em `DECISIONS.md` como `OPS-004`). Ver Seções
+  C, H e I abaixo para o estado observado nesta data.
+- **Atualização registrada em:** 2026-09-24 — reconciliação documental com a
+  auditoria-mestra somente leitura realizada nesta data sobre o HEAD
+  `0fc0755d7de4ced50400f6e297a99338f6d9cd50`. Ver "PAINEL MESTRE" e Seções
+  D, E, G e I abaixo. `P-002` passa a constar como resolvida **apenas como
+  prioridade** (`OPS-004`), com as decisões técnicas A e B pendentes.
 - Este checkpoint só deve ser atualizado quando houver mudança material de
   estado, houver evidência objetiva, rastreável e válida para o estado relevante
   do código — inclusive evidência de checkpoint anterior quando continuar válida
   pelos critérios de `AGENTS.md` Seção 7 —, a atualização fizer parte de tarefa
   autorizada e forem respeitadas as regras de aprovação de `AGENTS.md`. Memória
   de agente ou afirmação de conversa nunca substitui evidência.
+
+## PAINEL MESTRE
+
+Painel-resumo permanente deste checkpoint. Os valores abaixo são
+**observados em data específica** e devem ser atualizados a cada checkpoint
+autorizado; não substituem a verificação direta do Git (Seção B) nem
+`DECISIONS.md`/`NEXT_STEP.md`.
+
+- **Último checkpoint Git observado (2026-09-24):** `main` local e
+  `origin/main` (referência local, sem `fetch`) em
+  `0fc0755d7de4ced50400f6e297a99338f6d9cd50`; branch documental
+  `docs/resolve-p002-governance-v1` criada a partir desse hash, com
+  alterações locais não commitadas nos 4 documentos desta reconciliação.
+- **Estado geral estimado — ESTIMATIVAS qualitativas da auditoria-mestra,
+  NÃO métricas formais:**
+
+  | Área | Estimativa |
+  |---|---|
+  | Geral | ~65% |
+  | Governança | ~80% |
+  | Backend | ~80% |
+  | Frontend | ~60% |
+  | Banco/RLS | ~40% |
+  | Segurança | ~55% |
+  | IA jurídica | ~65% |
+  | Billing | ~60% |
+  | LGPD | ~35% |
+  | Testes/CI | ~50% |
+  | Release | ~40% |
+  | Production | **NÃO VERIFICADA** |
+
+- **Pronto (implementado no código, conforme auditoria de leitura):**
+  backend FastAPI `/api/v1` com JWT, RBAC, isolamento multi-tenant em nível
+  de aplicação (`scoped_query`) e auditoria; motores jurídicos, editor e
+  fluxo executivo com testes associados; billing com checkout/webhook
+  Asaas no código; frontend React com os principais fluxos; governança
+  persistente (7 arquivos) em `main`.
+- **Faltando:** RLS PostgreSQL versionado (ou decisão formal por isolamento
+  somente em aplicação); suíte hermética e suíte completa em CI; rate
+  limiting; políticas LGPD formais (retenção/descarte); painéis de frontend
+  ainda só visuais (Recursos e Sucessão); gate de release formal.
+- **Bloqueios:** decisões humanas A (modelo de isolamento) e B (semântica
+  do limite admin) pendentes em `OPS-004`; as 2 falhas conhecidas da suíte
+  global sem solução técnica decidida.
+- **Último resultado de testes conhecido:** suíte global `304 passed,
+  2 failed` em 306 testes; regressão direcionada `108 passed, 0 failed`
+  (ambos registrados em `OPS-003`/Seção D; **não reexecutados** na
+  auditoria-mestra).
+- **Próximo passo:** fechar esta atualização documental (BLOCO 0) →
+  DICO/ChatGPT decidem A e B → somente então, com nova autorização
+  específica, BLOCO 1 (ver `NEXT_STEP.md`).
+- **Decisões humanas abertas:** A e B (`OPS-004`); `P-001`, `P-003`,
+  `P-004`, `P-005`, `P-006`, `P-008`, `P-009`, `P-010`.
 
 ## B. Git / baseline observado (neste checkpoint, não permanente)
 
@@ -32,29 +95,22 @@ partir deste arquivo.
   nova sessão deve reobter esses valores via `git status`, `git rev-parse HEAD`
   e `git rev-parse origin/main`.
 
-## C. Frente local aberta (preservada, não commitada)
+## C. Frente de produto P-007 — encerrada (histórico preservado)
 
-A branch `fix/editor-civil-professional-risk-specialization-v1` possui, neste
-checkpoint, trabalho local **não commitado** em dois arquivos:
+Em checkpoint anterior (2026-09-01), a branch
+`fix/editor-civil-professional-risk-specialization-v1` possuía trabalho
+local não commitado em dois arquivos (`case_operational_assistant.py` e
+`test_massive_multicase_all_blocks_regression.py`), preservado intacto
+durante a implantação da governança em worktree separado. Essa era a
+pendência formalizada como `P-007`.
 
-- `backend/app/services/case_operational_assistant.py`
-- `backend/tests/test_massive_multicase_all_blocks_regression.py`
-
-Esses dois arquivos foram verificados byte a byte, via SHA-256, imediatamente
-após a criação do worktree de governança, para comprovar que permaneceram
-intocados:
-
-```
-c03c633727fd0510727b54816b56fdba8a2ff22ae6e183db81cc90bb5b519013  backend/app/services/case_operational_assistant.py
-5bb2ae19ee222b90cb56958a3d0afff47b89ab387ba96b902878e09f52b42103  backend/tests/test_massive_multicase_all_blocks_regression.py
-```
-
-**A governança está sendo implantada em um worktree separado precisamente para
-não misturar essa frente local com o rollout dos arquivos de governança.** O
-destino final dessa frente (quando/como commitar, abrir PR, ou outra decisão)
-permanece uma decisão humana pendente, formalizada em `DECISIONS.md` como
-`P-007`. Este `PROJECT_STATE.md` apenas registra o estado observado e não
-resolve nem antecipa a decisão.
+**Estado atual (checkpoint 2026-09-02): P-007 está resolvida.** A frente
+foi commitada (`7771de0384d9c9bd56f6ecb62f855674a3d96ed6`), integrada a
+`main` via PR #306 (squash-merged, `b9ca8a8141da1a582a0ee2842b9278652e1705f4`),
+e a branch de trabalho foi removida local e remotamente somente após prova
+de equivalência material de conteúdo com `main`. Detalhes completos da
+resolução estão registrados em `DECISIONS.md`, `OPS-003`. `main` local e
+`origin/main` estão sincronizadas nesse histórico.
 
 ## D. Evidência de testes
 
@@ -83,6 +139,24 @@ resolve nem antecipa a decisão.
   testes desse conjunto de quatro arquivos que dependiam dele. Esta é uma
   **observação pontual de ambiente naquele momento**, não um estado permanente
   do ambiente local.
+- **Atualização (checkpoint 2026-09-02):** durante a validação da frente
+  `P-007`, uma regressão direcionada adicional (mesmos quatro arquivos)
+  resultou em `108 passed, 0 failed`. Uma execução da suíte global completa
+  (`pytest backend/tests`) resultou em `304 passed, 2 failed` de 306 testes
+  coletados. As duas falhas
+  (`test_admin_tenant_usage_full_returns_consolidated_view` e
+  `test_rls_isolation`) foram diagnosticadas como externas à `P-007`. A
+  prioridade do próximo ciclo (`P-002`, resolvida apenas como prioridade em
+  `OPS-004`) é restaurar uma baseline confiável de testes e isolamento
+  multi-tenant; a solução técnica dessas falhas **não está decidida** e
+  depende das decisões humanas A e B de `OPS-004`. Este registro não
+  reexecuta nem reconfirma esses resultados; é transcrição da evidência já
+  obtida e registrada em `DECISIONS.md`.
+- **Auditoria-mestra (2026-09-24):** nenhum teste foi executado. Observado
+  no código: a suíte **não é hermética** (configuração carrega o `.env` da
+  raiz do repositório; `test_rls_isolation` usa o PostgreSQL local real e
+  grava dados); o CI possui 4 jobs e **não executa a suíte completa do
+  backend**.
 
 ## E. Estado arquitetural/produto comprovado pela auditoria (nível: documentado por auditoria de leitura)
 
@@ -91,8 +165,13 @@ encontrou como implementado no código, sem ampliar para além do que foi
 efetivamente lido:
 
 - Backend FastAPI + SQLAlchemy + Alembic + PostgreSQL, com JWT, RBAC,
-  segregação multi-tenant (incluindo RLS em Postgres) e middleware de
-  auditoria.
+  segregação multi-tenant em nível de aplicação (`scoped_query`) e
+  middleware de auditoria. **RLS PostgreSQL não está versionado:** a
+  auditoria-mestra de 2026-09-24 não encontrou `ENABLE ROW LEVEL SECURITY`
+  nem `CREATE POLICY` nas migrations; `set_config('app.tenant_id', ...)`
+  existe em `backend/app/core/tenant.py`, mas nada versionado o consome.
+  RLS consta como prometido/documentado, **não comprovado no Git**; o estado
+  do banco local e de Production não foi verificado.
 - Frontend React 19 + Vite 8.
 - Módulo de copiloto de edição assistida concentrado em
   `backend/app/services/case_operational_assistant.py` (arquivo extenso,
@@ -146,60 +225,73 @@ auditoria:
   produto — tratado como **risco de higiene/segurança a verificar
   futuramente**, sem que este checkpoint tenha lido ou exposto qualquer
   conteúdo desses arquivos.
+- **Achados da auditoria-mestra (2026-09-24), somente leitura:**
+  - RLS prometido/documentado, mas não versionado (ver Seção E).
+  - Suíte completa do backend fora do CI; testes não herméticos (Seção D).
+  - Nenhum rate limiting encontrado no HEAD auditado.
+  - Dump local de banco (`ia_trabalhista_before_case_cleanup_2026-04-14.dump`)
+    e arquivos em `backend/storage` presentes localmente — exigem decisão
+    e higiene LGPD (relacionado a `P-005`/`P-009`); conteúdo não aberto.
+  - Production **NÃO VERIFICADA**.
+  - 14 branches locais não mescladas em `main` — exigem auditoria futura;
+    nenhuma foi alterada.
 
-## H. Estado da implantação dos 7 arquivos de governança (neste checkpoint)
+## H. Estado da implantação dos 7 arquivos de governança
 
-| Arquivo | Estado |
-|---|---|
-| `AGENTS.md` | Criado e validado no worktree de governança. Untracked, não staged, não commitado, sem push, sem PR. |
-| `PROJECT_STATE.md` | Criado e validado no worktree de governança. Untracked, não staged, não commitado, sem push, sem PR. |
-| `ROADMAP.md` | Criado e validado no worktree de governança. Untracked, não staged, não commitado, sem push, sem PR. |
-| `ARCHITECTURE.md` | Criado e validado no worktree de governança. Untracked, não staged, não commitado, sem push, sem PR. |
-| `DECISIONS.md` | Criado e validado no worktree de governança. Untracked, não staged, não commitado, sem push, sem PR. |
-| `NEXT_STEP.md` | Criado e validado no worktree de governança. Untracked, não staged, não commitado, sem push, sem PR. |
-| `CLAUDE.md` | Criado e validado no worktree de governança. Untracked, não staged, não commitado, sem push, sem PR. |
+**Checkpoint 2026-09-01 (histórico):** os 7 arquivos foram materializados e
+validados no worktree de governança, untracked, não staged, não
+commitados.
 
-**7 de 7 arquivos materializados e validados neste checkpoint.** Isso
-**não** significa commitados, integrados em `main`, publicados, Production
-verificada, ou produto totalmente validado — nenhuma dessas afirmações é
-feita por este registro.
+**Checkpoint 2026-09-02 (histórico pós-integração):** os 7 arquivos foram commitados
+(`chore/governance-docs-v1`, `f52fece9ce2e13204f707b54ee0ff26e73ac5b43`),
+integrados a `main` via PR #305 (squash-merged), e posteriormente o
+código/produto de `P-007` (PR #306) e o fechamento documental de `P-007` em
+`DECISIONS.md` (PR #307) também foram integrados a `main`. `main` local e
+`origin/main` estão sincronizadas em
+`0fc0755d7de4ced50400f6e297a99338f6d9cd50`. O worktree de governança
+temporário
+(`/home/dilsondev/projetos/ia_trabalhista_robusta-governance-docs-v1`) e a
+branch `docs/close-p007-decision-v1` foram removidos após comprovação de
+equivalência material de conteúdo. A branch `chore/governance-docs-v1` não
+foi removida (permanece como registro histórico do commit
+`f52fece9ce2e13204f707b54ee0ff26e73ac5b43`, sem worktree associado).
 
-**Isolamento da implantação:**
-
-- Worktree de governança: `/home/dilsondev/projetos/ia_trabalhista_robusta-governance-docs-v1`
-- Branch de governança: `chore/governance-docs-v1`
-- Este worktree nasceu limpo, exatamente no baseline aprovado
-  `4e9d22fdae99fc717192ea5b6b96214f61d70628`, verificado por leitura
-  (`git rev-parse HEAD` no worktree novo == hash aprovado; `git status
-  --porcelain` vazio no momento da criação).
-- O repositório principal, na branch
-  `fix/editor-civil-professional-risk-specialization-v1`, foi verificado
-  por leitura como intocado após a criação de cada um dos 7 arquivos —
-  mesma branch, mesmos dois arquivos modificados, mesmos hashes SHA-256 da
-  Seção C, confirmados em todas as verificações realizadas.
-- Estes valores refletem o observado neste checkpoint; o estado real do
-  Git deve ser reverificado diretamente em cada nova sessão (Seção B) —
-  este registro não o substitui.
+Estes valores refletem o observado neste checkpoint; o estado real do Git
+deve ser reverificado diretamente em cada nova sessão (Seção B) — este
+registro não o substitui.
 
 ## I. Decisões humanas pendentes
 
 As decisões humanas pendentes estão formalizadas em `DECISIONS.md`. Neste
-checkpoint, `P-001` a `P-010` permanecem registradas conforme seu estado
-naquele documento. `PROJECT_STATE.md` não resolve, renumera nem substitui
-essas decisões; para o estado normativo corrente, consultar diretamente
-`DECISIONS.md`.
+checkpoint, `P-001`, `P-003` a `P-006` e `P-008` a `P-010` permanecem
+pendentes; `P-007` foi resolvida (`OPS-003`) e `P-002` foi resolvida
+**apenas como prioridade** (`OPS-004`), com as decisões técnicas A e B de
+`OPS-004` pendentes (humanas). `PROJECT_STATE.md` não resolve, renumera nem substitui
+essas decisões; para o estado normativo corrente e completo, consultar
+diretamente `DECISIONS.md`.
 
 Síntese temática (apenas resumo — `DECISIONS.md` é a fonte normativa):
 
-- Nomenclatura oficial do produto.
-- Prioridade do próximo ciclo de desenvolvimento.
-- Eventual refatoração de `case_operational_assistant.py`.
-- Fechamento formal do gate de release.
-- Política formal de retenção/descarte de dados (LGPD).
-- Nível de autonomia de agentes de IA neste projeto.
-- Destino/fechamento da frente local atual
-  (`fix/editor-civil-professional-risk-specialization-v1`).
+- Nomenclatura oficial do produto. (`P-001`, pendente)
+- Prioridade do próximo ciclo de desenvolvimento. (`P-002`, resolvida em
+  `OPS-004` apenas como prioridade: baseline confiável de testes e
+  isolamento multi-tenant antes de novas features; decisões A — modelo de
+  isolamento — e B — semântica do limite admin — pendentes; nenhuma branch
+  técnica criada ou autorizada)
+- Eventual refatoração de `case_operational_assistant.py`. (`P-003`,
+  pendente)
+- Fechamento formal do gate de release. (`P-004`, pendente)
+- Política formal de retenção/descarte de dados (LGPD). (`P-005`,
+  pendente)
+- Nível de autonomia de agentes de IA neste projeto. (`P-006`, pendente)
+- Destino/fechamento da frente local
+  `fix/editor-civil-professional-risk-specialization-v1`. (`P-007`,
+  resolvida em `OPS-003`)
 - Higiene de `.env`/`.env.bak*` na raiz do repositório de produto.
+  (`P-008`, pendente)
+- Eventual adoção de storage externo para anexos. (`P-009`, pendente)
+- Necessidade/prioridade de auditoria técnica aprofundada de áreas ainda
+  não auditadas em detalhe. (`P-010`, pendente)
 
 ## J. Limites do que este checkpoint NÃO comprova
 

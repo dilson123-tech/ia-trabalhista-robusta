@@ -108,12 +108,54 @@ sessão de implantação de governança, ou a um princípio já presente em
   removidas somente depois dessa comprovação. O PR #306 permanece
   preservado no histórico do GitHub. Regressão direcionada da frente:
   `108 passed, 0 failed`. Suíte global do backend no momento da validação:
-  `304 passed, 2 failed` em 306 testes; as duas falhas (divergência entre
-  configuração de limite de plano e expectativa do teste; ambiente
-  PostgreSQL local com usuário superuser bypassando RLS e estado
-  persistente entre execuções) foram diagnosticadas como externas a esta
-  frente, não foram misturadas no PR/commit, e permanecem trabalho
-  separado. Production não foi acessada durante o fechamento.
+  `304 passed, 2 failed` em 306 testes; as duas falhas
+  (`test_admin_tenant_usage_full_returns_consolidated_view` e
+  `test_rls_isolation`) foram diagnosticadas como externas a esta frente,
+  não foram misturadas no PR/commit, e permanecem trabalho separado. O
+  diagnóstico inicial dessas falhas registrado à época (superuser local
+  "bypassando RLS") foi **superado** pela auditoria-mestra de 2026-09-24 —
+  ver `OPS-004`. Production não foi acessada durante o fechamento.
+- **OPS-004** — Resolve `P-002` **somente como prioridade**. Decisão
+  humana: **a próxima PRIORIDADE do projeto é restaurar uma baseline
+  confiável de testes e isolamento multi-tenant antes de novas features.**
+  Esta decisão define apenas a prioridade; ela **não** define a solução
+  técnica das duas falhas conhecidas da suíte global do backend
+  (`304 passed, 2 failed` em 306 testes, último resultado conhecido
+  registrado em `OPS-003`, não reexecutado nesta decisão).
+  Base factual (auditoria-mestra somente leitura de 2026-09-24, sobre o
+  HEAD `0fc0755d7de4ced50400f6e297a99338f6d9cd50`):
+  - `test_rls_isolation`: **não** se atribui a falha apenas a um role
+    PostgreSQL superusuário. A auditoria **não encontrou** nas migrations
+    versionadas `ENABLE ROW LEVEL SECURITY` nem `CREATE POLICY`;
+    `set_config('app.tenant_id', ...)` existe em `backend/app/core/tenant.py`,
+    mas nada versionado o consome. RLS **não está comprovado no Git**. O
+    isolamento hoje observado no código é em nível de aplicação
+    (`scoped_query`). O teste usa o PostgreSQL local real e grava dados
+    (suíte não hermética). O estado do banco local e o estado de Production
+    **não foram verificados**.
+  - `test_admin_tenant_usage_full_returns_consolidated_view`: o teste espera
+    `case_limit == 50`, enquanto a rota administrativa deriva o limite de
+    `limits_for(get_effective_plan().plan_type)`. Não é uma simples troca
+    de número fixo por configuração: há uma questão de semântica do limite
+    exibido ao admin, pendente de decisão humana (item B abaixo).
+  A execução técnica desta prioridade depende de **duas decisões humanas
+  pendentes**, que esta decisão **não** toma:
+  - **A — Modelo de isolamento multi-tenant:** (A1) implementar RLS
+    PostgreSQL real e versionado; **ou** (A2) assumir formalmente
+    isolamento somente em nível de aplicação e ajustar arquitetura, testes
+    e documentação a esse modelo. **Status: pendente (humana).**
+  - **B — Semântica do limite exibido na visão administrativa:** (B1)
+    `Subscription.case_limit`; **ou** (B2) limite derivado de
+    `limits_for(plan_type)`. **Status: pendente (humana).**
+  O nome `fix/ci-plan-limit-test-and-rls-role-isolation-v1`, proposto
+  anteriormente, foi **superado** pela auditoria-mestra: essa branch
+  **nunca foi criada** e **não** constitui frente autorizada. Esta decisão
+  **não autoriza automaticamente**: criação de branch técnica, início de
+  implementação, alteração de testes ou código, alteração de banco/role,
+  migrations, execução de `pytest`, acesso a Production, decisão comercial
+  sobre valores de limites de plano, escolha de A ou B, ou resolução de
+  qualquer outra pendência (`P-001`, `P-003` a `P-006`, `P-008` a `P-010`),
+  que permanecem pendentes e intactas.
 
 ## E. Decisões jurídicas/processuais aprovadas
 
@@ -140,7 +182,11 @@ aberto até decisão humana explícita.
 - **P-002 — Prioridade do próximo ciclo de desenvolvimento** após esta
   governança. Contexto: `docs/OPERATIONAL_PIPELINE_CHECKPOINT_V1.md` lista 4
   opções (Checklist+WhatsApp, refino visual, documentação comercial,
-  exportação do dossiê) sem priorização registrada. **Status: pendente.**
+  exportação do dossiê) sem priorização registrada. **Status: resolvido em
+  `OPS-004` apenas como prioridade** (baseline confiável de testes e
+  isolamento multi-tenant antes de novas features); as decisões técnicas
+  A (modelo de isolamento) e B (semântica do limite admin) descritas em
+  `OPS-004` permanecem **pendentes (humanas)**.
 - **P-003 — Eventual refatoração, ou não, de**
   `backend/app/services/case_operational_assistant.py`. Contexto: arquivo de
   ~7.600 linhas, identificado como risco arquitetural em `ARCHITECTURE.md`,
