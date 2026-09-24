@@ -10,46 +10,73 @@ autorização humana explícita quando exigida.
 
 ## B. Tarefa operacional corrente
 
-**Nenhuma tarefa técnica está em foco.**
+**Sequência obrigatória, nesta ordem:**
 
-A implantação inicial da governança está materialmente concluída: 7/7
-arquivos criados e validados no worktree de governança. `PROJECT_STATE.md`,
-`ROADMAP.md` e `ARCHITECTURE.md` já foram atualizados e verificados; este
-`NEXT_STEP.md` é atualizado por último.
+1. **Fechar esta atualização documental** (reconciliação de
+   `DECISIONS.md`, `PROJECT_STATE.md`, `NEXT_STEP.md` e `ROADMAP.md` com a
+   auditoria-mestra de 2026-09-24), mediante revisão humana
+   (DICO/ChatGPT). Staging, commit, push e PR desta atualização exigem
+   autorização humana específica para cada ato.
+2. **DICO/ChatGPT decidem as pendências A e B** registradas em `OPS-004`
+   (`DECISIONS.md`):
+   - **A — Modelo de isolamento multi-tenant:** RLS PostgreSQL real e
+     versionado **ou** isolamento formalmente somente em nível de aplicação
+     (com arquitetura, testes e documentação ajustados). **Pendente
+     (humana).**
+   - **B — Semântica do limite na visão admin:** `Subscription.case_limit`
+     **ou** limite derivado de `limits_for(plan_type)`. **Pendente
+     (humana).**
+3. **Somente depois**, e mediante nova autorização humana específica,
+   iniciar o primeiro bloco técnico (BLOCO 1).
 
-Com a verificação em leitura desta versão final de `NEXT_STEP.md` concluída
-com sucesso, o fechamento documental está concluído. Até essa verificação,
-considerar o fechamento **em verificação final**.
+`P-007` foi resolvida (`OPS-003`): código/produto integrado a `main` via
+PR #306; fechamento documental integrado a `main` via PR #307.
+`P-002` foi resolvida em `OPS-004` **apenas como prioridade**: restaurar
+uma baseline confiável de testes e isolamento multi-tenant antes de novas
+features. A solução técnica das duas falhas conhecidas
+(`test_admin_tenant_usage_full_returns_consolidated_view` e
+`test_rls_isolation`) **não está decidida** e depende de A e B.
 
-Nenhuma tarefa técnica nova foi selecionada como consequência disso.
-Nenhuma feature, refatoração ou frente técnica está autorizada por
-consequência. `P-002` (prioridade do próximo ciclo) e `P-007`
-(destino/fechamento da frente local atual) permanecem pendentes, assim como
-as demais pendências registradas em `DECISIONS.md`.
+### Sequência de blocos aprovada (planejamento, não autorização)
+
+- **BLOCO 0** — governança/documentação coerente (esta atualização).
+- **BLOCO 1** — suíte hermética + baseline real + CI completo.
+- **BLOCO 2** — isolamento PostgreSQL/tenant comprovado.
+- **BLOCO 3** — segurança/LGPD.
+- **BLOCO 4** — billing/Asaas.
+- **BLOCO 5** — frontend faltante.
+- **BLOCO 6** — gate de release.
+
+**Nenhum bloco técnico (BLOCO 1 a 6) está autorizado por esta edição.**
+Nenhuma branch técnica foi criada ou autorizada. O nome
+`fix/ci-plan-limit-test-and-rls-role-isolation-v1`, proposto
+anteriormente, foi superado pela auditoria-mestra, nunca foi criado e não
+constitui frente autorizada.
 
 Nenhuma ação de Git de escrita, Production ou integração externa é
 autorizada automaticamente por este estado.
 
-**NENHUMA TAREFA TÉCNICA AUTORIZADA — AGUARDANDO DECISÃO HUMANA SOBRE A
-PRÓXIMA FRENTE.**
+**PRÓXIMO PASSO: FECHAR ESTA ATUALIZAÇÃO DOCUMENTAL → DECISÃO HUMANA DE A E
+B → SOMENTE ENTÃO, COM NOVA AUTORIZAÇÃO ESPECÍFICA, BLOCO 1.**
 
-## C. Estado atual da implantação
+## C. Estado atual do repositório
 
-- Worktree de governança:
-  `/home/dilsondev/projetos/ia_trabalhista_robusta-governance-docs-v1`
-- Branch de governança: `chore/governance-docs-v1`, nascida limpa no
-  baseline aprovado `4e9d22fdae99fc717192ea5b6b96214f61d70628`.
-- **7/7 arquivos materialmente criados e validados** (untracked, não
-  staged, não commitados, sem push, sem PR): `AGENTS.md`,
-  `PROJECT_STATE.md`, `ROADMAP.md`, `ARCHITECTURE.md`, `DECISIONS.md`,
-  `NEXT_STEP.md`, `CLAUDE.md`.
-- `PROJECT_STATE.md`, `ROADMAP.md` e `ARCHITECTURE.md` já receberam as
-  correções temporais necessárias e foram validados antes desta edição
-  final de `NEXT_STEP.md`.
-- Este `NEXT_STEP.md` é atualizado por último.
-- Com a verificação em leitura desta versão final concluída com sucesso,
-  o fechamento documental está concluído. Até essa verificação, considerar
-  o fechamento **em verificação final**.
+- Repositório principal: `/home/dilsondev/projetos/ia_trabalhista_robusta`,
+  branch `main`, sincronizada local e remotamente em
+  `0fc0755d7de4ced50400f6e297a99338f6d9cd50` (ver `PROJECT_STATE.md`,
+  Seção B, para o protocolo de reverificação em cada sessão).
+- Os 7 arquivos de governança estão commitados e integrados em `main`
+  (PR #305); o fechamento de `P-007` (PR #306, produto) e seu registro
+  documental (PR #307, `DECISIONS.md`) também estão integrados em `main`.
+- O worktree de governança temporário e a branch
+  `docs/close-p007-decision-v1` foram removidos após comprovação de
+  equivalência material de conteúdo.
+- Nenhuma branch técnica para `P-002` foi criada.
+- Esta atualização documental está sendo feita na branch
+  `docs/resolve-p002-governance-v1` (criada a partir de `main` em
+  `0fc0755d7de4ced50400f6e297a99338f6d9cd50`), com alterações locais não
+  commitadas em `DECISIONS.md`, `PROJECT_STATE.md`, `NEXT_STEP.md` e
+  `ROADMAP.md` — valor observado em 2026-09-24, a reverificar via Git.
 
 ## D. Escopo permitido no estado de espera
 
@@ -76,80 +103,62 @@ material da implantação (7/7) nem pelo fechamento documental:
 - Nenhuma feature de produto.
 - Nenhuma refatoração (incluindo `case_operational_assistant.py`, `P-003`).
 - Nenhuma nova frente técnica.
-- Nenhum fechamento, commit, push ou PR da branch local
-  `fix/editor-civil-professional-risk-specialization-v1` — ela e seus dois
-  arquivos modificados (`case_operational_assistant.py`,
-  `test_massive_multicase_all_blocks_regression.py`) **continuam fora do
-  escopo desta implantação de governança e não devem ser tocados.**
+- Nenhum fechamento, commit, push ou PR de branch técnica sem autorização
+  específica para o ato — a antiga branch de produto
+  `fix/editor-civil-professional-risk-specialization-v1` já foi encerrada e
+  removida (`P-007`, resolvida em `OPS-003`) e não existe mais; esta regra
+  permanece como princípio geral para qualquer branch/frente de produto
+  atualmente em andamento.
 - Nenhum `commit`, `push`, `PR`, `merge`, `pull`, `tag`, `release` ou
-  `deploy` do próprio worktree de governança, salvo autorização humana
-  explícita e específica para esse ato (fora do escopo desta tarefa).
+  `deploy` relacionado a esta atualização documental ocorre automaticamente;
+  cada ato exige autorização humana explícita e específica.
 - Nenhum acesso a Production, integração externa, teste, build, banco ou
   migração nesta etapa.
 
-## F. Critérios de conclusão MATERIAL da implantação
+## F. Critério histórico de conclusão MATERIAL da implantação inicial
 
-A implantação inicial da governança é considerada **materialmente concluída**
-quando:
+A implantação inicial da governança persistente já foi materialmente concluída
+e integrada em `main`. Este bloco permanece somente como registro histórico do
+critério usado naquele rollout.
 
-1. `CLAUDE.md` tiver sido proposto, aprovado, criado e validado conforme o
-   processo já aprovado (proposta → aprovação → escrita → verificação em
-   leitura); e
-2. uma verificação em leitura confirmar os 7 de 7 arquivos materializados no
-   worktree de governança, sem alterações indevidas nos demais arquivos e
-   sem staging/commit/push não autorizados.
+Na implantação inicial, a conclusão material exigia:
 
-Ao atingir 7/7:
-- registrar que a implantação está **materialmente concluída**;
-- **PARAR**;
-- **não iniciar automaticamente** o fechamento documental da Seção G;
-- **não iniciar** nenhuma tarefa técnica;
-- **aguardar nova instrução humana específica**.
+1. os 7 arquivos de governança propostos, aprovados, criados e validados;
+2. verificação objetiva de que os 7 arquivos estavam presentes e coerentes;
+3. ausência de alterações indevidas, staging, commit ou push não autorizados;
+4. parada obrigatória antes de qualquer nova frente técnica.
 
-A etapa de fechamento documental (Seção G) é **separada e posterior** à
-conclusão material — não é um terceiro critério desta seção, e não ocorre
-como consequência automática de atingir 7/7. Isso preserva a distinção:
+Esse marco histórico não constitui tarefa atual, não exige recriação de
+worktree e não autoriza automaticamente nova implementação.
 
-7/7 materializados e validados
-≠ fechamento documental já executado
-≠ autorização para próxima frente técnica.
+O estado operacional corrente é definido pelas Seções B, C, H e J deste
+documento, em conjunto com `PROJECT_STATE.md` e `DECISIONS.md`.
 
-Cada critério acima exige evidência objetiva, rastreável e válida para o
-estado relevante. Evidência de checkpoint anterior pode continuar válida
-quando permanecer válida pelos critérios de `AGENTS.md` Seção 7 /
-`DECISIONS.md` `GOV-006`. Memória de agente ou afirmação de conversa nunca
-substitui evidência. Se houver mudança relevante, regressão, dúvida material
-ou mudança de checkpoint que invalide a evidência, devem ser refeitas as
-verificações pertinentes.
+## G. Regra histórica de parada após a implantação inicial
 
-## G. Regra de parada após 7/7
+Durante o rollout inicial, ao atingir 7 de 7 arquivos de governança criados e
+validados, o processo deveria parar antes de qualquer nova frente técnica.
+Essa regra foi aplicada; a implantação foi posteriormente integrada em `main`
+e o worktree temporário de governança foi removido.
 
-Ao atingir 7 de 7 arquivos materialmente criados e validados, o processo
-**para** — nenhuma ação subsequente é automática. Antes de qualquer nova
-tarefa técnica:
+O princípio continua válido: conclusão documental nunca autoriza, por si só,
+uma nova tarefa técnica.
 
-1. Deve haver uma **etapa documental separada de fechamento da implantação**,
-   destinada a atualizar checkpoints que tenham ficado temporalmente
-   desatualizados pela própria sequência de criação dos arquivos. Nesta
-   implantação, essa necessidade ocorreu e os checkpoints afetados foram
-   corrigidos antes do encerramento documental final.
-2. Essa etapa de fechamento é, ela própria, uma tarefa que segue o mesmo
-   ciclo de proposta → aprovação → escrita → verificação — não ocorre
-   silenciosamente como efeito colateral da criação de `CLAUDE.md`.
-3. Somente depois desse fechamento documental, o responsável humano decide
-   qual será a próxima tarefa técnica — este documento não a escolhe, não a
-   sugere como decidida e não a inicia.
+No estado atual, a sequência vigente é a definida na Seção B:
 
-## H. Pendências humanas que impedem escolha automática da próxima frente
+1. fechar esta atualização documental;
+2. obter as decisões humanas A e B de `OPS-004`;
+3. somente depois, mediante nova autorização específica, iniciar o BLOCO 1.
 
-Nenhum agente de IA escolhe a próxima frente técnica por conta própria. Em
-especial, as seguintes pendências de `DECISIONS.md` seguem abertas e devem
-ser consideradas pelo humano responsável quando essa escolha for feita:
+## H. Pendências humanas relacionadas ao início da implementação
 
-- **P-002** — prioridade do próximo ciclo de desenvolvimento.
-- **P-007** — destino/fechamento da frente local atual.
-- Demais pendências (`P-001`, `P-003` a `P-006`, `P-008` a `P-010`) também
-  permanecem em aberto e podem condicionar ou informar essa escolha futura.
+`P-007` (destino da frente local anterior) foi decidida (`OPS-003`).
+`P-002` foi decidida apenas como prioridade (`OPS-004`). As decisões
+técnicas **A** (modelo de isolamento) e **B** (semântica do limite admin),
+registradas em `OPS-004`, permanecem **pendentes (humanas)** e condicionam
+o início do BLOCO 1/BLOCO 2. As demais pendências seguem abertas e não são
+resolvidas nem antecipadas por este documento: `P-001`, `P-003` a `P-006`,
+`P-008` a `P-010`.
 
 ## I. Evidência necessária para qualquer futura declaração de conclusão
 
@@ -165,15 +174,16 @@ ser consideradas pelo humano responsável quando essa escolha for feita:
 
 ## J. Status operacional
 
-- Tarefa em foco: **nenhuma tarefa técnica; implantação inicial
-  materialmente concluída; fechamento documental em verificação final.**
-- 7/7 arquivos materialmente criados e validados; `PROJECT_STATE.md`,
-  `ROADMAP.md` e `ARCHITECTURE.md` atualizados e verificados; este
-  `NEXT_STEP.md` atualizado por último.
-- Com a verificação em leitura desta versão bem-sucedida, o fechamento
-  documental está concluído.
-- **NENHUMA TAREFA TÉCNICA AUTORIZADA — AGUARDANDO DECISÃO HUMANA SOBRE A
-  PRÓXIMA FRENTE**, considerando especialmente `P-002`, `P-007` e as
-  demais pendências de `DECISIONS.md`.
+- Tarefa em foco: **fechar a atualização documental (BLOCO 0) e obter a
+  decisão humana de A e B (`OPS-004`).**
+- `P-007` resolvida e integrada em `main`; `P-002` resolvida apenas como
+  prioridade (`OPS-004`); A e B pendentes (humanas).
+- Último resultado conhecido da suíte global do backend: `304 passed,
+  2 failed` em 306 testes (registrado em `OPS-003`; não reexecutado).
+  Production: **NÃO VERIFICADA**.
+- **NENHUM BLOCO TÉCNICO AUTORIZADO — AGUARDANDO REVISÃO DESTA ATUALIZAÇÃO
+  DOCUMENTAL, DECISÃO HUMANA DE A E B E NOVA AUTORIZAÇÃO HUMANA
+  ESPECÍFICA** para criar branch técnica, alterar testes/código/banco ou
+  executar testes.
 - Este documento, por si só, não autoriza nenhuma ação de Git de escrita,
   Production ou integração externa.

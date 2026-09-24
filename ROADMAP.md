@@ -38,15 +38,26 @@ antecipa.
 
 ## C. Fases/frentes já implementadas ou avançadas
 
-- ✅ Autenticação JWT, RBAC, isolamento multi-tenant (incluindo RLS em
-  Postgres) — implementado e testado, per `MVP_VALIDATION_MATRIX.md`
-  (itens `[x]` nas seções 2 e 3) e suíte de testes (`test_rls_isolation.py`,
-  `test_tenant_isolation.py`, `test_multi_tenant_isolation.py`).
+- ✅ Autenticação JWT, RBAC e isolamento multi-tenant **em nível de
+  aplicação** (`scoped_query`) — implementado e testado, per
+  `MVP_VALIDATION_MATRIX.md` (itens `[x]` nas seções 2 e 3) e suíte de testes
+  (`test_tenant_isolation.py`, `test_multi_tenant_isolation.py`).
+- ⚠️ **RLS PostgreSQL — NÃO comprovado no Git:** documentado/prometido, mas a
+  auditoria-mestra de 2026-09-24 não encontrou `ENABLE ROW LEVEL SECURITY`
+  nem `CREATE POLICY` nas migrations versionadas; `set_config('app.tenant_id',
+  ...)` existe no código, mas nada versionado o consome. `test_rls_isolation`
+  é um dos 2 testes com falha conhecida, depende do PostgreSQL local real e
+  não é hermético. O modelo de isolamento (RLS real versionado ou isolamento
+  formal somente em aplicação) é a decisão humana **A** pendente em
+  `OPS-004`.
 - ✅ Fluxo executivo caso → análise → resumo → relatório → PDF — implementado
   e testado, per `MVP_VALIDATION_MATRIX.md` (seções 4–6) e serviços auditados
   (`decision_engine.py`, `report_engine.py`, `pdf_executive.py`).
-- ✅ Health/readiness/CI/smoke — implementado e testado, per
-  `.github/workflows/ci.yml` e seção 1 da matriz.
+- ✅ Health/CI/smoke — implementado e testado, per
+  `.github/workflows/ci.yml` e seção 1 da matriz. Limites observados na
+  auditoria-mestra (2026-09-24): apenas o endpoint `/health` foi encontrado
+  (sem `/ready`); o CI possui 4 jobs e **não executa a suíte completa do
+  backend**.
 - ✅ Cobertura extensa de especialização trabalhista e consumidor no editor
   assistido — implementado, com cadeia de PRs mesclados (#284–#299) e testes
   correspondentes (`test_editor_labor_template_routing.py` e a família
@@ -54,23 +65,18 @@ antecipa.
 - ✅ Billing técnico (checkout + webhook Asaas com verificação de token) —
   implementado e integrado no código (`payment_checkout.py`, `webhooks.py`);
   ver Seção I para o limite exato dessa comprovação.
-- ✅ **Governança documental persistente de IA** — implantação inicial
-  MATERIAL concluída: 7/7 arquivos materializados e validados no worktree
-  `chore/governance-docs-v1`; nenhum staged/commitado/enviado por push/com
-  PR. Isso registra somente a conclusão documental da implantação e não
-  autoriza nova frente técnica nem resolve `P-002`/`P-007`.
+- ✅ **Governança documental persistente de IA** — 7/7 arquivos criados,
+  commitados e integrados em `main` (PR #305, squash-merged). Registra a
+  conclusão da implantação documental; não resolve, por si só, pendências
+  de produto.
+- ✅ **Especialização cível — restrição/risco profissional (LGPD)**: frente
+  commitada (`7771de0384d9c9bd56f6ecb62f855674a3d96ed6`), integrada a
+  `main` via PR #306 (squash-merged,
+  `b9ca8a8141da1a582a0ee2842b9278652e1705f4`). `P-007` resolvida em
+  `DECISIONS.md`, `OPS-003` — ver detalhes completos lá.
 
 ## D. Frentes em andamento
 
-- 🔄 **Especialização cível — restrição/risco profissional (LGPD)**: frente
-  local aberta na branch `fix/editor-civil-professional-risk-specialization-v1`,
-  que permanece no repositório/worktree original
-  (`/home/dilsondev/projetos/ia_trabalhista_robusta`), com os dois arquivos
-  locais não commitados registrados em `PROJECT_STATE.md` (Seções B–C). É a
-  **governança** — não essa frente — que está sendo implantada em worktree
-  separado, justamente para não misturar as duas. ⚠️ O fechamento dessa frente
-  (commit/PR) é decisão humana pendente — este roadmap não a decide nem a
-  agenda automaticamente.
 - 🔄 **Módulo Criminal V1**: escopo oficial definido
   (`docs/CRIMINAL_MODULE_V1_SCOPE.md`), com roteamento parcial já no código
   (`test_editor_criminal_template_routing.py`). O próprio escopo declara que
@@ -88,6 +94,25 @@ antecipa.
 - ⚠️⏳ **Refatoração de `case_operational_assistant.py`**: identificada como
   risco arquitetural na auditoria, mas **não é tarefa automática deste
   roadmap** (regra explícita) — depende de decisão humana ainda pendente.
+- ⏳ **Prioridade do próximo ciclo (`P-002`, resolvida em `OPS-004` apenas
+  como prioridade)**: restaurar uma baseline confiável de testes e
+  isolamento multi-tenant **antes de novas features**. A solução técnica
+  **não está decidida** e depende de duas decisões humanas pendentes em
+  `OPS-004`:
+  - **A** — RLS PostgreSQL real e versionado **ou** isolamento formal somente
+    em aplicação;
+  - **B** — semântica do limite admin: `Subscription.case_limit` **ou**
+    `limits_for(plan_type)` (não é simples troca de "50" por configuração).
+- ⏳ Sequência planejada (detalhada em `NEXT_STEP.md`; planejamento, **não
+  autorização**): fechar a atualização documental → decisão humana de A e B
+  → primeiro bloco técnico = **baseline de testes** (suíte hermética e
+  confiável) → **isolamento de banco como bloco próprio**, conforme a decisão
+  A. Nenhuma branch técnica foi criada ou autorizada; o nome
+  `fix/ci-plan-limit-test-and-rls-role-isolation-v1` está **superado** e a
+  branch nunca foi criada. Este roadmap não autoriza nenhum início
+  (`AGENTS.md`, Seção 5).
+- 🚫 **Nenhuma feature nova antes dos bloqueios básicos** (baseline de testes
+  e isolamento multi-tenant) — consequência da prioridade de `P-002`.
 
 ## F. Segurança/LGPD
 
@@ -104,6 +129,10 @@ antecipa.
   risco de higiene a verificar, sem leitura de conteúdo nesta auditoria nem
   neste roadmap.
 - ✅ Regra permanente de nunca expor segredos — fixada em `AGENTS.md`, Seção 6.
+- ⚠️ Nenhum rate limiting encontrado no HEAD auditado (auditoria-mestra,
+  2026-09-24).
+- ⚠️ Dump local de banco e arquivos em `backend/storage` presentes no
+  ambiente local — exigem decisão e higiene LGPD (conteúdo não aberto).
 
 ## G. Confiabilidade jurídica
 
@@ -186,9 +215,11 @@ antecipa.
 
 **Governança documental inicial: 7 de 7 arquivos materializados e
 validados neste checkpoint.** Nenhum staged, commitado, enviado por push
-ou com PR aberto. **Implantação MATERIAL concluída** — isso não altera
-prioridades técnicas nem resolve `P-002`/`P-007` em `DECISIONS.md`, que
-permanecem pendentes.
+ou com PR aberto. **Implantação MATERIAL concluída** — isso, por si só, não
+alterou prioridades técnicas. *(Registro histórico do checkpoint de
+implantação; posteriormente os 7 arquivos foram integrados a `main` via
+PR #305 — ver Seção C; `P-007` foi resolvida em `OPS-003` e `P-002` apenas
+como prioridade em `OPS-004`.)*
 
 ## L. Decisões humanas que bloqueiam ou condicionam fases
 
@@ -198,9 +229,11 @@ condiciona neste roadmap; não resolve nenhuma delas.
 
 - **Nomenclatura oficial do produto — `P-001`** — condiciona comunicação
   externa e comercial consistente (Seção B).
-- **Prioridade do próximo ciclo de desenvolvimento — `P-002`** — bloqueia o
-  início de qualquer nova frente técnica pós-governança (Seção E, 4 opções
-  em aberto).
+- **Prioridade do próximo ciclo de desenvolvimento — `P-002`** — resolvida
+  em `OPS-004` **apenas como prioridade**: baseline confiável de testes e
+  isolamento multi-tenant antes de novas features. Condicionada às decisões
+  humanas pendentes **A** (modelo de isolamento) e **B** (semântica do
+  limite admin). Nenhuma branch técnica criada ou autorizada (Seção E).
 - **Refatoração de `case_operational_assistant.py` — `P-003`** — condiciona
   a evolução segura da Seção H; não deve ser tratada como tarefa automática
   deste roadmap.
@@ -211,14 +244,15 @@ condiciona neste roadmap; não resolve nenhuma delas.
   bloqueia fechamento formal de conformidade mínima permanente (Seção F).
 - **Nível de autonomia dos agentes de IA — `P-006`** — condiciona quanto
   `NEXT_STEP.md` poderá ser executado sem aprovação humana passo a passo.
-- **Destino/fechamento da frente local aberta — `P-007`** — enquanto houver
-  trabalho local não relacionado/não commitado nessa working tree, outra
-  frente não deve ser misturada nela; trabalho separado pode exigir
-  branch/worktree apropriado e autorização conforme
-  `AGENTS.md`/`DECISIONS.md`. O destino da frente atual continua decisão
-  humana pendente (Seção D).
+- **Destino/fechamento da frente local — `P-007`** — resolvida em
+  `OPS-003`: a frente foi commitada, integrada a `main` via PR #306
+  (squash-merged) e a branch de trabalho foi removida após comprovação de
+  equivalência material de conteúdo (Seção C).
 - **Higiene de `.env`/`.env.bak*` — `P-008`** — condiciona o fechamento de
   segurança operacional (Seção F).
+- **Storage externo para anexos — `P-009`** e **auditoria técnica
+  aprofundada — `P-010`** — pendentes em `DECISIONS.md`; não resolvidas por
+  este roadmap.
 
 ## M. Critérios de passagem entre fases
 
@@ -245,15 +279,20 @@ encontrada na auditoria — não é métrica automatizada nem projeção tempora
 ```
 IA Trabalhista Robusta / [nomenclatura oficial pendente]
 │
-├── ✅ Infra base (auth, tenant, RLS, health/ready, CI, plans/limits)
-│     estimativa: ~90% — quase todos os itens [x] nas seções 1–3 da matriz
+├── 🔄 Infra base (auth, tenant app-level, health, CI, plans/limits)
+│     itens [x] nas seções 1–3 da matriz; porém RLS não versionado/não
+│     comprovado no Git, suíte completa fora do CI, testes não herméticos,
+│     sem /ready e sem rate limiting (auditoria-mestra 2026-09-24).
+│     Estimativas da auditoria (NÃO métricas): Banco/RLS ~40%,
+│     Testes/CI ~50%, Segurança ~55% — ver PAINEL MESTRE em PROJECT_STATE.md
 │
 ├── ✅ Fluxo executivo (análise → resumo → relatório → PDF)
 │     estimativa: ~85% — quase todos os itens [x] na seção 6 da matriz
 │
 ├── 🔄 Motor de especialização jurídica (copiloto/editor)
-│     estimativa: ~65% — cobertura extensa trabalhista/consumidor; cível em
-│     expansão ativa (frente local aberta, não commitada); criminal V1 parcial
+│     estimativa: ~65% — cobertura extensa trabalhista/consumidor; cível
+│     ampliada (especialização de risco profissional integrada via PR #306,
+│     P-007 resolvida em OPS-003); criminal V1 parcial
 │
 ├── 🔄 Billing/Asaas
 │     estimativa: ~70% no código (implementado/integrado/testado);
@@ -262,12 +301,12 @@ IA Trabalhista Robusta / [nomenclatura oficial pendente]
 ├── ✅ Governança documental de IA
 │     progresso documental: 7 de 7 arquivos materializados e validados
 │     (AGENTS.md, PROJECT_STATE.md, ROADMAP.md, ARCHITECTURE.md,
-│     DECISIONS.md, NEXT_STEP.md, CLAUDE.md), nenhum staged/commitado/
-│     enviado por push/com PR. Implantação MATERIAL concluída. Este
-│     número mede apenas o progresso da implantação documental da
-│     governança — não percentual de conclusão técnica do produto, nem
-│     resolução de P-002/P-007 em DECISIONS.md, que permanecem
-│     pendentes.
+│     DECISIONS.md, NEXT_STEP.md, CLAUDE.md). Implantação MATERIAL
+│     concluída e posteriormente integrada a main via PR #305.
+│     Este número mede apenas o progresso da implantação documental da
+│     governança — não percentual de conclusão técnica do produto.
+│     P-007 resolvida (OPS-003); P-002 resolvida só como prioridade
+│     (OPS-004), A/B pendentes.
 │
 ├── ⏳ LGPD formal (retenção/descarte/exportação/exclusão)
 │     auto-declarado parcial pelo próprio docs/LGPD_MINIMA.md
@@ -280,5 +319,6 @@ IA Trabalhista Robusta / [nomenclatura oficial pendente]
 │     agendada automaticamente por este roadmap
 │
 └── 🚫 Verificação ao vivo de Production
-      não autorizada nesta etapa de governança
+      NÃO VERIFICADA neste checkpoint; qualquer verificação ao vivo
+      exige autorização humana específica
 ```
