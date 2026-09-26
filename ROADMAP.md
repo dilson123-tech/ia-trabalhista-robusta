@@ -107,16 +107,26 @@ antecipa.
     limites e enforcement; `Subscription.case_limit` é legado/informativo
     (coluna mantida). O teste de uso administrativo deve ser reconciliado
     com B2, sem `50` hardcoded e sem depender do `.env` local.
-  - Defeito registrado para o BLOCO 1 (**sem solução decidida**):
-    `remaining.cases` é calculado contra o contador mensal `cases_created`,
-    embora `cases_per_month` seja alias de `active_cases_limit` (mistura
-    casos ATIVOS com casos CRIADOS NO MÊS).
-- ⏳ Sequência planejada (detalhada em `NEXT_STEP.md`; planejamento, **não
-  autorização**): fechar este adendo documental A1/B2 →
-  **preparar o BLOCO 1** (planejamento em leitura, sem implementar) →
-  somente com nova autorização específica, implementar o BLOCO 1 =
-  **baseline de testes** (suíte hermética e confiável) → **isolamento de
-  banco como bloco próprio** (BLOCO 2), conforme A1. Nenhuma branch técnica foi criada ou autorizada; o nome
+  - Defeito registrado (**sem solução decidida**): `remaining.cases` é
+    calculado contra o contador mensal `cases_created`, embora
+    `cases_per_month` seja alias de `active_cases_limit` (mistura casos
+    ATIVOS com casos CRIADOS NO MÊS). **Congelado** na frente 1A → 2 → 1B
+    (`OPS-005`); exige decisão humana própria futura.
+- ⏳ Sequência planejada — modelo de execução decidido em 2026-09-25
+  (`OPS-005`; detalhado em `NEXT_STEP.md`; planejamento, **não
+  autorização**; adendo A1/B2 já integrado via PR #309):
+  **BLOCO 1A** (hermeticidade/configuração de testes com PostgreSQL 16
+  efêmero, migrations no banco de teste, sem `.env` real/PG de
+  desenvolvimento; teste admin reconciliado com B2; infraestrutura de
+  `test_rls_isolation` adaptada com assert preservado; sem
+  `skip`/`xfail`/assert enfraquecido; **sem** job de suíte completa
+  vermelho no CI) → **BLOCO 2** (A1: RLS real/versionado, role não
+  superusuária sem `BYPASSRLS`, `FORCE ROW LEVEL SECURITY`;
+  `test_rls_isolation` verde) → **BLOCO 1B** (suíte completa do backend
+  no CI, obrigatória e verde; baseline final registrada). Nenhum BLOCO 1
+  é declarado concluído antes do 1B. PostgreSQL 16 alinha-se ao
+  `docker-compose.yml` e não afirma a versão de Production. Cada bloco
+  exige nova autorização específica. Nenhuma branch técnica foi criada ou autorizada; o nome
   `fix/ci-plan-limit-test-and-rls-role-isolation-v1` está **superado** e a
   branch nunca foi criada. Este roadmap não autoriza nenhum início
   (`AGENTS.md`, Seção 5).
@@ -243,7 +253,8 @@ condiciona neste roadmap; não resolve nenhuma delas.
   isolamento multi-tenant antes de novas features. As decisões humanas
   **A** (modelo de isolamento) e **B** (semântica do limite admin) foram
   tomadas em 2026-09-25: **A1** (`ARCH-001`) e **B2** (`ARCH-002`), não
-  implementadas. Nenhuma branch técnica criada ou autorizada (Seção E).
+  implementadas; modelo de execução 1A → 2 → 1B decidido em `OPS-005`,
+  não iniciado. Nenhuma branch técnica criada ou autorizada (Seção E).
 - **Refatoração de `case_operational_assistant.py` — `P-003`** — condiciona
   a evolução segura da Seção H; não deve ser tratada como tarefa automática
   deste roadmap.
@@ -318,7 +329,7 @@ IA Trabalhista Robusta / [nomenclatura oficial pendente]
 │     governança — não percentual de conclusão técnica do produto.
 │     P-007 resolvida (OPS-003); P-002 resolvida só como prioridade
 │     (OPS-004); A1 (ARCH-001) / B2 (ARCH-002) decididas, não
-│     implementadas.
+│     implementadas; execução 1A → 2 → 1B decidida (OPS-005).
 │
 ├── ⏳ LGPD formal (retenção/descarte/exportação/exclusão)
 │     auto-declarado parcial pelo próprio docs/LGPD_MINIMA.md

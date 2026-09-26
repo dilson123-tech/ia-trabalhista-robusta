@@ -32,6 +32,13 @@ partir deste arquivo.
   semântica do limite administrativo. Nenhum código, teste, banco ou
   migration alterado; nenhum teste executado. Ver "PAINEL MESTRE" e Seções
   D, G e I abaixo.
+- **Atualização registrada em:** 2026-09-25 — registro documental da
+  decisão humana (DICO/ChatGPT) sobre o modelo de execução **BLOCO 1A →
+  BLOCO 2 → BLOCO 1B** (`OPS-005`), tomada após relatório somente leitura
+  de preparação do BLOCO 1. Base: HEAD observado
+  `ba169bcaadb9836dd9763f96ba818a7544d37ea8` (`main` = `origin/main`
+  local, após PR #309, que integrou o adendo A1/B2). Nenhum código,
+  teste, workflow, banco ou migration alterado; nenhum teste executado.
 - Este checkpoint só deve ser atualizado quando houver mudança material de
   estado, houver evidência objetiva, rastreável e válida para o estado relevante
   do código — inclusive evidência de checkpoint anterior quando continuar válida
@@ -46,13 +53,15 @@ Painel-resumo permanente deste checkpoint. Os valores abaixo são
 autorizado; não substituem a verificação direta do Git (Seção B) nem
 `DECISIONS.md`/`NEXT_STEP.md`.
 
-- **Último checkpoint Git observado (2026-09-25):** `main` local e
-  `origin/main` confirmados após `fetch` e `pull --ff-only` em
-  `55945775ffeda2a8ea5c033bd8569d156f0972ac` (PR #308 — reconciliação de
-  `P-002` com a auditoria-mestra), working tree limpo antes desta edição;
-  esta atualização documental (registro de A1/B2) foi feita no working
-  tree de `main`, com alterações locais não commitadas nos 4 documentos
-  (`DECISIONS.md`, `PROJECT_STATE.md`, `NEXT_STEP.md`, `ROADMAP.md`).
+- **Último checkpoint Git observado (2026-09-25):** `main` local igual a
+  `origin/main` local em `ba169bcaadb9836dd9763f96ba818a7544d37ea8`
+  (PR #309 — registro das decisões A1/B2, adendo integrado), working tree
+  limpo antes desta edição, após `fetch` e `pull --ff-only` que confirmaram
+  `main` local igual a `origin/main`;
+  esta atualização documental (registro de `OPS-005`) foi feita no
+  working tree de `main`, com alterações locais não commitadas nos 4
+  documentos (`DECISIONS.md`, `PROJECT_STATE.md`, `NEXT_STEP.md`,
+  `ROADMAP.md`).
 - **Estado geral estimado — ESTIMATIVAS qualitativas da auditoria-mestra,
   NÃO métricas formais:**
 
@@ -82,23 +91,25 @@ autorizado; não substituem a verificação direta do Git (Seção B) nem
   superusuária e sem `BYPASSRLS`, tratamento explícito de ownership/
   `FORCE ROW LEVEL SECURITY`, teste em PostgreSQL real e CI); reconciliação do teste de
   uso administrativo com B2 (`ARCH-002`); correção da semântica de
-  `remaining.cases` (defeito registrado, sem solução decidida); suíte hermética e suíte completa em CI; rate
+  `remaining.cases` (defeito registrado, sem solução decidida, congelado
+  na frente 1A → 2 → 1B por `OPS-005`); suíte hermética (BLOCO 1A) e
+  suíte completa em CI (BLOCO 1B, somente após o RLS do BLOCO 2); rate
   limiting; políticas LGPD formais (retenção/descarte); painéis de frontend
   ainda só visuais (Recursos e Sucessão); gate de release formal.
 - **Bloqueios:** nenhuma decisão humana A/B pendente (A1 em `ARCH-001`,
-  B2 em `ARCH-002`); o BLOCO 1 depende de nova autorização humana
-  específica para implementação; as 2 falhas conhecidas da suíte global
+  B2 em `ARCH-002`; modelo de execução 1A → 2 → 1B em `OPS-005`); cada
+  bloco (1A, 2, 1B) depende de nova autorização humana específica para
+  implementação; as 2 falhas conhecidas da suíte global
   têm direção decidida (A1/B2), mas **não estão corrigidas**; o defeito de
   `remaining.cases` não tem solução decidida.
 - **Último resultado de testes conhecido:** suíte global `304 passed,
   2 failed` em 306 testes; regressão direcionada `108 passed, 0 failed`
   (ambos registrados em `OPS-003`/Seção D; **não reexecutados** na
   auditoria-mestra).
-- **Próximo passo:** fechar este adendo documental A1/B2, complementar ao
-  BLOCO 0 já integrado → preparar o BLOCO 1 (planejamento em leitura, sem
-  implementar) → somente com nova autorização específica, implementar o
-  BLOCO 1 (ver
-  `NEXT_STEP.md`).
+- **Próximo passo:** revisão humana deste registro documental de
+  `OPS-005` → somente com nova autorização específica, BLOCO 1A → BLOCO 2
+  → BLOCO 1B, nessa ordem (ver `NEXT_STEP.md`). Nenhum BLOCO 1 é
+  declarado concluído antes do 1B.
 - **Decisões humanas abertas:** `P-001`, `P-003`, `P-004`, `P-005`,
   `P-006`, `P-008`, `P-009`, `P-010`. (A e B de `OPS-004` decididas em
   2026-09-25: `ARCH-001`/`ARCH-002`.)
@@ -262,7 +273,9 @@ auditoria:
   decidida:** `cases_per_month` é alias legado de `active_cases_limit`,
   mas `remaining.cases` é calculado contra o contador mensal
   `cases_created`, misturando limite de casos **ATIVOS** com casos
-  **CRIADOS NO MÊS**. Problema técnico a tratar no BLOCO 1.
+  **CRIADOS NO MÊS**. Por `OPS-005`, fica **congelado** na frente
+  1A → 2 → 1B e exige decisão humana própria futura antes de qualquer
+  mudança de contrato.
 
 ## H. Estado da implantação dos 7 arquivos de governança
 

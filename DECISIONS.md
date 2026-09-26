@@ -161,6 +161,54 @@ sessão de implantação de governança, ou a um princípio já presente em
   sobre valores de limites de plano, escolha de A ou B, ou resolução de
   qualquer outra pendência (`P-001`, `P-003` a `P-006`, `P-008` a `P-010`),
   que permanecem pendentes e intactas.
+- **OPS-005** — Modelo de execução da prioridade de `OPS-004` com as
+  decisões `ARCH-001` (A1) e `ARCH-002` (B2): **sequência obrigatória
+  BLOCO 1A → BLOCO 2 → BLOCO 1B** ("Modelo Y" com refinamento). Decisão
+  humana (DICO/ChatGPT), 2026-09-25, tomada após relatório somente leitura
+  de preparação do BLOCO 1 sobre o HEAD
+  `ba169bcaadb9836dd9763f96ba818a7544d37ea8`.
+  - **BLOCO 1A — hermeticidade/configuração de testes:**
+    - PostgreSQL **16** efêmero para testes;
+    - migrations aplicadas no banco de teste;
+    - eliminar a dependência do `.env` real e do PostgreSQL de
+      desenvolvimento;
+    - reconciliar `test_admin_tenant_usage_full_returns_consolidated_view`
+      com `ARCH-002` (B2);
+    - adaptar a infraestrutura de `test_rls_isolation` ao PostgreSQL
+      efêmero, **preservando seu assert**, deixando explícito que ele
+      ainda depende do BLOCO 2 para ficar verde;
+    - **nenhum** `skip`, **nenhum** `xfail`, **nenhum** assert
+      enfraquecido;
+    - `remaining.cases` permanece inalterado.
+  - **BLOCO 2 — implementar `ARCH-001` (A1):** RLS real e versionado; role
+    de aplicação não superusuária, sem `BYPASSRLS`; ownership/`FORCE ROW
+    LEVEL SECURITY` tratado explicitamente; isolamento em PostgreSQL real;
+    `test_rls_isolation` deve ficar verde.
+  - **BLOCO 1B — somente depois do BLOCO 2:** adicionar/fechar a suíte
+    completa do backend no CI; CI completo obrigatório e verde; executar e
+    registrar a baseline final. **Nenhum BLOCO 1 será declarado concluído
+    antes do 1B.**
+  - **Refinamento obrigatório:** **não** adicionar no BLOCO 1A um job de
+    suíte completa propositalmente vermelho, nem mesmo como não-required.
+    O job completo entra somente no BLOCO 1B, depois do RLS, para não
+    normalizar checks vermelhos.
+  - **Decisões técnicas adicionais:**
+    - PostgreSQL de testes = versão 16, por alinhamento ao
+      `docker-compose.yml` versionado; isso **não** afirma a versão de
+      Production (não verificada);
+    - tentar primeiro bootstrap precoce de configuração pelo `conftest.py`;
+    - `settings.py` só poderá receber hook mínimo de teste se
+      objetivamente necessário para impedir contaminação pelo `.env` real,
+      sem alterar defaults nem comportamento de produção;
+    - `remaining.cases` / `cases_per_month` ficam **congelados** nesta
+      frente (1A → 2 → 1B) e exigem decisão humana própria futura antes de
+      qualquer mudança de contrato (ver achado em `ARCH-002`).
+  Esta decisão define **ordem e critérios**; ela **não implementa nada** e
+  **não autoriza automaticamente**: criação de branch, alteração de
+  código, testes, CI/workflow, banco/role ou migrations, execução de
+  `pytest`/build, acesso a Production ou qualquer ato de Git de escrita —
+  cada ato de cada bloco continua exigindo autorização humana específica.
+  Concluir um bloco não autoriza iniciar o seguinte por inferência.
 
 ### Decisões arquiteturais aprovadas (série `ARCH-*`)
 
@@ -226,7 +274,9 @@ sessão de implantação de governança, ou a um princípio já presente em
   **ATIVOS** com o contador de casos **CRIADOS NO MÊS**. Registrado como
   problema técnico a tratar no **BLOCO 1**; a correção (semântica e
   implementação) permanece pendente de análise e decisão humana
-  específicas.
+  específicas. **Atualização (`OPS-005`, 2026-09-25):** esse achado
+  **não** será corrigido na frente 1A → 2 → 1B; `remaining.cases` /
+  `cases_per_month` ficam congelados até decisão humana própria futura.
 
 ## E. Decisões jurídicas/processuais aprovadas
 
@@ -335,8 +385,8 @@ aberto até decisão humana explícita.
 
 - Não decide, por iniciativa própria, nenhuma das pendências `P-001` a
   `P-010`; os itens marcados como resolvidos (`P-002`, `P-007`) e as
-  decisões `A`/`B` de `OPS-004` (`ARCH-001`/`ARCH-002`) apenas registram
-  decisões humanas explícitas.
+  decisões `A`/`B` de `OPS-004` (`ARCH-001`/`ARCH-002`) e o modelo de
+  execução `OPS-005` apenas registram decisões humanas explícitas.
 - Não autoriza, por si só, implementação, commit, push, deploy, acesso a
   Production ou integração externa — essas ações continuam exigindo
   autorização humana explícita e específica, conforme `AGENTS.md`.
