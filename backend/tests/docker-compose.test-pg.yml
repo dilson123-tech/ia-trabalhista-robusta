@@ -1,0 +1,27 @@
+# PostgreSQL 16 EFÊMERO — EXCLUSIVO DE TESTE (BLOCO 1A / S4).
+# Não reutiliza container, volume ou porta do docker-compose.yml de desenvolvimento.
+# Dados em tmpfs: nada persiste após `down`.
+#
+# Subir:   docker compose -f backend/tests/docker-compose.test-pg.yml up -d --wait
+# Derrubar: docker compose -f backend/tests/docker-compose.test-pg.yml down -v
+# URL de teste (credenciais sintéticas, não são segredo):
+#   IA_TRAB_TEST_PG_OWNER_URL=postgresql+psycopg2://ia_trab_test_owner:ia_trab_test_owner_pass@127.0.0.1:55433/ia_trab_test
+name: ia_trab_pytest_pg
+
+services:
+  pg_test:
+    image: postgres:16-alpine
+    container_name: ia_trab_pytest_pg16
+    environment:
+      POSTGRES_DB: ia_trab_test
+      POSTGRES_USER: ia_trab_test_owner
+      POSTGRES_PASSWORD: ia_trab_test_owner_pass
+    ports:
+      - "127.0.0.1:55433:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ia_trab_test_owner -d ia_trab_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 30

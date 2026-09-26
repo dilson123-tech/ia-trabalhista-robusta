@@ -138,3 +138,80 @@ def client(db_session):
             yield c
     finally:
         _restore_get_db_override(previous)
+
+
+# ---------------------------------------------------------------------------
+# PostgreSQL 16 efêmero de TESTE (BLOCO 1A / S4) — opt-in, nunca autouse.
+# SQLite acima continua sendo a camada padrão. Só testes que pedirem os
+# fixtures pg_* abaixo tocam PostgreSQL; a URL vem exclusivamente de
+# IA_TRAB_TEST_PG_OWNER_URL (e, no BLOCO 2, IA_TRAB_TEST_PG_APP_URL), validada
+# por tests/pg_test_support.py. Sem fallback para settings.DATABASE_URL.
+# ---------------------------------------------------------------------------
+from sqlalchemy.orm import Session as _PgSession
+
+from tests import pg_test_support as _pg
+
+
+@pytest.fixture(scope="session")
+def pg_test_owner_url():
+    """URL owner/migration do servidor PG de teste (falha fechada se ausente/inválida)."""
+    if not os.environ.get(_pg.OWNER_URL_ENV, "").strip():
+        pytest.fail(
+            f"{_pg.OWNER_URL_ENV} não definida: teste PostgreSQL exige servidor efêmero de teste "
+            "(backend/tests/docker-compose.test-pg.yml)",
+            pytrace=False,
+        )
+    try:
+        return _pg.owner_url_from_env()
+    except _pg.UnsafeTestDatabaseError as exc:
+        pytest.fail(str(exc), pytrace=False)
+
+
+@pytest.fixture(scope="session")
+def pg_migrated_database_url(pg_test_owner_url):
+    """Database exclusivo desta execução, com `alembic upgrade head`; removido ao final."""
+    run_url = _pg.create_run_database(pg_test_owner_url)
+    try:
+        _pg.run_alembic_upgrade_head(run_url)
+        yield run_url
+    finally:
+        _pg.drop_run_database(pg_test_owner_url, run_url)
+
+
+@pytest.fixture(scope="session")
+def pg_app_database_url(pg_migrated_database_url):
+    """Ponto de extensão do BLOCO 2: URL da role de aplicação no database desta execução.
+
+    Sem IA_TRAB_TEST_PG_APP_URL, usa a própria role owner (sem separação de roles ainda).
+    """
+    app_url = _pg.app_url_from_env()
+    if app_url is None:
+        return pg_migrated_database_url
+    return _pg.assert_test_pg_url(
+        app_url.set(database=pg_migrated_database_url.database),
+        source=_pg.APP_URL_ENV,
+    )
+
+
+@pytest.fixture(scope="session")
+def pg_engine(pg_app_database_url):
+    engine_ = create_engine(pg_app_database_url, pool_pre_ping=True)
+    try:
+        yield engine_
+    finally:
+        engine_.dispose()
+
+
+@pytest.fixture(scope="function")
+def pg_session(pg_engine):
+    """Sessão PG isolada por teste: transação externa sempre revertida (commits viram savepoints)."""
+    connection = pg_engine.connect()
+    transaction = connection.begin()
+    session = _PgSession(bind=connection, join_transaction_mode="create_savepoint")
+    try:
+        yield session
+    finally:
+        session.close()
+        if transaction.is_active:
+            transaction.rollback()
+        connection.close()
