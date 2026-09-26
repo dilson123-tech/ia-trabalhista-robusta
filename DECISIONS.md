@@ -137,16 +137,21 @@ sessão de implantação de governança, ou a um princípio já presente em
     `case_limit == 50`, enquanto a rota administrativa deriva o limite de
     `limits_for(get_effective_plan().plan_type)`. Não é uma simples troca
     de número fixo por configuração: há uma questão de semântica do limite
-    exibido ao admin, pendente de decisão humana (item B abaixo).
-  A execução técnica desta prioridade depende de **duas decisões humanas
-  pendentes**, que esta decisão **não** toma:
+    exibido ao admin, pendente de decisão humana (item B abaixo) à época
+    desta decisão — decidida posteriormente em `ARCH-002`.
+  A execução técnica desta prioridade depende de **duas decisões humanas**,
+  pendentes à época e que esta decisão **não** toma (ambas decididas
+  posteriormente, em 2026-09-25, por registros próprios — `ARCH-001` e
+  `ARCH-002`):
   - **A — Modelo de isolamento multi-tenant:** (A1) implementar RLS
     PostgreSQL real e versionado; **ou** (A2) assumir formalmente
     isolamento somente em nível de aplicação e ajustar arquitetura, testes
-    e documentação a esse modelo. **Status: pendente (humana).**
+    e documentação a esse modelo. **Status: decidida (humana) em
+    2026-09-25 — A1, registrada em `ARCH-001`.**
   - **B — Semântica do limite exibido na visão administrativa:** (B1)
     `Subscription.case_limit`; **ou** (B2) limite derivado de
-    `limits_for(plan_type)`. **Status: pendente (humana).**
+    `limits_for(plan_type)`. **Status: decidida (humana) em 2026-09-25 —
+    B2, registrada em `ARCH-002`.**
   O nome `fix/ci-plan-limit-test-and-rls-role-isolation-v1`, proposto
   anteriormente, foi **superado** pela auditoria-mestra: essa branch
   **nunca foi criada** e **não** constitui frente autorizada. Esta decisão
@@ -156,6 +161,72 @@ sessão de implantação de governança, ou a um princípio já presente em
   sobre valores de limites de plano, escolha de A ou B, ou resolução de
   qualquer outra pendência (`P-001`, `P-003` a `P-006`, `P-008` a `P-010`),
   que permanecem pendentes e intactas.
+
+### Decisões arquiteturais aprovadas (série `ARCH-*`)
+
+- **ARCH-001** — Resolve o item **A** de `OPS-004` (modelo de isolamento
+  multi-tenant). Decisão humana (DICO/ChatGPT), 2026-09-25: **opção A1 —
+  implementar RLS PostgreSQL real e versionado, mantendo também o
+  isolamento multi-tenant em nível de aplicação.** Requisitos obrigatórios
+  da implementação futura:
+  - policies de RLS versionadas por migration;
+  - role de aplicação apropriada, **não superusuária**, sem atributo
+    `BYPASSRLS` e sem depender da propriedade das tabelas protegidas para
+    isolamento; a implementação deve tratar explicitamente a relação entre
+    ownership e `FORCE ROW LEVEL SECURITY`;
+  - isolamento testado em PostgreSQL real;
+  - cobertura em CI;
+  - `scoped_query`/isolamento de aplicação mantido como camada adicional
+    (defesa em profundidade), não substituído pelo RLS.
+  Evidência de base (auditoria-mestra de 2026-09-24, registrada em
+  `OPS-004`): não há `ENABLE ROW LEVEL SECURITY` nem `CREATE POLICY` nas
+  migrations versionadas; `set_config('app.tenant_id', ...)` em
+  `backend/app/core/tenant.py` não tem consumidor versionado; o isolamento
+  hoje observado é em nível de aplicação (`scoped_query`). Estado do banco
+  local e de Production **não verificados**.
+  **Esta decisão não implementa RLS** e **não autoriza automaticamente**:
+  criação de branch, migration, alteração de role/banco, alteração de
+  código ou testes, execução de `pytest`, alteração de CI ou acesso a
+  Production — cada ato continua exigindo autorização humana específica.
+- **ARCH-002** — Resolve o item **B** de `OPS-004` (semântica do limite
+  administrativo). Decisão humana (DICO/ChatGPT), 2026-09-25: **opção B2 —
+  `limits_for(plan_type)` é a FONTE OFICIAL da verdade para limites de
+  plano e para enforcement.** Fundamentos (investigação somente leitura de
+  2026-09-25, sobre o HEAD `55945775ffeda2a8ea5c033bd8569d156f0972ac`):
+  - o enforcement (`backend/app/services/plan_enforcement.py`) usa
+    `limits_for(get_effective_plan().plan_type)`;
+  - o resumo de uso (`usage_summary`) usa `limits_for`;
+  - o frontend consome `usage/summary-v2`, baseado em `limits_for`;
+  - a documentação comercial descreve limites **por plano**;
+  - não existe fluxo de override contratual de `case_limit` (o schema de
+    upsert administrativo não expõe o campo);
+  - os writers de `Subscription.case_limit` (signup, webhook, rotas admin)
+    apenas copiam o limite do plano (`limits_for(plan).cases_per_month`);
+  - `case_limit` não participa do enforcement (as funções legadas de
+    `backend/app/core/subscription.py` que o consultariam não têm
+    chamadores).
+  Consequências aprovadas:
+  1. `Subscription.case_limit` passa a ser tratado como campo
+     **LEGADO/INFORMATIVO** no estado atual.
+  2. `case_limit` **não** é fonte de enforcement, **não** é override
+     contratual e **não** é a fonte oficial do limite administrativo.
+  3. A coluna **não** é removida. Qualquer remoção ou deprecação futura
+     exige análise separada e nova decisão humana.
+  4. `test_admin_tenant_usage_full_returns_consolidated_view` deverá ser
+     futuramente reconciliado com B2, **sem** depender de valor `50`
+     hardcoded e **sem** depender do `.env` local.
+  Esta decisão **não** altera código, testes, banco ou valores comerciais
+  de limites, e **não autoriza automaticamente** a implementação dessas
+  consequências.
+  **Achado técnico independente registrado (não decidido, sem solução
+  definida):** `cases_per_month` é alias legado de `active_cases_limit`,
+  mas `remaining.cases` é calculado contra o contador mensal
+  `cases_created` (rota administrativa de uso consolidado, `/summary-v2` e
+  resumo/exportação administrativa de uso). Isso mistura o limite de casos
+  **ATIVOS** com o contador de casos **CRIADOS NO MÊS**. Registrado como
+  problema técnico a tratar no **BLOCO 1**; a correção (semântica e
+  implementação) permanece pendente de análise e decisão humana
+  específicas.
 
 ## E. Decisões jurídicas/processuais aprovadas
 
@@ -186,7 +257,8 @@ aberto até decisão humana explícita.
   `OPS-004` apenas como prioridade** (baseline confiável de testes e
   isolamento multi-tenant antes de novas features); as decisões técnicas
   A (modelo de isolamento) e B (semântica do limite admin) descritas em
-  `OPS-004` permanecem **pendentes (humanas)**.
+  `OPS-004` foram decididas por humano em 2026-09-25: A1 em `ARCH-001` e
+  B2 em `ARCH-002`.
 - **P-003 — Eventual refatoração, ou não, de**
   `backend/app/services/case_operational_assistant.py`. Contexto: arquivo de
   ~7.600 linhas, identificado como risco arquitetural em `ARCHITECTURE.md`,
@@ -261,7 +333,10 @@ aberto até decisão humana explícita.
 
 ## I. Limites deste documento
 
-- Não decide nenhuma das pendências `P-001` a `P-010`.
+- Não decide, por iniciativa própria, nenhuma das pendências `P-001` a
+  `P-010`; os itens marcados como resolvidos (`P-002`, `P-007`) e as
+  decisões `A`/`B` de `OPS-004` (`ARCH-001`/`ARCH-002`) apenas registram
+  decisões humanas explícitas.
 - Não autoriza, por si só, implementação, commit, push, deploy, acesso a
   Production ou integração externa — essas ações continuam exigindo
   autorização humana explícita e específica, conforme `AGENTS.md`.

@@ -47,9 +47,12 @@ antecipa.
   nem `CREATE POLICY` nas migrations versionadas; `set_config('app.tenant_id',
   ...)` existe no código, mas nada versionado o consome. `test_rls_isolation`
   é um dos 2 testes com falha conhecida, depende do PostgreSQL local real e
-  não é hermético. O modelo de isolamento (RLS real versionado ou isolamento
-  formal somente em aplicação) é a decisão humana **A** pendente em
-  `OPS-004`.
+  não é hermético. O modelo de isolamento foi decidido por humano em
+  2026-09-25 — **A1** (`ARCH-001`): RLS PostgreSQL real e versionado,
+  mantendo `scoped_query` como camada adicional (policies por migration,
+  role de aplicação não superusuária e sem `BYPASSRLS`, tratamento explícito
+  de ownership/`FORCE ROW LEVEL SECURITY`, teste em PostgreSQL real e CI).
+  **Não implementado.**
 - ✅ Fluxo executivo caso → análise → resumo → relatório → PDF — implementado
   e testado, per `MVP_VALIDATION_MATRIX.md` (seções 4–6) e serviços auditados
   (`decision_engine.py`, `report_engine.py`, `pdf_executive.py`).
@@ -96,18 +99,24 @@ antecipa.
   roadmap** (regra explícita) — depende de decisão humana ainda pendente.
 - ⏳ **Prioridade do próximo ciclo (`P-002`, resolvida em `OPS-004` apenas
   como prioridade)**: restaurar uma baseline confiável de testes e
-  isolamento multi-tenant **antes de novas features**. A solução técnica
-  **não está decidida** e depende de duas decisões humanas pendentes em
-  `OPS-004`:
-  - **A** — RLS PostgreSQL real e versionado **ou** isolamento formal somente
-    em aplicação;
-  - **B** — semântica do limite admin: `Subscription.case_limit` **ou**
-    `limits_for(plan_type)` (não é simples troca de "50" por configuração).
+  isolamento multi-tenant **antes de novas features**. As duas decisões
+  humanas de `OPS-004` foram tomadas em 2026-09-25 (**não implementadas**):
+  - **A = A1 (`ARCH-001`)** — RLS PostgreSQL real e versionado, mantendo o
+    isolamento em aplicação (`scoped_query`) como camada adicional;
+  - **B = B2 (`ARCH-002`)** — `limits_for(plan_type)` é a fonte oficial de
+    limites e enforcement; `Subscription.case_limit` é legado/informativo
+    (coluna mantida). O teste de uso administrativo deve ser reconciliado
+    com B2, sem `50` hardcoded e sem depender do `.env` local.
+  - Defeito registrado para o BLOCO 1 (**sem solução decidida**):
+    `remaining.cases` é calculado contra o contador mensal `cases_created`,
+    embora `cases_per_month` seja alias de `active_cases_limit` (mistura
+    casos ATIVOS com casos CRIADOS NO MÊS).
 - ⏳ Sequência planejada (detalhada em `NEXT_STEP.md`; planejamento, **não
-  autorização**): fechar a atualização documental → decisão humana de A e B
-  → primeiro bloco técnico = **baseline de testes** (suíte hermética e
-  confiável) → **isolamento de banco como bloco próprio**, conforme a decisão
-  A. Nenhuma branch técnica foi criada ou autorizada; o nome
+  autorização**): fechar este adendo documental A1/B2 →
+  **preparar o BLOCO 1** (planejamento em leitura, sem implementar) →
+  somente com nova autorização específica, implementar o BLOCO 1 =
+  **baseline de testes** (suíte hermética e confiável) → **isolamento de
+  banco como bloco próprio** (BLOCO 2), conforme A1. Nenhuma branch técnica foi criada ou autorizada; o nome
   `fix/ci-plan-limit-test-and-rls-role-isolation-v1` está **superado** e a
   branch nunca foi criada. Este roadmap não autoriza nenhum início
   (`AGENTS.md`, Seção 5).
@@ -231,9 +240,10 @@ condiciona neste roadmap; não resolve nenhuma delas.
   externa e comercial consistente (Seção B).
 - **Prioridade do próximo ciclo de desenvolvimento — `P-002`** — resolvida
   em `OPS-004` **apenas como prioridade**: baseline confiável de testes e
-  isolamento multi-tenant antes de novas features. Condicionada às decisões
-  humanas pendentes **A** (modelo de isolamento) e **B** (semântica do
-  limite admin). Nenhuma branch técnica criada ou autorizada (Seção E).
+  isolamento multi-tenant antes de novas features. As decisões humanas
+  **A** (modelo de isolamento) e **B** (semântica do limite admin) foram
+  tomadas em 2026-09-25: **A1** (`ARCH-001`) e **B2** (`ARCH-002`), não
+  implementadas. Nenhuma branch técnica criada ou autorizada (Seção E).
 - **Refatoração de `case_operational_assistant.py` — `P-003`** — condiciona
   a evolução segura da Seção H; não deve ser tratada como tarefa automática
   deste roadmap.
@@ -283,6 +293,7 @@ IA Trabalhista Robusta / [nomenclatura oficial pendente]
 │     itens [x] nas seções 1–3 da matriz; porém RLS não versionado/não
 │     comprovado no Git, suíte completa fora do CI, testes não herméticos,
 │     sem /ready e sem rate limiting (auditoria-mestra 2026-09-24).
+│     Modelo de isolamento decidido: A1 (ARCH-001) — não implementado.
 │     Estimativas da auditoria (NÃO métricas): Banco/RLS ~40%,
 │     Testes/CI ~50%, Segurança ~55% — ver PAINEL MESTRE em PROJECT_STATE.md
 │
@@ -306,7 +317,8 @@ IA Trabalhista Robusta / [nomenclatura oficial pendente]
 │     Este número mede apenas o progresso da implantação documental da
 │     governança — não percentual de conclusão técnica do produto.
 │     P-007 resolvida (OPS-003); P-002 resolvida só como prioridade
-│     (OPS-004), A/B pendentes.
+│     (OPS-004); A1 (ARCH-001) / B2 (ARCH-002) decididas, não
+│     implementadas.
 │
 ├── ⏳ LGPD formal (retenção/descarte/exportação/exclusão)
 │     auto-declarado parcial pelo próprio docs/LGPD_MINIMA.md
