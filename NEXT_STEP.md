@@ -12,34 +12,56 @@ autorização humana explícita quando exigida.
 
 **Sequência obrigatória, nesta ordem:**
 
-1. **Fechar esta atualização documental** (reconciliação de
-   `DECISIONS.md`, `PROJECT_STATE.md`, `NEXT_STEP.md` e `ROADMAP.md` com a
-   auditoria-mestra de 2026-09-24), mediante revisão humana
-   (DICO/ChatGPT). Staging, commit, push e PR desta atualização exigem
-   autorização humana específica para cada ato.
-2. **DICO/ChatGPT decidem as pendências A e B** registradas em `OPS-004`
-   (`DECISIONS.md`):
-   - **A — Modelo de isolamento multi-tenant:** RLS PostgreSQL real e
-     versionado **ou** isolamento formalmente somente em nível de aplicação
-     (com arquitetura, testes e documentação ajustados). **Pendente
-     (humana).**
-   - **B — Semântica do limite na visão admin:** `Subscription.case_limit`
-     **ou** limite derivado de `limits_for(plan_type)`. **Pendente
-     (humana).**
-3. **Somente depois**, e mediante nova autorização humana específica,
-   iniciar o primeiro bloco técnico (BLOCO 1).
+1. **Fechar este adendo documental A1/B2** (registro das decisões humanas
+   A1/B2 em `DECISIONS.md`, `PROJECT_STATE.md`, `NEXT_STEP.md` e
+   `ROADMAP.md`), mediante revisão humana (DICO/ChatGPT). Staging, commit,
+   push e PR deste adendo exigem autorização humana específica para
+   cada ato.
+2. **Preparar o BLOCO 1** (suíte hermética + baseline real + CI completo):
+   somente planejamento/análise em leitura, quando solicitado pelo
+   responsável humano. **Preparação não é implementação.**
+3. **Somente depois**, e mediante nova autorização humana específica para
+   cada ato, implementar o BLOCO 1 (criar branch técnica, alterar
+   testes/código/CI, executar `pytest`).
+
+As decisões humanas **A** e **B** de `OPS-004` foram tomadas em
+2026-09-25 (DICO/ChatGPT) e registradas em `DECISIONS.md`:
+
+- **A = A1 (`ARCH-001`)** — implementar RLS PostgreSQL real e versionado,
+  mantendo o isolamento multi-tenant em nível de aplicação
+  (`scoped_query`) como camada adicional. Requisitos da implementação
+  futura: policies versionadas por migration; role de aplicação
+  compatível com `ARCH-001` — não superusuária, sem `BYPASSRLS`, com
+  ownership/`FORCE ROW LEVEL SECURITY` tratado explicitamente; isolamento
+  testado em PostgreSQL real; cobertura em CI. **RLS não implementado.**
+- **B = B2 (`ARCH-002`)** — `limits_for(plan_type)` é a fonte oficial da
+  verdade para limites de plano e enforcement. `Subscription.case_limit`
+  é campo legado/informativo (não é enforcement, não é override
+  contratual, não é fonte oficial do limite admin); a coluna **não** é
+  removida (remoção/deprecação futura exige análise separada).
+  `test_admin_tenant_usage_full_returns_consolidated_view` deverá ser
+  reconciliado com B2, sem `50` hardcoded e sem depender do `.env` local.
+  **Nada foi alterado em código ou testes.**
+
+Problema técnico registrado para o BLOCO 1 (achado em `ARCH-002`, **sem
+solução decidida**): `cases_per_month` é alias legado de
+`active_cases_limit`, mas `remaining.cases` é calculado contra o contador
+mensal `cases_created`, misturando limite de casos **ATIVOS** com casos
+**CRIADOS NO MÊS**.
 
 `P-007` foi resolvida (`OPS-003`): código/produto integrado a `main` via
 PR #306; fechamento documental integrado a `main` via PR #307.
 `P-002` foi resolvida em `OPS-004` **apenas como prioridade**: restaurar
 uma baseline confiável de testes e isolamento multi-tenant antes de novas
-features. A solução técnica das duas falhas conhecidas
+features; a reconciliação documental correspondente foi integrada a `main`
+via PR #308. A solução técnica das duas falhas conhecidas
 (`test_admin_tenant_usage_full_returns_consolidated_view` e
-`test_rls_isolation`) **não está decidida** e depende de A e B.
+`test_rls_isolation`) agora tem direção decidida (B2 e A1,
+respectivamente), mas **não foi implementada**.
 
 ### Sequência de blocos aprovada (planejamento, não autorização)
 
-- **BLOCO 0** — governança/documentação coerente (esta atualização).
+- **BLOCO 0** — governança/documentação coerente (integrado via PR #308; este adendo registra A1/B2).
 - **BLOCO 1** — suíte hermética + baseline real + CI completo.
 - **BLOCO 2** — isolamento PostgreSQL/tenant comprovado.
 - **BLOCO 3** — segurança/LGPD.
@@ -47,7 +69,9 @@ features. A solução técnica das duas falhas conhecidas
 - **BLOCO 5** — frontend faltante.
 - **BLOCO 6** — gate de release.
 
-**Nenhum bloco técnico (BLOCO 1 a 6) está autorizado por esta edição.**
+**Nenhum bloco técnico (BLOCO 1 a 6) está autorizado para implementação
+por esta edição.** A preparação (planejamento em leitura) do BLOCO 1 é o
+foco atual.
 Nenhuma branch técnica foi criada ou autorizada. O nome
 `fix/ci-plan-limit-test-and-rls-role-isolation-v1`, proposto
 anteriormente, foi superado pela auditoria-mestra, nunca foi criado e não
@@ -56,27 +80,32 @@ constitui frente autorizada.
 Nenhuma ação de Git de escrita, Production ou integração externa é
 autorizada automaticamente por este estado.
 
-**PRÓXIMO PASSO: FECHAR ESTA ATUALIZAÇÃO DOCUMENTAL → DECISÃO HUMANA DE A E
-B → SOMENTE ENTÃO, COM NOVA AUTORIZAÇÃO ESPECÍFICA, BLOCO 1.**
+**PRÓXIMO PASSO: FECHAR ESTE ADENDO DOCUMENTAL A1/B2 → PREPARAR O BLOCO 1
+(SEM IMPLEMENTAR) → SOMENTE COM NOVA AUTORIZAÇÃO ESPECÍFICA, IMPLEMENTAR O
+BLOCO 1.**
 
 ## C. Estado atual do repositório
 
 - Repositório principal: `/home/dilsondev/projetos/ia_trabalhista_robusta`,
-  branch `main`, sincronizada local e remotamente em
-  `0fc0755d7de4ced50400f6e297a99338f6d9cd50` (ver `PROJECT_STATE.md`,
-  Seção B, para o protocolo de reverificação em cada sessão).
+  branch `main`, observada em 2026-09-25 em
+  `55945775ffeda2a8ea5c033bd8569d156f0972ac` (commit
+  `docs(governance): reconcile P-002 with master audit (#308)`), igual a
+  `origin/main` local, working tree limpo antes desta edição — valor
+  observado, a reverificar via Git em cada sessão (ver `PROJECT_STATE.md`,
+  Seção B).
 - Os 7 arquivos de governança estão commitados e integrados em `main`
   (PR #305); o fechamento de `P-007` (PR #306, produto) e seu registro
-  documental (PR #307, `DECISIONS.md`) também estão integrados em `main`.
+  documental (PR #307, `DECISIONS.md`) também estão integrados em `main`;
+  a reconciliação de `P-002` com a auditoria-mestra foi integrada em
+  `main` via PR #308.
 - O worktree de governança temporário e a branch
   `docs/close-p007-decision-v1` foram removidos após comprovação de
   equivalência material de conteúdo.
-- Nenhuma branch técnica para `P-002` foi criada.
-- Esta atualização documental está sendo feita na branch
-  `docs/resolve-p002-governance-v1` (criada a partir de `main` em
-  `0fc0755d7de4ced50400f6e297a99338f6d9cd50`), com alterações locais não
+- Nenhuma branch técnica para `P-002`/BLOCO 1 foi criada.
+- Esta atualização documental (registro de A1/B2) está sendo feita
+  diretamente no working tree de `main`, com alterações locais não
   commitadas em `DECISIONS.md`, `PROJECT_STATE.md`, `NEXT_STEP.md` e
-  `ROADMAP.md` — valor observado em 2026-09-24, a reverificar via Git.
+  `ROADMAP.md`; sem staging, commit ou push.
 
 ## D. Escopo permitido no estado de espera
 
@@ -146,17 +175,20 @@ uma nova tarefa técnica.
 
 No estado atual, a sequência vigente é a definida na Seção B:
 
-1. fechar esta atualização documental;
-2. obter as decisões humanas A e B de `OPS-004`;
-3. somente depois, mediante nova autorização específica, iniciar o BLOCO 1.
+1. fechar este adendo documental A1/B2;
+2. preparar o BLOCO 1 (planejamento em leitura, sem implementar);
+3. somente depois, mediante nova autorização específica, implementar o
+   BLOCO 1.
 
 ## H. Pendências humanas relacionadas ao início da implementação
 
 `P-007` (destino da frente local anterior) foi decidida (`OPS-003`).
 `P-002` foi decidida apenas como prioridade (`OPS-004`). As decisões
-técnicas **A** (modelo de isolamento) e **B** (semântica do limite admin),
-registradas em `OPS-004`, permanecem **pendentes (humanas)** e condicionam
-o início do BLOCO 1/BLOCO 2. As demais pendências seguem abertas e não são
+técnicas **A** (modelo de isolamento) e **B** (semântica do limite admin)
+foram decididas por humano em 2026-09-25: **A1** (`ARCH-001`) e **B2**
+(`ARCH-002`). Essas decisões **não** autorizam, por si só, a implementação
+do BLOCO 1/BLOCO 2. O defeito de `remaining.cases` registrado em `ARCH-002`
+não tem solução decidida. As demais pendências seguem abertas e não são
 resolvidas nem antecipadas por este documento: `P-001`, `P-003` a `P-006`,
 `P-008` a `P-010`.
 
@@ -174,16 +206,17 @@ resolvidas nem antecipadas por este documento: `P-001`, `P-003` a `P-006`,
 
 ## J. Status operacional
 
-- Tarefa em foco: **fechar a atualização documental (BLOCO 0) e obter a
-  decisão humana de A e B (`OPS-004`).**
+- Tarefa em foco: **fechar a atualização documental que registra A1/B2
+  e, em seguida, preparar (sem implementar) o BLOCO 1.**
 - `P-007` resolvida e integrada em `main`; `P-002` resolvida apenas como
-  prioridade (`OPS-004`); A e B pendentes (humanas).
+  prioridade (`OPS-004`); A decidida como A1 (`ARCH-001`) e B decidida
+  como B2 (`ARCH-002`) — nenhuma das duas implementada.
 - Último resultado conhecido da suíte global do backend: `304 passed,
   2 failed` em 306 testes (registrado em `OPS-003`; não reexecutado).
   Production: **NÃO VERIFICADA**.
-- **NENHUM BLOCO TÉCNICO AUTORIZADO — AGUARDANDO REVISÃO DESTA ATUALIZAÇÃO
-  DOCUMENTAL, DECISÃO HUMANA DE A E B E NOVA AUTORIZAÇÃO HUMANA
-  ESPECÍFICA** para criar branch técnica, alterar testes/código/banco ou
-  executar testes.
+- **BLOCO 1 NÃO IMPLEMENTADO E NÃO AUTORIZADO PARA IMPLEMENTAÇÃO —
+  AGUARDANDO REVISÃO DESTA ATUALIZAÇÃO DOCUMENTAL E NOVA AUTORIZAÇÃO
+  HUMANA ESPECÍFICA** para criar branch técnica, alterar
+  testes/código/banco/CI, criar migration ou executar testes.
 - Este documento, por si só, não autoriza nenhuma ação de Git de escrita,
   Production ou integração externa.

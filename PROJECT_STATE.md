@@ -22,6 +22,16 @@ partir deste arquivo.
   `0fc0755d7de4ced50400f6e297a99338f6d9cd50`. Ver "PAINEL MESTRE" e Seções
   D, E, G e I abaixo. `P-002` passa a constar como resolvida **apenas como
   prioridade** (`OPS-004`), com as decisões técnicas A e B pendentes.
+- **Atualização registrada em:** 2026-09-25 — registro documental das
+  decisões humanas (DICO/ChatGPT) sobre os itens A e B de `OPS-004`:
+  **A1** (`ARCH-001`: RLS PostgreSQL real e versionado + isolamento de
+  aplicação mantido) e **B2** (`ARCH-002`: `limits_for(plan_type)` como
+  fonte oficial; `Subscription.case_limit` legado/informativo). Base: HEAD
+  observado `55945775ffeda2a8ea5c033bd8569d156f0972ac` (`main` =
+  `origin/main` local, após PR #308) e investigação somente leitura da
+  semântica do limite administrativo. Nenhum código, teste, banco ou
+  migration alterado; nenhum teste executado. Ver "PAINEL MESTRE" e Seções
+  D, G e I abaixo.
 - Este checkpoint só deve ser atualizado quando houver mudança material de
   estado, houver evidência objetiva, rastreável e válida para o estado relevante
   do código — inclusive evidência de checkpoint anterior quando continuar válida
@@ -36,11 +46,13 @@ Painel-resumo permanente deste checkpoint. Os valores abaixo são
 autorizado; não substituem a verificação direta do Git (Seção B) nem
 `DECISIONS.md`/`NEXT_STEP.md`.
 
-- **Último checkpoint Git observado (2026-09-24):** `main` local e
-  `origin/main` (referência local, sem `fetch`) em
-  `0fc0755d7de4ced50400f6e297a99338f6d9cd50`; branch documental
-  `docs/resolve-p002-governance-v1` criada a partir desse hash, com
-  alterações locais não commitadas nos 4 documentos desta reconciliação.
+- **Último checkpoint Git observado (2026-09-25):** `main` local e
+  `origin/main` confirmados após `fetch` e `pull --ff-only` em
+  `55945775ffeda2a8ea5c033bd8569d156f0972ac` (PR #308 — reconciliação de
+  `P-002` com a auditoria-mestra), working tree limpo antes desta edição;
+  esta atualização documental (registro de A1/B2) foi feita no working
+  tree de `main`, com alterações locais não commitadas nos 4 documentos
+  (`DECISIONS.md`, `PROJECT_STATE.md`, `NEXT_STEP.md`, `ROADMAP.md`).
 - **Estado geral estimado — ESTIMATIVAS qualitativas da auditoria-mestra,
   NÃO métricas formais:**
 
@@ -65,29 +77,38 @@ autorizado; não substituem a verificação direta do Git (Seção B) nem
   fluxo executivo com testes associados; billing com checkout/webhook
   Asaas no código; frontend React com os principais fluxos; governança
   persistente (7 arquivos) em `main`.
-- **Faltando:** RLS PostgreSQL versionado (ou decisão formal por isolamento
-  somente em aplicação); suíte hermética e suíte completa em CI; rate
+- **Faltando:** RLS PostgreSQL versionado (decidido em `ARCH-001` — A1 —,
+  **não implementado**: policies por migration, role de aplicação não
+  superusuária e sem `BYPASSRLS`, tratamento explícito de ownership/
+  `FORCE ROW LEVEL SECURITY`, teste em PostgreSQL real e CI); reconciliação do teste de
+  uso administrativo com B2 (`ARCH-002`); correção da semântica de
+  `remaining.cases` (defeito registrado, sem solução decidida); suíte hermética e suíte completa em CI; rate
   limiting; políticas LGPD formais (retenção/descarte); painéis de frontend
   ainda só visuais (Recursos e Sucessão); gate de release formal.
-- **Bloqueios:** decisões humanas A (modelo de isolamento) e B (semântica
-  do limite admin) pendentes em `OPS-004`; as 2 falhas conhecidas da suíte
-  global sem solução técnica decidida.
+- **Bloqueios:** nenhuma decisão humana A/B pendente (A1 em `ARCH-001`,
+  B2 em `ARCH-002`); o BLOCO 1 depende de nova autorização humana
+  específica para implementação; as 2 falhas conhecidas da suíte global
+  têm direção decidida (A1/B2), mas **não estão corrigidas**; o defeito de
+  `remaining.cases` não tem solução decidida.
 - **Último resultado de testes conhecido:** suíte global `304 passed,
   2 failed` em 306 testes; regressão direcionada `108 passed, 0 failed`
   (ambos registrados em `OPS-003`/Seção D; **não reexecutados** na
   auditoria-mestra).
-- **Próximo passo:** fechar esta atualização documental (BLOCO 0) →
-  DICO/ChatGPT decidem A e B → somente então, com nova autorização
-  específica, BLOCO 1 (ver `NEXT_STEP.md`).
-- **Decisões humanas abertas:** A e B (`OPS-004`); `P-001`, `P-003`,
-  `P-004`, `P-005`, `P-006`, `P-008`, `P-009`, `P-010`.
+- **Próximo passo:** fechar este adendo documental A1/B2, complementar ao
+  BLOCO 0 já integrado → preparar o BLOCO 1 (planejamento em leitura, sem
+  implementar) → somente com nova autorização específica, implementar o
+  BLOCO 1 (ver
+  `NEXT_STEP.md`).
+- **Decisões humanas abertas:** `P-001`, `P-003`, `P-004`, `P-005`,
+  `P-006`, `P-008`, `P-009`, `P-010`. (A e B de `OPS-004` decididas em
+  2026-09-25: `ARCH-001`/`ARCH-002`.)
 
-## B. Git / baseline observado (neste checkpoint, não permanente)
+## B. Git / baseline histórico do checkpoint inicial
 
 - **Repositório de produto original:** `/home/dilsondev/projetos/ia_trabalhista_robusta`
-- **Branch de trabalho original observada:** `fix/editor-civil-professional-risk-specialization-v1`
-- **Baseline Git observado/aprovado:** `4e9d22fdae99fc717192ea5b6b96214f61d70628`
-- **`origin/main` observado neste checkpoint:** mesmo hash,
+- **Branch histórica observada no checkpoint inicial:** `fix/editor-civil-professional-risk-specialization-v1`
+- **Baseline histórico observado/aprovado naquele checkpoint:** `4e9d22fdae99fc717192ea5b6b96214f61d70628`
+- **`origin/main` histórico observado naquele checkpoint inicial:** mesmo hash,
   `4e9d22fdae99fc717192ea5b6b96214f61d70628` — confirmado em pré-check de leitura
   antes da criação do worktree de governança.
 - Estes valores refletem o que foi observado no momento do checkpoint. **Não
@@ -148,8 +169,9 @@ resolução estão registrados em `DECISIONS.md`, `OPS-003`. `main` local e
   `test_rls_isolation`) foram diagnosticadas como externas à `P-007`. A
   prioridade do próximo ciclo (`P-002`, resolvida apenas como prioridade em
   `OPS-004`) é restaurar uma baseline confiável de testes e isolamento
-  multi-tenant; a solução técnica dessas falhas **não está decidida** e
-  depende das decisões humanas A e B de `OPS-004`. Este registro não
+  multi-tenant; a solução técnica dessas falhas dependia das decisões
+  humanas A e B de `OPS-004`, tomadas em 2026-09-25 (A1 em `ARCH-001`, B2
+  em `ARCH-002`) — direção decidida, **não implementada**. Este registro não
   reexecuta nem reconfirma esses resultados; é transcrição da evidência já
   obtida e registrada em `DECISIONS.md`.
 - **Auditoria-mestra (2026-09-24):** nenhum teste foi executado. Observado
@@ -235,6 +257,12 @@ auditoria:
   - Production **NÃO VERIFICADA**.
   - 14 branches locais não mescladas em `main` — exigem auditoria futura;
     nenhuma foi alterada.
+- **Achado da investigação da semântica do limite administrativo
+  (2026-09-25), somente leitura — registrado em `ARCH-002`, sem solução
+  decidida:** `cases_per_month` é alias legado de `active_cases_limit`,
+  mas `remaining.cases` é calculado contra o contador mensal
+  `cases_created`, misturando limite de casos **ATIVOS** com casos
+  **CRIADOS NO MÊS**. Problema técnico a tratar no BLOCO 1.
 
 ## H. Estado da implantação dos 7 arquivos de governança
 
@@ -265,8 +293,9 @@ registro não o substitui.
 As decisões humanas pendentes estão formalizadas em `DECISIONS.md`. Neste
 checkpoint, `P-001`, `P-003` a `P-006` e `P-008` a `P-010` permanecem
 pendentes; `P-007` foi resolvida (`OPS-003`) e `P-002` foi resolvida
-**apenas como prioridade** (`OPS-004`), com as decisões técnicas A e B de
-`OPS-004` pendentes (humanas). `PROJECT_STATE.md` não resolve, renumera nem substitui
+**apenas como prioridade** (`OPS-004`); as decisões técnicas A e B de
+`OPS-004` foram tomadas por humano em 2026-09-25 (A1 em `ARCH-001`, B2 em
+`ARCH-002`), sem implementação. `PROJECT_STATE.md` não resolve, renumera nem substitui
 essas decisões; para o estado normativo corrente e completo, consultar
 diretamente `DECISIONS.md`.
 
@@ -276,8 +305,9 @@ Síntese temática (apenas resumo — `DECISIONS.md` é a fonte normativa):
 - Prioridade do próximo ciclo de desenvolvimento. (`P-002`, resolvida em
   `OPS-004` apenas como prioridade: baseline confiável de testes e
   isolamento multi-tenant antes de novas features; decisões A — modelo de
-  isolamento — e B — semântica do limite admin — pendentes; nenhuma branch
-  técnica criada ou autorizada)
+  isolamento — e B — semântica do limite admin — tomadas em 2026-09-25:
+  A1 (`ARCH-001`) e B2 (`ARCH-002`); nenhuma branch técnica criada ou
+  autorizada; nada implementado)
 - Eventual refatoração de `case_operational_assistant.py`. (`P-003`,
   pendente)
 - Fechamento formal do gate de release. (`P-004`, pendente)
@@ -303,7 +333,8 @@ Síntese temática (apenas resumo — `DECISIONS.md` é a fonte normativa):
 - Não substitui a necessidade de qualquer sessão futura consultar o Git
   diretamente para saber a branch, o HEAD, `origin/main` ou o estado do
   working tree correntes.
-- Não decide nenhuma das pendências humanas listadas na seção I.
+- Não decide nenhuma das pendências humanas listadas na seção I; apenas
+  espelha decisões humanas registradas em `DECISIONS.md`.
 - Não define automaticamente qual será o próximo trabalho técnico do produto.
   A tarefa operacional corrente deve ser consultada em `NEXT_STEP.md`, cuja
   existência não constitui, por si só, autorização automática de execução,
