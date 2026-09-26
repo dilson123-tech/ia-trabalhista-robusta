@@ -62,6 +62,9 @@ from app.db.session import get_db
 from app.main import app as fastapi_app
 
 import app.models  # noqa: F401  (garante Base.metadata com todos models)
+import app.core.middleware as _app_middleware_module
+import app.db.session as _app_db_session_module
+import app.main as _app_main_module
 
 # Banco isolado para testes
 TEST_DATABASE_URL = "sqlite+pysqlite:///:memory:"
@@ -69,16 +72,53 @@ TEST_DATABASE_URL = "sqlite+pysqlite:///:memory:"
 engine = create_engine(TEST_DATABASE_URL, connect_args={"check_same_thread": False}, poolclass=StaticPool)
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
+_NO_OVERRIDE = object()
+
+
+def _restore_get_db_override(previous):
+    if previous is _NO_OVERRIDE:
+        fastapi_app.dependency_overrides.pop(get_db, None)
+    else:
+        fastapi_app.dependency_overrides[get_db] = previous
+
+
+@pytest.fixture(autouse=True)
+def _hermetic_request_db(monkeypatch):
+    """Todas as requests do teste usam o SQLite isolado; schema recriado por teste.
+
+    - get_db: override em fastapi_app.dependency_overrides, resolvido no momento
+      da request (cobre TestClient criado no nível de módulo).
+    - SessionLocal importado por nome (middleware de auditoria e /ready):
+      substituído no módulo consumidor; restaurado pelo monkeypatch.
+    """
+    Base.metadata.create_all(bind=engine)
+
+    def _override_get_db():
+        db = TestingSessionLocal()
+        try:
+            yield db
+        finally:
+            db.close()
+
+    previous = fastapi_app.dependency_overrides.get(get_db, _NO_OVERRIDE)
+    fastapi_app.dependency_overrides[get_db] = _override_get_db
+    monkeypatch.setattr(_app_main_module, "SessionLocal", TestingSessionLocal)
+    monkeypatch.setattr(_app_middleware_module, "SessionLocal", TestingSessionLocal)
+    monkeypatch.setattr(_app_db_session_module, "SessionLocal", TestingSessionLocal)
+    try:
+        yield
+    finally:
+        _restore_get_db_override(previous)
+        Base.metadata.drop_all(bind=engine)
+
 
 @pytest.fixture(scope="function")
-def db_session():
-    Base.metadata.create_all(bind=engine)
+def db_session(_hermetic_request_db):
     session = TestingSessionLocal()
     try:
         yield session
     finally:
         session.close()
-        Base.metadata.drop_all(bind=engine)
 
 
 @pytest.fixture(scope="function")
@@ -89,10 +129,12 @@ def client(db_session):
         finally:
             pass
 
+    previous = fastapi_app.dependency_overrides.get(get_db, _NO_OVERRIDE)
     fastapi_app.dependency_overrides[get_db] = override_get_db
 
     from fastapi.testclient import TestClient
-    with TestClient(fastapi_app) as c:
-        yield c
-
-    fastapi_app.dependency_overrides.clear()
+    try:
+        with TestClient(fastapi_app) as c:
+            yield c
+    finally:
+        _restore_get_db_override(previous)
