@@ -1,15 +1,18 @@
 import uuid
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 
 from app.main import app
-from app.db.session import SessionLocal
 from app.models.tenant import Tenant
 from app.models.user import User
 from app.models.tenant_member import TenantMember
 from app.core.security import pwd_context
 from app.core.tenant import set_tenant_on_session
+
+# Setup direto e requests HTTP no PG efêmero de teste (fixture pg_request_db).
+pytestmark = pytest.mark.pg
 
 client = TestClient(app)
 
@@ -60,10 +63,10 @@ def ensure_subscription(db, tenant_id):
     )
 
 
-def test_admin_request_does_not_leak_tenant_context(monkeypatch):
+def test_admin_request_does_not_leak_tenant_context(monkeypatch, pg_request_db):
     monkeypatch.setenv("ADMIN_API_KEY", "pytest-admin-key")
 
-    db = SessionLocal()
+    db = pg_request_db()
 
     tenant_a = create_tenant(db, f"TenantA_{uuid.uuid4()}")
     tenant_b = create_tenant(db, f"TenantB_{uuid.uuid4()}")

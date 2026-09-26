@@ -1,8 +1,10 @@
 import pytest
 from sqlalchemy import text
-from app.db.session import SessionLocal
 from app.models.tenant import Tenant
 from app.models.case import Case
+
+
+pytestmark = pytest.mark.pg
 
 
 def create_tenant(db, name):
@@ -13,8 +15,8 @@ def create_tenant(db, name):
     return tenant
 
 
-def test_rls_isolation():
-    db = SessionLocal()
+def test_rls_isolation(pg_session):
+    db = pg_session
 
     # Criar dois tenants
     tenant_a = create_tenant(db, "Tenant A")
@@ -57,5 +59,3 @@ def test_rls_isolation():
 
     assert len(results_b) == 1
     assert results_b[0].case_number == "B-001"
-
-    db.close()

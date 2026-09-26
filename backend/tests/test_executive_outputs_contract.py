@@ -3,7 +3,8 @@ import json
 import uuid
 
 import fpdf
-from sqlalchemy import create_engine, text
+import pytest
+from sqlalchemy import text
 
 from app.main import app
 from app.core.settings import settings
@@ -48,7 +49,8 @@ def _auth_headers(monkeypatch):
     return {"Authorization": f"Bearer {token}"}
 
 
-def test_executive_outputs_contract_and_missing_case(monkeypatch):
+@pytest.mark.pg
+def test_executive_outputs_contract_and_missing_case(monkeypatch, pg_request_db):
     headers = _auth_headers(monkeypatch)
 
     create_payload = {
@@ -100,7 +102,8 @@ def test_executive_outputs_contract_and_missing_case(monkeypatch):
     missing_pdf = client.get(f"/api/v1/cases/{missing_id}/executive-pdf", headers=headers)
     assert missing_pdf.status_code == 404
 
-def test_executive_pdf_refreshes_stale_executive_data_before_generating(monkeypatch):
+@pytest.mark.pg
+def test_executive_pdf_refreshes_stale_executive_data_before_generating(monkeypatch, pg_request_db):
     headers = _auth_headers(monkeypatch)
 
     create_payload = {
@@ -145,12 +148,15 @@ def test_executive_pdf_refreshes_stale_executive_data_before_generating(monkeypa
         },
     }
 
-    engine = create_engine(settings.DATABASE_URL)
-    with engine.begin() as conn:
-        conn.execute(
+    db = pg_request_db()
+    try:
+        db.execute(
             text("update case_analyses set executive_data = :payload where case_id = :case_id"),
             {"payload": json.dumps(stale_payload), "case_id": case_id},
         )
+        db.commit()
+    finally:
+        db.close()
 
     captured = {}
 
@@ -226,7 +232,8 @@ def test_pdf_fallback_uses_financial_risk_when_risk_level_is_missing(monkeypatch
 
 
 
-def test_public_executive_outputs_do_not_expose_numeric_prediction_fields(monkeypatch):
+@pytest.mark.pg
+def test_public_executive_outputs_do_not_expose_numeric_prediction_fields(monkeypatch, pg_request_db):
     headers = _auth_headers(monkeypatch)
 
     create_payload = {

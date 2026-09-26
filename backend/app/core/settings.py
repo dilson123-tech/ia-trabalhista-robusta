@@ -1,11 +1,16 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field, AliasChoices
 from pathlib import Path
+import os
 
 ROOT_DIR = Path(__file__).resolve().parents[3]
 
+# Modo de teste explícito (ativado somente pelo bootstrap de backend/tests/conftest.py):
+# decidido apenas pelo ambiente do processo; quando ativo, ROOT/.env não é carregado.
+_TEST_MODE = os.environ.get("IA_TRAB_TEST_MODE") == "1"
+
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=str(ROOT_DIR / ".env"), env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(env_file=None if _TEST_MODE else str(ROOT_DIR / ".env"), env_file_encoding="utf-8", extra="ignore")
 
     APP_NAME: str = "Plataforma Jurídica Multiárea"
     APP_ENV: str = "dev"
