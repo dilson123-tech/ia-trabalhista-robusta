@@ -1,4 +1,4 @@
-from datetime import datetime, timezone, date
+from datetime import datetime, timezone, date, timedelta
 
 from app.models.subscription import Subscription
 from app.models.tenant import Tenant
@@ -6,6 +6,7 @@ from app.models.tenant_member import TenantMember
 from app.models.usage_counter import UsageCounter
 from app.models.user import User
 from app.core.security import pwd_context
+from app.core.plans import PlanType, limits_for
 
 
 def test_admin_tenant_usage_full_requires_admin_key(client, monkeypatch):
@@ -22,13 +23,16 @@ def test_admin_tenant_usage_full_returns_consolidated_view(client, db_session, m
     db_session.add(tenant)
     db_session.commit()
 
+    expected_limits = limits_for(PlanType.pro)
+    legacy_case_limit = expected_limits.cases_per_month + 1
+
     sub = Subscription(
         tenant_id=tenant.id,
         plan_type="pro",
         status="active",
-        case_limit=50,
+        case_limit=legacy_case_limit,
         active=True,
-        expires_at=datetime.now(timezone.utc),
+        expires_at=datetime.now(timezone.utc) + timedelta(days=30),
     )
     db_session.add(sub)
     db_session.commit()
@@ -78,7 +82,7 @@ def test_admin_tenant_usage_full_returns_consolidated_view(client, db_session, m
     assert data["subscription"]["plan_type"] == "pro"
     assert data["subscription"]["status"] == "active"
     assert data["subscription"]["active"] is True
-    assert data["subscription"]["case_limit"] == 50
+    assert data["subscription"]["case_limit"] == legacy_case_limit
 
     assert data["users"]["count"] == 2
     usernames = [item["username"] for item in data["users"]["items"]]
@@ -87,8 +91,46 @@ def test_admin_tenant_usage_full_returns_consolidated_view(client, db_session, m
 
     assert data["usage_summary"]["used"]["cases_created"] == 7
     assert data["usage_summary"]["used"]["ai_analyses_generated"] == 3
-    assert data["usage_summary"]["limits"]["cases_per_month"] == 50
-    assert data["usage_summary"]["remaining"]["cases"] == 43
+    assert data["usage_summary"]["plan"]["type"] == "pro"
+    assert data["usage_summary"]["limits"]["cases_per_month"] == expected_limits.cases_per_month
+    assert data["usage_summary"]["limits"]["ai_analyses_per_month"] == expected_limits.ai_analyses_per_month
+    assert data["usage_summary"]["remaining"]["cases"] == expected_limits.cases_per_month - 7
+
+
+def test_admin_tenant_usage_full_uses_basic_limits_for_expired_subscription(client, db_session, monkeypatch):
+    monkeypatch.setenv("ADMIN_API_KEY", "test-admin-key")
+
+    tenant = Tenant(name="Tenant Expired Pro", plan="free")
+    db_session.add(tenant)
+    db_session.commit()
+
+    expected_limits = limits_for(PlanType.basic)
+    legacy_case_limit = expected_limits.cases_per_month + 1
+
+    sub = Subscription(
+        tenant_id=tenant.id,
+        plan_type="pro",
+        status="active",
+        case_limit=legacy_case_limit,
+        active=True,
+        expires_at=datetime.now(timezone.utc) - timedelta(days=1),
+    )
+    db_session.add(sub)
+    db_session.commit()
+
+    r = client.get(
+        f"/api/v1/admin/tenants/{tenant.id}/usage/full",
+        headers={"X-Admin-Key": "test-admin-key"},
+    )
+    assert r.status_code == 200
+
+    data = r.json()
+    assert data["subscription"]["plan_type"] == "pro"
+    assert data["subscription"]["case_limit"] == legacy_case_limit
+    assert data["usage_summary"]["plan"]["type"] == "basic"
+    assert data["usage_summary"]["limits"]["cases_per_month"] == expected_limits.cases_per_month
+    assert data["usage_summary"]["limits"]["ai_analyses_per_month"] == expected_limits.ai_analyses_per_month
+
 
 
 def test_admin_tenant_usage_full_returns_404_for_missing_tenant(client, monkeypatch):
