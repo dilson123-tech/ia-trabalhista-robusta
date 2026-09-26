@@ -1,13 +1,17 @@
 import uuid
+
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 from app.main import app
-from app.db.session import SessionLocal
 from app.models.tenant import Tenant
 from app.models.user import User
 from app.models.tenant_member import TenantMember
 from app.core.security import pwd_context
 from app.core.tenant import set_tenant_on_session
+
+# Setup direto e requests HTTP no PG efêmero de teste (fixture pg_request_db).
+pytestmark = pytest.mark.pg
 
 client = TestClient(app)
 
@@ -47,8 +51,8 @@ def login(username, password):
     return response.json()["access_token"]
 
 
-def test_e2e_multi_tenant_isolation():
-    db = SessionLocal()
+def test_e2e_multi_tenant_isolation(pg_request_db):
+    db = pg_request_db()
 
     # Criar tenants
     tenant_a = create_tenant(db, f"TenantA_{uuid.uuid4()}")
@@ -89,7 +93,7 @@ def test_e2e_multi_tenant_isolation():
     resp_a = client.post(
         "/api/v1/cases",
         json={
-            "case_number": "A-001",
+            "case_number": f"A-{uuid.uuid4().hex[:8]}",
             "title": "Caso A",
             "description": "Desc A",
             "status": "draft"
@@ -103,7 +107,7 @@ def test_e2e_multi_tenant_isolation():
     resp_b = client.post(
         "/api/v1/cases",
         json={
-            "case_number": "B-001",
+            "case_number": f"B-{uuid.uuid4().hex[:8]}",
             "title": "Caso B",
             "description": "Desc B",
             "status": "draft"

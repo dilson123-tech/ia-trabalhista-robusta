@@ -215,3 +215,82 @@ def pg_session(pg_engine):
         if transaction.is_active:
             transaction.rollback()
         connection.close()
+
+
+# ---------------------------------------------------------------------------
+# Requests HTTP contra o PostgreSQL de TESTE (BLOCO 1A / S5) — opt-in.
+# Estratégia: commit real no database exclusivo da execução + TRUNCATE antes e
+# depois de cada teste. pg_session (rollback) não serve aqui: o TestClient
+# atende as requests em outra thread/conexão, que não enxerga dados sem commit,
+# e Session não é thread-safe para ser compartilhada.
+# ---------------------------------------------------------------------------
+from sqlalchemy import inspect as _sa_inspect
+from sqlalchemy import text as _sa_text
+from sqlalchemy.pool import NullPool as _NullPool
+import weakref as _weakref
+
+
+def _truncate_pg_test_tables(owner_run_url):
+    """Esvazia todas as tabelas do database de execução (exceto alembic_version)."""
+    _pg.assert_test_pg_url(owner_run_url, source="pg_request_db")
+    _pg._assert_run_database(owner_run_url.database)
+    cleanup_engine = create_engine(owner_run_url, poolclass=_NullPool)
+    try:
+        with cleanup_engine.begin() as conn:
+            tables = [
+                name
+                for name in _sa_inspect(conn).get_table_names(schema="public")
+                if name != "alembic_version"
+            ]
+            if tables:
+                quoted = ", ".join(f'public."{name}"' for name in tables)
+                conn.execute(_sa_text(f"TRUNCATE TABLE {quoted} RESTART IDENTITY CASCADE"))
+    finally:
+        cleanup_engine.dispose()
+
+
+@pytest.fixture(scope="function")
+def pg_request_db(_hermetic_request_db, monkeypatch, pg_migrated_database_url, pg_app_database_url):
+    """Aponta get_db, middleware de auditoria e /ready para o PG de teste; devolve a factory de sessão.
+
+    - Roda depois da autouse SQLite e sobrepõe seu override/monkeypatch; restaura ao final.
+    - Setup direto usa a factory devolvida e faz commit real (visível às requests).
+    - Engine própria por teste: conexões com app.tenant_id (set_config de sessão)
+      são descartadas no teardown e não vazam para o teste seguinte. Não há reset
+      por checkin, para não mascarar vazamento de contexto dentro do próprio teste.
+    """
+    _truncate_pg_test_tables(pg_migrated_database_url)
+
+    request_engine = create_engine(pg_app_database_url, pool_pre_ping=True)
+    _pg_sessionmaker = sessionmaker(
+        autocommit=False, autoflush=False, bind=request_engine, expire_on_commit=False
+    )
+    opened_sessions = _weakref.WeakSet()
+
+    def PgSessionLocal():
+        # Uma Session nova por chamada (por request/thread); rastreada para o teardown.
+        session = _pg_sessionmaker()
+        opened_sessions.add(session)
+        return session
+
+    def _override_get_db():
+        db = PgSessionLocal()
+        try:
+            yield db
+        finally:
+            db.close()
+
+    previous = fastapi_app.dependency_overrides.get(get_db, _NO_OVERRIDE)
+    fastapi_app.dependency_overrides[get_db] = _override_get_db
+    monkeypatch.setattr(_app_main_module, "SessionLocal", PgSessionLocal)
+    monkeypatch.setattr(_app_middleware_module, "SessionLocal", PgSessionLocal)
+    monkeypatch.setattr(_app_db_session_module, "SessionLocal", PgSessionLocal)
+    try:
+        yield PgSessionLocal
+    finally:
+        _restore_get_db_override(previous)
+        # Sessão deixada aberta por falha no meio do teste seguraria locks e travaria o TRUNCATE.
+        for session in list(opened_sessions):
+            session.close()
+        request_engine.dispose()
+        _truncate_pg_test_tables(pg_migrated_database_url)
