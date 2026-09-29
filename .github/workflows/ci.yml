@@ -252,6 +252,48 @@ jobs:
         run: npm run build
 
 
+
+  backend-full-suite:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: ia_trab_test
+          POSTGRES_USER: ia_trab_test_owner
+          POSTGRES_PASSWORD: ia_trab_test_owner_pass
+        ports:
+          - "5432:5432"
+        options: >-
+          --health-cmd="pg_isready -U ia_trab_test_owner -d ia_trab_test"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      IA_TRAB_TEST_PG_OWNER_URL: postgresql+psycopg2://ia_trab_test_owner:ia_trab_test_owner_pass@127.0.0.1:5432/ia_trab_test
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: |
+          python -m venv ../.venv
+          source ../.venv/bin/activate
+          pip install -r requirements.txt
+
+      - name: Run full backend test suite
+        run: |
+          .venv/bin/python -m pytest backend/tests -q
+
   backend-multicase-regression:
     runs-on: ubuntu-latest
 
