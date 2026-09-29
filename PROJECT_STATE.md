@@ -190,6 +190,18 @@ resolução estão registrados em `DECISIONS.md`, `OPS-003`. `main` local e
   raiz do repositório; `test_rls_isolation` usa o PostgreSQL local real e
   grava dados); o CI possui 4 jobs e **não executa a suíte completa do
   backend**.
+- **Atualização (checkpoint 2026-09-29 — BLOCO 1B):** a baseline completa do
+  backend foi reexecutada em ambiente de teste isolado com PostgreSQL 16
+  efêmero, resultando em `316 passed, 0 failed` (`112 warnings`). O PR #313,
+  commit `5473a88656d49fac026f7e30856dca73557f202d`, adicionou o job
+  `backend-full-suite` ao workflow de CI. No PR #313, os 5 checks executados
+  ficaram verdes, incluindo `backend-full-suite`. Após essa comprovação,
+  `backend-full-suite` foi adicionado aos status checks obrigatórios da
+  proteção de `main`, preservando `smoke-backend`,
+  `contract-saas-limits` e `strict: true`. Este registro substitui, para o
+  estado atual, as limitações observadas pela auditoria de 2026-09-24 quanto
+  à ausência da suíte completa no CI; o registro histórico acima permanece
+  preservado. Nenhuma ação em Production foi realizada.
 
 ## E. Estado arquitetural/produto comprovado pela auditoria (nível: documentado por auditoria de leitura)
 
