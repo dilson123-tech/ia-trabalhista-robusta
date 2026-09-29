@@ -118,7 +118,20 @@ def require_auth(
 
     claims = decode_token(creds.credentials)
 
+    # 1) tenant do token: presente e inteiro positivo (antes de qualquer consulta).
     tenant_id = claims.get("tenant_id")
+    if not tenant_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="tenant missing",
+        )
+    if isinstance(tenant_id, bool) or not isinstance(tenant_id, int) or tenant_id <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="invalid tenant",
+        )
+
+    # 2) usuário (tabela users sem RLS) e 3) ativo.
     user = db.execute(
         text("SELECT id, is_active FROM users WHERE username = :u"),
         {"u": claims.get("sub")},
@@ -127,19 +140,17 @@ def require_auth(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="user not found")
     if not user[1]:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="user is inactive")
+
+    # 4) contexto de tenant na sessão ANTES de tocar tabela com RLS.
+    set_tenant_on_session(db, tenant_id)
+
+    # 5) membership (tenant_members tem RLS: só enxerga linhas do tenant setado).
     member = db.execute(
         text("SELECT 1 FROM tenant_members WHERE user_id = :uid AND tenant_id = :tid"),
         {"uid": user[0], "tid": tenant_id},
     ).fetchone()
     if not member:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="invalid tenant membership")
-    if not tenant_id:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="tenant missing",
-        )
-
-    set_tenant_on_session(db, tenant_id)
 
     return claims
 

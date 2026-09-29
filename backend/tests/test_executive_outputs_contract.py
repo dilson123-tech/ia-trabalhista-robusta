@@ -8,6 +8,8 @@ from sqlalchemy import text
 
 from app.main import app
 from app.core.settings import settings
+from app.core.security import decode_token
+from app.core.tenant import set_tenant_on_session
 from app.api.v1.routes import cases as cases_routes
 from app.services import pdf_executive as pdf_executive_service
 from app.services.executive_summary_engine import generate_executive_summary
@@ -103,7 +105,9 @@ def test_executive_outputs_contract_and_missing_case(monkeypatch, pg_request_db)
     assert missing_pdf.status_code == 404
 
 @pytest.mark.pg
-def test_executive_pdf_refreshes_stale_executive_data_before_generating(monkeypatch, pg_request_db):
+def test_executive_pdf_refreshes_stale_executive_data_before_generating(
+    monkeypatch, pg_request_db
+):
     headers = _auth_headers(monkeypatch)
 
     create_payload = {
@@ -148,12 +152,18 @@ def test_executive_pdf_refreshes_stale_executive_data_before_generating(monkeypa
         },
     }
 
+    token = headers["Authorization"].split(" ", 1)[1]
+    tenant_id = int(decode_token(token)["tenant_id"])
+
+    # Mutação pela role runtime, com tenant conhecido e contexto RLS definido.
     db = pg_request_db()
     try:
-        db.execute(
+        set_tenant_on_session(db, tenant_id)
+        result = db.execute(
             text("update case_analyses set executive_data = :payload where case_id = :case_id"),
             {"payload": json.dumps(stale_payload), "case_id": case_id},
         )
+        assert result.rowcount == 1
         db.commit()
     finally:
         db.close()

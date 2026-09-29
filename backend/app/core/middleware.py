@@ -10,6 +10,7 @@ from starlette.requests import Request
 from starlette.responses import Response
 
 from app.core.settings import settings
+from app.core.tenant import set_tenant_on_session
 from app.db.session import SessionLocal
 from app.models.audit_log import AuditLog
 
@@ -79,6 +80,8 @@ def _write_audit(
 
     db = SessionLocal()
     try:
+        # audit_logs tem RLS (FORCE): contexto do tenant antes do INSERT, na conexão runtime.
+        set_tenant_on_session(db, tenant_id)
         db.add(
             AuditLog(
                 tenant_id=tenant_id,

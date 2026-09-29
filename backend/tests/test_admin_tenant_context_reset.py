@@ -38,8 +38,11 @@ def create_user(db, username, password, role="admin"):
 
 
 def link_user_to_tenant(db, user_id, tenant_id):
+    # RLS (BLOCO 2): tenant_members exige app.tenant_id do próprio tenant no INSERT.
+    set_tenant_on_session(db, tenant_id)
     member = TenantMember(user_id=user_id, tenant_id=tenant_id)
     db.add(member)
+    db.flush()
 
 
 def login(username, password):

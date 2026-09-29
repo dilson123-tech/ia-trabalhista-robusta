@@ -15,9 +15,9 @@ from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.plans import PlanType, limits_for
-from app.core.tenant import set_tenant_on_session
+from app.core.tenant import clear_tenant_on_session, set_tenant_on_session
 from app.core.security import pwd_context
-from app.db.session import get_db
+from app.db.session import get_db, get_admin_db
 from app.models.audit_log import AuditLog
 from app.models.billing_request import BillingRequest
 from app.models.subscription import Subscription
@@ -68,24 +68,25 @@ def require_admin_key(x_admin_key: str | None = Header(default=None, alias="X-Ad
 
 def _reset_tenant_context(db: Session) -> None:
     """
-    Best-effort: garante que app.tenant_id não vaze pra próxima request no pool.
-    Em SQLite/dev, isso vira no-op.
+    Best-effort: remove o tenant lógico da Session e encerra a transação atual.
+    O contexto PostgreSQL é transaction-local e não persiste no pool.
     """
-    try:
-        bind = db.get_bind()
-        dialect = getattr(getattr(bind, "dialect", None), "name", "") or ""
-        if str(dialect).startswith("postgres"):
-            db.execute(text("RESET app.tenant_id"))
-        # garante sessão limpinha
-        try:
-            db.rollback()
-        except Exception:
-            pass
-    except Exception:
-        try:
-            db.rollback()
-        except Exception:
-            pass
+    clear_tenant_on_session(db)
+
+
+def _billing_request_tenant_id(admin_db: Session, billing_request_id: int) -> int:
+    """
+    Descoberta do tenant de uma billing_request (tenant ainda desconhecido):
+    somente pela conexão admin. Mutações seguem na sessão runtime.
+    """
+    tid = (
+        admin_db.query(BillingRequest.tenant_id)
+        .filter(BillingRequest.id == billing_request_id)
+        .scalar()
+    )
+    if tid is None:
+        raise HTTPException(status_code=404, detail="Billing request não encontrada.")
+    return int(tid)
 
 
 class SubscriptionActiveToggleIn(BaseModel):
@@ -134,6 +135,8 @@ def admin_create_billing_request(
         tenant = db.query(Tenant).filter(Tenant.id == tenant_id).one_or_none()
         if tenant is None:
             raise HTTPException(status_code=404, detail="Tenant não encontrado.")
+
+        set_tenant_on_session(db, tenant_id)
 
         try:
             requested_plan = PlanType(payload.requested_plan_type)
@@ -225,8 +228,11 @@ def admin_create_billing_checkout_session(
     billing_request_id: int,
     payload: BillingRequestCheckoutIn,
     db: Session = Depends(get_db),
+    admin_db: Session = Depends(get_admin_db),
 ):
     try:
+        tid = _billing_request_tenant_id(admin_db, billing_request_id)
+        set_tenant_on_session(db, tid)
         billing = (
             db.query(BillingRequest)
             .filter(BillingRequest.id == billing_request_id)
@@ -328,6 +334,8 @@ def admin_list_billing_requests(
         if tenant is None:
             raise HTTPException(status_code=404, detail="Tenant não encontrado.")
 
+        set_tenant_on_session(db, tenant_id)
+
         q = db.query(BillingRequest).filter(BillingRequest.tenant_id == tenant_id)
 
         if status:
@@ -374,6 +382,8 @@ def admin_list_billing_requests(
     except Exception as e:
         logger.exception("admin list billing requests failed (unexpected)")
         raise HTTPException(status_code=500, detail=f"admin list billing requests failed: {type(e).__name__}: {e}")
+    finally:
+        _reset_tenant_context(db)
 
 
 @router.patch("/billing-requests/{billing_request_id}/mark-paid", dependencies=[Depends(require_admin_key)])
@@ -381,8 +391,11 @@ def admin_mark_billing_request_paid(
     billing_request_id: int,
     payload: BillingRequestMarkPaidIn,
     db: Session = Depends(get_db),
+    admin_db: Session = Depends(get_admin_db),
 ):
     try:
+        tid = _billing_request_tenant_id(admin_db, billing_request_id)
+        set_tenant_on_session(db, tid)
         billing = (
             db.query(BillingRequest)
             .filter(BillingRequest.id == billing_request_id)
@@ -477,6 +490,8 @@ def admin_mark_billing_request_paid(
             pass
         logger.exception("admin mark billing request paid failed (unexpected)")
         raise HTTPException(status_code=500, detail=f"admin mark billing request paid failed: {type(e).__name__}: {e}")
+    finally:
+        _reset_tenant_context(db)
 
 
 @router.get("/audit/logs", dependencies=[Depends(require_admin_key)])
@@ -485,8 +500,9 @@ def admin_audit_logs(
     status_code: Optional[int] = Query(default=None),
     path: Optional[str] = Query(default=None),
     limit: int = Query(default=100, ge=1, le=500),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_admin_db),
 ):
+    # Visão global (cross-tenant) sob RLS: conexão admin (membro de ia_rls_admin).
     try:
         q = db.query(AuditLog)
 
@@ -539,8 +555,9 @@ def admin_audit_logs(
 
 @router.get("/dashboard/summary", dependencies=[Depends(require_admin_key)])
 def admin_dashboard_summary(
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_admin_db),
 ):
+    # Agregados globais (cross-tenant) sob RLS: conexão admin (membro de ia_rls_admin).
     try:
         tenants_total = db.query(Tenant).count()
         users_total = db.query(User).count()
@@ -720,11 +737,12 @@ def admin_list_tenants(
     plan_type: Optional[str] = Query(default=None, description="basic|pro|office"),
     status: Optional[str] = Query(default=None, description="trial|active|canceled"),
     name: Optional[str] = Query(default=None, description="Busca por nome do tenant"),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_admin_db),
 ):
     """
     Lista global de tenants para operação/admin.
-    Não usa set_tenant_on_session: visão global de backoffice.
+    Não usa set_tenant_on_session: visão global de backoffice, via conexão admin
+    (membro de ia_rls_admin), pois subscriptions está sob RLS.
     """
     try:
         q = (
@@ -870,6 +888,7 @@ def admin_get_subscription(
     db: Session = Depends(get_db),
 ):
     try:
+        set_tenant_on_session(db, tenant_id)
         sub = (
             db.query(Subscription)
             .filter(Subscription.tenant_id == tenant_id)
@@ -898,6 +917,8 @@ def admin_get_subscription(
     except Exception as e:
         logger.exception("admin get subscription failed (unexpected)")
         raise HTTPException(status_code=500, detail=f"admin get subscription failed: {type(e).__name__}: {e}")
+    finally:
+        _reset_tenant_context(db)
 
 
 @router.patch("/tenants/{tenant_id}/subscription/active", dependencies=[Depends(require_admin_key)])
@@ -907,6 +928,7 @@ def toggle_subscription_active(
     db: Session = Depends(get_db),
 ):
     try:
+        set_tenant_on_session(db, tenant_id)
         sub = (
             db.query(Subscription)
             .filter(Subscription.tenant_id == tenant_id)
@@ -947,6 +969,8 @@ def toggle_subscription_active(
             pass
         logger.exception("admin toggle subscription failed (unexpected)")
         raise HTTPException(status_code=500, detail=f"admin toggle subscription failed: {type(e).__name__}: {e}")
+    finally:
+        _reset_tenant_context(db)
 
 
 @router.get("/tenants/{tenant_id}/usage/summary", dependencies=[Depends(require_admin_key)])
@@ -1116,6 +1140,7 @@ def admin_list_tenant_users(
         if tenant is None:
             raise HTTPException(status_code=404, detail="Tenant não encontrado.")
 
+        set_tenant_on_session(db, tenant_id)
         rows = (
             db.query(User, TenantMember)
             .join(TenantMember, TenantMember.user_id == User.id)
@@ -1150,6 +1175,8 @@ def admin_list_tenant_users(
     except Exception as e:
         logger.exception("admin list tenant users failed (unexpected)")
         raise HTTPException(status_code=500, detail=f"admin list tenant users failed: {type(e).__name__}: {e}")
+    finally:
+        _reset_tenant_context(db)
 
 
 
@@ -1205,6 +1232,7 @@ def admin_tenant_usage_full(
         if tenant is None:
             raise HTTPException(status_code=404, detail="Tenant não encontrado.")
 
+        set_tenant_on_session(db, tenant_id)
         sub = (
             db.query(Subscription)
             .filter(Subscription.tenant_id == tenant_id)
@@ -1293,6 +1321,8 @@ def admin_tenant_usage_full(
     except Exception as e:
         logger.exception("admin tenant usage full failed (unexpected)")
         raise HTTPException(status_code=500, detail=f"admin tenant usage full failed: {type(e).__name__}: {e}")
+    finally:
+        _reset_tenant_context(db)
 
 
 @router.get("/tenants/{tenant_id}/usage/events", dependencies=[Depends(require_admin_key)])

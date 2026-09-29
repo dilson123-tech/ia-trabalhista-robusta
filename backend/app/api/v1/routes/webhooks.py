@@ -11,7 +11,9 @@ from sqlalchemy.orm import Session
 
 from app.core.plans import PlanType, limits_for
 from app.core.settings import settings
-from app.db.session import get_db
+from app.core.tenant import clear_tenant_on_session, set_tenant_on_session
+from app.db import session as db_session_module
+from app.db.session import AdminDatabaseNotConfigured, get_db
 from app.models.billing_request import BillingRequest
 from app.models.subscription import Subscription
 
@@ -31,6 +33,29 @@ def _authorized(token: str | None) -> bool:
 def _payment_payload(payload: dict[str, Any]) -> dict[str, Any]:
     payment = payload.get("payment")
     return payment if isinstance(payment, dict) else {}
+
+
+def _billing_request_tenant_id(billing_id: int) -> int | None:
+    """
+    Descobre o tenant da BillingRequest pela conexão admin (leitura global).
+
+    Sem fallback para DATABASE_URL: se a conexão admin não estiver configurada,
+    responde 503 para o provedor reenviar o evento, nunca um sucesso falso.
+    """
+    try:
+        admin_db = db_session_module.AdminSessionLocal()
+    except AdminDatabaseNotConfigured as exc:
+        logger.error("asaas webhook failed: admin database unavailable")
+        raise HTTPException(status_code=503, detail="admin database unavailable") from exc
+    try:
+        tenant_id = (
+            admin_db.query(BillingRequest.tenant_id)
+            .filter(BillingRequest.id == billing_id)
+            .scalar()
+        )
+    finally:
+        admin_db.close()
+    return int(tenant_id) if tenant_id is not None else None
 
 
 @router.post("/asaas")
@@ -74,7 +99,20 @@ async def asaas_webhook(
 
         billing_id = int(external_reference)
 
-        billing = db.query(BillingRequest).filter(BillingRequest.id == billing_id).one_or_none()
+        # RLS (BLOCO 2): o tenant da cobrança ainda é desconhecido. A descoberta
+        # usa somente leitura pela conexão admin separada; toda mutação segue pela
+        # sessão runtime, já com o contexto do tenant aplicado.
+        tenant_id = _billing_request_tenant_id(billing_id)
+        if tenant_id is None:
+            return {"ok": True, "missing_billing_request": billing_id}
+
+        set_tenant_on_session(db, tenant_id)
+
+        billing = (
+            db.query(BillingRequest)
+            .filter(BillingRequest.id == billing_id, BillingRequest.tenant_id == tenant_id)
+            .one_or_none()
+        )
         if billing is None:
             return {"ok": True, "missing_billing_request": billing_id}
 
@@ -158,3 +196,5 @@ async def asaas_webhook(
         db.rollback()
         logger.exception("asaas webhook failed unexpectedly")
         raise HTTPException(status_code=500, detail="Erro inesperado ao processar webhook Asaas.")
+    finally:
+        clear_tenant_on_session(db)

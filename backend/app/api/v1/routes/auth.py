@@ -10,7 +10,8 @@ import zlib
 
 from app.core.settings import settings
 from app.core.security import issue_token, require_auth, require_role, pwd_context
-from app.db.session import get_db
+import app.db.session as db_session
+from app.db.session import AdminDatabaseNotConfigured, get_admin_db, get_db
 from app.core.tenant import set_tenant_on_session
 from app.core.plans import PlanType, limits_for
 from app.models.tenant_member import TenantMember
@@ -119,8 +120,9 @@ def _ensure_tenant_id(db: Session, username: str) -> int:
     return int(new_id)
 
 
-def _ensure_membership(db: Session, u: User) -> TenantMember:
-    m = db.execute(select(TenantMember).where(TenantMember.user_id == u.id)).scalar_one_or_none()
+def _ensure_membership(db: Session, admin_db: Session, u: User) -> TenantMember:
+    # Descoberta global (sem tenant conhecido): somente pela conexão admin.
+    m = admin_db.execute(select(TenantMember).where(TenantMember.user_id == u.id)).scalar_one_or_none()
     if m is not None:
         return m
 
@@ -173,7 +175,13 @@ def _ensure_membership(db: Session, u: User) -> TenantMember:
         db.commit()
     except IntegrityError:
         db.rollback()
-        m = db.execute(select(TenantMember).where(TenantMember.user_id == u.id)).scalar_one()
+        # rollback desfaz o set_config da transação: reaplicar antes de consulta protegida.
+        set_tenant_on_session(db, tenant_id)
+        m = db.execute(
+            select(TenantMember).where(TenantMember.user_id == u.id, TenantMember.tenant_id == tenant_id)
+        ).scalar_one_or_none()
+        if m is None:
+            m = admin_db.execute(select(TenantMember).where(TenantMember.user_id == u.id)).scalar_one()
         return m
 
     db.refresh(m)
@@ -187,37 +195,60 @@ def seed_admin(
     x_seed_token: str = Header(default=""),
     db: Session = Depends(get_db),
 ):
-        # HARDENING: seed-admin é break-glass (desativado por padrão)
+    # HARDENING: seed-admin é break-glass (desativado por padrão).
     if not settings.ALLOW_SEED_ADMIN:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="not found")
     if not settings.ADMIN_SEED_TOKEN or settings.ADMIN_SEED_TOKEN == "CHANGE_ME_SEED_TOKEN":
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="seed token not configured")
-
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="seed token not configured",
+        )
     if x_seed_token != settings.ADMIN_SEED_TOKEN:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid seed token")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="invalid seed token",
+        )
 
-    existing = db.execute(select(User).where(User.username == payload.username)).scalar_one_or_none()
-    if existing:
-        _ensure_membership(db, existing)
-        return {"ok": True, "seeded": False, "reason": "already exists"}
-
-    u = User(
-        username=payload.username,
-        password_hash=pwd_context.hash(payload.password),
-        role=payload.role,
-    )
-    db.add(u)
+    # Só exige conexão admin depois das proteções de break-glass.
     try:
-        db.commit()
-    except IntegrityError:
-        db.rollback()
-        return {"ok": True, "seeded": False, "reason": "already exists"}
+        admin_db = db_session.AdminSessionLocal()
+    except AdminDatabaseNotConfigured as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="admin database unavailable",
+        ) from exc
 
-    db.refresh(u)
-    _ensure_membership(db, u)
+    try:
+        existing = db.execute(
+            select(User).where(User.username == payload.username)
+        ).scalar_one_or_none()
+        if existing:
+            _ensure_membership(db, admin_db, existing)
+            return {"ok": True, "seeded": False, "reason": "already exists"}
 
-    return {"ok": True, "seeded": True, "username": payload.username, "role": payload.role}
+        u = User(
+            username=payload.username,
+            password_hash=pwd_context.hash(payload.password),
+            role=payload.role,
+        )
+        db.add(u)
+        try:
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+            return {"ok": True, "seeded": False, "reason": "already exists"}
 
+        db.refresh(u)
+        _ensure_membership(db, admin_db, u)
+
+        return {
+            "ok": True,
+            "seeded": True,
+            "username": payload.username,
+            "role": payload.role,
+        }
+    finally:
+        admin_db.close()
 
 
 @router.post("/users", response_model=UserOut, dependencies=[Depends(require_role("admin"))])
@@ -355,7 +386,11 @@ def list_users(claims=Depends(require_auth), db: Session = Depends(get_db)):
 
 
 @router.post("/login", response_model=TokenOut)
-def login(payload: LoginIn, db: Session = Depends(get_db)):
+def login(
+    payload: LoginIn,
+    db: Session = Depends(get_db),
+    admin_db: Session = Depends(get_admin_db),
+):
     u = db.execute(
         select(User).where(User.username == payload.username)
     ).scalar_one_or_none()
@@ -372,7 +407,8 @@ def login(payload: LoginIn, db: Session = Depends(get_db)):
             detail="user is inactive",
         )
 
-    membership = db.execute(
+    # tenant ainda desconhecido: descoberta global da membership pela conexão admin.
+    membership = admin_db.execute(
         select(TenantMember).where(TenantMember.user_id == u.id)
     ).scalar_one_or_none()
 
