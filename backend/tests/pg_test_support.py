@@ -10,8 +10,13 @@ Fonte da URL: SOMENTE variáveis explícitas de teste. Não há fallback para
 settings.DATABASE_URL, DATABASE_URL do ambiente, .env ou qualquer default.
 
   IA_TRAB_TEST_PG_OWNER_URL  (obrigatória) role owner/migration; database base de teste
-  IA_TRAB_TEST_PG_APP_URL    (opcional, BLOCO 2) role de aplicação; se ausente, os
-                             fixtures usam a URL owner
+
+Roles de aplicação (BLOCO 2 / RLS): create_test_roles cria, somente no PG
+efêmero de teste, uma role runtime e uma role admin sintéticas (LOGIN,
+NOSUPERUSER, NOBYPASSRLS, NOCREATEDB, NOCREATEROLE, NOREPLICATION, não owner);
+a admin é membro da role NOLOGIN ia_rls_admin. Migrations rodam como owner;
+as requests e sessões de teste NUNCA usam a URL owner (sem fallback).
+drop_test_roles remove as roles sintéticas antes do DROP DATABASE.
 
 Toda URL passa por assert_test_pg_url antes de qualquer conexão; qualquer
 dúvida => erro (falha fechada).
@@ -21,6 +26,7 @@ from __future__ import annotations
 
 import os
 import re
+import secrets
 import subprocess
 import sys
 import uuid
@@ -34,12 +40,15 @@ BACKEND_DIR = Path(__file__).resolve().parents[1]
 ALEMBIC_INI = BACKEND_DIR / "alembic.ini"
 
 OWNER_URL_ENV = "IA_TRAB_TEST_PG_OWNER_URL"
-APP_URL_ENV = "IA_TRAB_TEST_PG_APP_URL"
 
 # Marcadores obrigatórios de TESTE.
 TEST_DATABASE_PREFIX = "ia_trab_test"
 TEST_ROLE_PREFIX = "ia_trab_test"
 RUN_DATABASE_RE = re.compile(r"^ia_trab_test_run_[0-9a-f]{12}$")
+# Roles sintéticas criadas por create_test_roles (runtime/admin).
+TEST_APP_ROLE_RE = re.compile(r"^ia_trab_test_(rt|adm)_[0-9a-f]{12}$")
+# Role NOLOGIN cuja membership concede acesso administrativo nas policies RLS.
+RLS_ADMIN_ROLE = "ia_rls_admin"
 
 _ALLOWED_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
 # Porta do PG de desenvolvimento em docker-compose.yml da raiz.
@@ -109,14 +118,6 @@ def owner_url_from_env() -> URL:
     return assert_test_pg_url(os.environ.get(OWNER_URL_ENV), source=OWNER_URL_ENV)
 
 
-def app_url_from_env() -> URL | None:
-    """Ponto de extensão do BLOCO 2 (role de aplicação separada). None se não definida."""
-    raw = os.environ.get(APP_URL_ENV)
-    if raw is None or not raw.strip():
-        return None
-    return assert_test_pg_url(raw, source=APP_URL_ENV)
-
-
 def _assert_run_database(name: str) -> None:
     if not RUN_DATABASE_RE.fullmatch(name):
         raise UnsafeTestDatabaseError(f"database de execução {name!r} fora do padrão {RUN_DATABASE_RE.pattern}")
@@ -153,6 +154,148 @@ def drop_run_database(owner_url: URL, run_url: URL) -> None:
     finally:
         admin_engine.dispose()
 
+
+
+def _assert_test_app_role(name: str) -> None:
+    if not TEST_APP_ROLE_RE.fullmatch(name):
+        raise UnsafeTestDatabaseError(f"role de teste {name!r} fora do padrão {TEST_APP_ROLE_RE.pattern}")
+
+
+_ROLE_ATTRS = "LOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE NOREPLICATION"
+
+
+def create_test_roles(owner_run_url: URL) -> tuple[URL, URL, tuple[str, str]]:
+    """(B') Cria as roles sintéticas runtime/admin SOMENTE no PG efêmero de teste.
+
+    Retorna (runtime_url, admin_url, (runtime_role, admin_role)). Ambas as roles:
+    LOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE NOREPLICATION, sem
+    ownership de tabelas; a admin é membro de ia_rls_admin (NOLOGIN, criada se
+    não existir e nunca removida). Senhas aleatórias por execução; nenhuma
+    mensagem de erro expõe senha (hide_parameters + exceção sanitizada).
+    """
+    owner_run_url = assert_test_pg_url(owner_run_url, source="create_test_roles")
+    _assert_run_database(owner_run_url.database)
+
+    suffix = uuid.uuid4().hex[:12]
+    runtime_role = f"{TEST_ROLE_PREFIX}_rt_{suffix}"
+    admin_role = f"{TEST_ROLE_PREFIX}_adm_{suffix}"
+    for role in (runtime_role, admin_role):
+        _assert_test_app_role(role)
+    passwords = {runtime_role: secrets.token_hex(24), admin_role: secrets.token_hex(24)}
+    database = owner_run_url.database
+
+    engine = create_engine(owner_run_url, isolation_level="AUTOCOMMIT", hide_parameters=True)
+    try:
+        with engine.connect() as conn:
+            for role, password in passwords.items():
+                # psycopg2 interpola o parâmetro no cliente; hide_parameters oculta-o em erros.
+                conn.execute(text(f'CREATE ROLE "{role}" {_ROLE_ATTRS} PASSWORD :pw'), {"pw": password})
+
+            exists = conn.execute(
+                text("SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = :r"), {"r": RLS_ADMIN_ROLE}
+            ).first()
+            if exists is None:
+                conn.execute(text(f'CREATE ROLE "{RLS_ADMIN_ROLE}" NOLOGIN NOSUPERUSER NOBYPASSRLS'))
+            conn.execute(text(f'GRANT "{RLS_ADMIN_ROLE}" TO "{admin_role}"'))
+
+            for role in (runtime_role, admin_role):
+                conn.execute(text(f'GRANT CONNECT ON DATABASE "{database}" TO "{role}"'))
+                conn.execute(text(f'GRANT USAGE ON SCHEMA public TO "{role}"'))
+
+            # Runtime: aplicação normal, sujeita ao tenant RLS.
+            conn.execute(
+                text(
+                    f'GRANT SELECT, INSERT, UPDATE, DELETE '
+                    f'ON ALL TABLES IN SCHEMA public TO "{runtime_role}"'
+                )
+            )
+            conn.execute(
+                text(
+                    f'GRANT USAGE, SELECT ON ALL SEQUENCES '
+                    f'IN SCHEMA public TO "{runtime_role}"'
+                )
+            )
+
+            # Admin: descoberta/leitura cross-tenant apenas.
+            # Mutações devem voltar para a role runtime após conhecer o tenant.
+            conn.execute(
+                text(f'GRANT SELECT ON ALL TABLES IN SCHEMA public TO "{admin_role}"')
+            )
+
+            _verify_test_roles(conn, runtime_role, admin_role)
+    except UnsafeTestDatabaseError:
+        raise
+    except Exception as exc:
+        # Não propagar a mensagem original (pode conter o comando com a senha).
+        raise RuntimeError(
+            f"falha ao criar roles de teste no database {database!r} ({type(exc).__name__})"
+        ) from None
+    finally:
+        engine.dispose()
+
+    runtime_url = assert_test_pg_url(
+        owner_run_url.set(username=runtime_role, password=passwords[runtime_role]), source="create_test_roles"
+    )
+    admin_url = assert_test_pg_url(
+        owner_run_url.set(username=admin_role, password=passwords[admin_role]), source="create_test_roles"
+    )
+    return runtime_url, admin_url, (runtime_role, admin_role)
+
+
+def _verify_test_roles(conn, runtime_role: str, admin_role: str) -> None:
+    rows = conn.execute(
+        text(
+            "SELECT rolname, rolcanlogin, rolsuper, rolbypassrls, rolcreatedb, rolcreaterole, rolreplication "
+            "FROM pg_catalog.pg_roles WHERE rolname IN (:rt, :adm, :rls)"
+        ),
+        {"rt": runtime_role, "adm": admin_role, "rls": RLS_ADMIN_ROLE},
+    ).all()
+    by_name = {row[0]: row for row in rows}
+    for role in (runtime_role, admin_role):
+        row = by_name.get(role)
+        if row is None or tuple(row[1:]) != (True, False, False, False, False, False):
+            raise UnsafeTestDatabaseError(f"role de teste {role!r} com atributos inesperados")
+    rls = by_name.get(RLS_ADMIN_ROLE)
+    if rls is None or rls[1] or rls[2] or rls[3]:
+        raise UnsafeTestDatabaseError(f"role {RLS_ADMIN_ROLE!r} deve ser NOLOGIN NOSUPERUSER NOBYPASSRLS")
+
+    owned = conn.execute(
+        text("SELECT count(*) FROM pg_catalog.pg_tables WHERE tableowner IN (:rt, :adm)"),
+        {"rt": runtime_role, "adm": admin_role},
+    ).scalar_one()
+    if owned:
+        raise UnsafeTestDatabaseError("roles de teste runtime/admin não podem ser owner de tabelas")
+
+    membership = conn.execute(
+        text(
+            "SELECT pg_catalog.pg_has_role(:rt, :rls, 'MEMBER'), pg_catalog.pg_has_role(:adm, :rls, 'MEMBER')"
+        ),
+        {"rt": runtime_role, "adm": admin_role, "rls": RLS_ADMIN_ROLE},
+    ).one()
+    if membership != (False, True):
+        raise UnsafeTestDatabaseError(f"membership em {RLS_ADMIN_ROLE!r} inesperada para roles de teste")
+
+
+def drop_test_roles(owner_run_url: URL, role_names: tuple[str, ...]) -> None:
+    """(B') Remove as roles sintéticas; deve rodar ANTES de drop_run_database.
+
+    DROP OWNED BY no database de execução revoga os grants (incluindo CONNECT);
+    roles são globais do cluster, por isso são removidas explicitamente.
+    ia_rls_admin nunca é removida.
+    """
+    owner_run_url = assert_test_pg_url(owner_run_url, source="drop_test_roles")
+    _assert_run_database(owner_run_url.database)
+    for role in role_names:
+        _assert_test_app_role(role)
+
+    engine = create_engine(owner_run_url, isolation_level="AUTOCOMMIT", hide_parameters=True)
+    try:
+        with engine.connect() as conn:
+            for role in role_names:
+                conn.execute(text(f'DROP OWNED BY "{role}"'))
+                conn.execute(text(f'DROP ROLE IF EXISTS "{role}"'))
+    finally:
+        engine.dispose()
 
 def run_alembic_upgrade_head(run_url: URL) -> None:
     """(C) `alembic upgrade head` somente contra o database de execução de teste.

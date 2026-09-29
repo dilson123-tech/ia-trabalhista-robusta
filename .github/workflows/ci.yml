@@ -52,7 +52,95 @@ jobs:
           source ../.venv/bin/activate
           alembic upgrade head
 
+      - name: Install OS deps (psql client)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      # RLS (BLOCO 2): migrations rodam como owner (DATABASE_URL do job); o app
+      # roda com roles separadas, sem SUPERUSER/BYPASSRLS e sem ownership.
+      # Senhas sintéticas, exclusivas deste Postgres efêmero de CI.
+      - name: Bootstrap CI DB roles (runtime/admin, RLS)
+        run: |
+          psql "${DATABASE_URL/+psycopg2/}" -v ON_ERROR_STOP=1 <<'SQL'
+          DO $$
+          BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'ia_rls_admin') THEN
+              CREATE ROLE ia_rls_admin NOLOGIN NOSUPERUSER NOBYPASSRLS;
+            END IF;
+          END
+          $$;
+          CREATE ROLE ia_trab_ci_runtime LOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE NOREPLICATION PASSWORD 'ci-runtime-pass';
+          CREATE ROLE ia_trab_ci_admin LOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE NOREPLICATION PASSWORD 'ci-admin-pass';
+          GRANT ia_rls_admin TO ia_trab_ci_admin;
+          GRANT CONNECT ON DATABASE ia_trab TO ia_trab_ci_runtime, ia_trab_ci_admin;
+          GRANT USAGE ON SCHEMA public TO ia_trab_ci_runtime, ia_trab_ci_admin;
+          GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO ia_trab_ci_runtime;
+          GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO ia_trab_ci_runtime;
+          GRANT SELECT ON ALL TABLES IN SCHEMA public TO ia_trab_ci_admin;
+
+          -- Validação fail-closed antes de subir o app.
+          DO $$
+          DECLARE
+            r record;
+          BEGIN
+            IF NOT EXISTS (
+              SELECT 1 FROM pg_roles
+              WHERE rolname = 'ia_rls_admin' AND NOT rolcanlogin AND NOT rolsuper AND NOT rolbypassrls
+            ) THEN
+              RAISE EXCEPTION 'ia_rls_admin ausente ou com propriedades inseguras';
+            END IF;
+
+            IF (SELECT count(*) FROM pg_roles WHERE rolname IN ('ia_trab_ci_runtime', 'ia_trab_ci_admin')) <> 2 THEN
+              RAISE EXCEPTION 'roles de CI ausentes';
+            END IF;
+
+            FOR r IN SELECT * FROM pg_roles WHERE rolname IN ('ia_trab_ci_runtime', 'ia_trab_ci_admin') LOOP
+              IF NOT r.rolcanlogin OR r.rolsuper OR r.rolbypassrls OR r.rolcreatedb
+                 OR r.rolcreaterole OR r.rolreplication THEN
+                RAISE EXCEPTION 'role % com propriedades inseguras', r.rolname;
+              END IF;
+            END LOOP;
+
+            IF EXISTS (
+              SELECT 1 FROM pg_class c JOIN pg_roles o ON o.oid = c.relowner
+              WHERE o.rolname IN ('ia_trab_ci_runtime', 'ia_trab_ci_admin')
+            ) THEN
+              RAISE EXCEPTION 'role de CI não pode ser owner de objetos';
+            END IF;
+
+            IF NOT pg_has_role('ia_trab_ci_admin', 'ia_rls_admin', 'MEMBER') THEN
+              RAISE EXCEPTION 'ia_trab_ci_admin deve ser membro de ia_rls_admin';
+            END IF;
+
+            IF pg_has_role('ia_trab_ci_runtime', 'ia_rls_admin', 'MEMBER') THEN
+              RAISE EXCEPTION 'ia_trab_ci_runtime não pode ser membro de ia_rls_admin';
+            END IF;
+
+            IF EXISTS (
+              SELECT 1 FROM pg_tables
+              WHERE schemaname = 'public'
+                AND has_table_privilege('ia_trab_ci_admin', format('%I.%I', schemaname, tablename),
+                                        'INSERT, UPDATE, DELETE, TRUNCATE')
+            ) THEN
+              RAISE EXCEPTION 'ia_trab_ci_admin deve ser somente leitura';
+            END IF;
+
+            IF NOT EXISTS (
+              SELECT 1 FROM pg_class
+              WHERE relnamespace = 'public'::regnamespace AND relrowsecurity AND relforcerowsecurity
+            ) THEN
+              RAISE EXCEPTION 'nenhuma tabela com RLS ENABLE+FORCE após migrations';
+            END IF;
+          END
+          $$;
+          SQL
+
       - name: Run backend smoke (start server + auth script)
+        env:
+          # App sob RLS: runtime (DML, sujeita às policies) e admin (SELECT, membro de ia_rls_admin).
+          DATABASE_URL: postgresql+psycopg2://ia_trab_ci_runtime:ci-runtime-pass@localhost:5432/ia_trab
+          ADMIN_DATABASE_URL: postgresql+psycopg2://ia_trab_ci_admin:ci-admin-pass@localhost:5432/ia_trab
         run: |
           cd backend
           source ../.venv/bin/activate

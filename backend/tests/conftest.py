@@ -34,6 +34,7 @@ _HERMETIC_UNSET_ENV = (
     "LLM_PROVIDER", "LLM_API_KEY", "LLM_MODEL", "LLM_TIMEOUT_SECONDS", "LLM_BASE_URL",
     "PAYMENT_PROVIDER", "PAYMENT_CHECKOUT_BASE_URL",
     "ASAAS_API_KEY", "ASAAS_BASE_URL", "ASAAS_WEBHOOK_TOKEN",
+    "ADMIN_DATABASE_URL",
 )
 
 # pydantic-settings casa nomes sem diferenciar maiúsculas/minúsculas.
@@ -58,7 +59,7 @@ from sqlalchemy.pool import StaticPool
 from sqlalchemy.orm import sessionmaker
 
 from app.db.base import Base
-from app.db.session import get_db
+from app.db.session import get_admin_db, get_db
 from app.main import app as fastapi_app
 
 import app.models  # noqa: F401  (garante Base.metadata com todos models)
@@ -75,11 +76,11 @@ TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engin
 _NO_OVERRIDE = object()
 
 
-def _restore_get_db_override(previous):
+def _restore_override(dependency, previous):
     if previous is _NO_OVERRIDE:
-        fastapi_app.dependency_overrides.pop(get_db, None)
+        fastapi_app.dependency_overrides.pop(dependency, None)
     else:
-        fastapi_app.dependency_overrides[get_db] = previous
+        fastapi_app.dependency_overrides[dependency] = previous
 
 
 @pytest.fixture(autouse=True)
@@ -90,6 +91,8 @@ def _hermetic_request_db(monkeypatch):
       da request (cobre TestClient criado no nível de módulo).
     - SessionLocal importado por nome (middleware de auditoria e /ready):
       substituído no módulo consumidor; restaurado pelo monkeypatch.
+    - get_admin_db / AdminSessionLocal (BLOCO 2): no SQLite não há RLS nem
+      roles; a conexão administrativa aponta para o mesmo SQLite isolado.
     """
     Base.metadata.create_all(bind=engine)
 
@@ -101,14 +104,18 @@ def _hermetic_request_db(monkeypatch):
             db.close()
 
     previous = fastapi_app.dependency_overrides.get(get_db, _NO_OVERRIDE)
+    previous_admin = fastapi_app.dependency_overrides.get(get_admin_db, _NO_OVERRIDE)
     fastapi_app.dependency_overrides[get_db] = _override_get_db
+    fastapi_app.dependency_overrides[get_admin_db] = _override_get_db
     monkeypatch.setattr(_app_main_module, "SessionLocal", TestingSessionLocal)
     monkeypatch.setattr(_app_middleware_module, "SessionLocal", TestingSessionLocal)
     monkeypatch.setattr(_app_db_session_module, "SessionLocal", TestingSessionLocal)
+    monkeypatch.setattr(_app_db_session_module, "AdminSessionLocal", TestingSessionLocal)
     try:
         yield
     finally:
-        _restore_get_db_override(previous)
+        _restore_override(get_admin_db, previous_admin)
+        _restore_override(get_db, previous)
         Base.metadata.drop_all(bind=engine)
 
 
@@ -137,15 +144,18 @@ def client(db_session):
         with TestClient(fastapi_app) as c:
             yield c
     finally:
-        _restore_get_db_override(previous)
+        _restore_override(get_db, previous)
 
 
 # ---------------------------------------------------------------------------
 # PostgreSQL 16 efêmero de TESTE (BLOCO 1A / S4) — opt-in, nunca autouse.
 # SQLite acima continua sendo a camada padrão. Só testes que pedirem os
 # fixtures pg_* abaixo tocam PostgreSQL; a URL vem exclusivamente de
-# IA_TRAB_TEST_PG_OWNER_URL (e, no BLOCO 2, IA_TRAB_TEST_PG_APP_URL), validada
-# por tests/pg_test_support.py. Sem fallback para settings.DATABASE_URL.
+# IA_TRAB_TEST_PG_OWNER_URL, validada por tests/pg_test_support.py. Sem
+# fallback para settings.DATABASE_URL.
+# BLOCO 2 (RLS): migrations/TRUNCATE rodam como owner; sessões e requests usam
+# roles sintéticas runtime/admin criadas por execução (pg_test_roles), nunca a
+# URL owner.
 # ---------------------------------------------------------------------------
 from sqlalchemy.orm import Session as _PgSession
 
@@ -179,18 +189,25 @@ def pg_migrated_database_url(pg_test_owner_url):
 
 
 @pytest.fixture(scope="session")
-def pg_app_database_url(pg_migrated_database_url):
-    """Ponto de extensão do BLOCO 2: URL da role de aplicação no database desta execução.
+def pg_test_roles(pg_migrated_database_url):
+    """Roles sintéticas runtime/admin no database desta execução; removidas antes do DROP DATABASE."""
+    runtime_url, admin_url, role_names = _pg.create_test_roles(pg_migrated_database_url)
+    try:
+        yield runtime_url, admin_url
+    finally:
+        _pg.drop_test_roles(pg_migrated_database_url, role_names)
 
-    Sem IA_TRAB_TEST_PG_APP_URL, usa a própria role owner (sem separação de roles ainda).
-    """
-    app_url = _pg.app_url_from_env()
-    if app_url is None:
-        return pg_migrated_database_url
-    return _pg.assert_test_pg_url(
-        app_url.set(database=pg_migrated_database_url.database),
-        source=_pg.APP_URL_ENV,
-    )
+
+@pytest.fixture(scope="session")
+def pg_app_database_url(pg_test_roles):
+    """URL da role runtime (sujeita a RLS). Sem fallback para a URL owner."""
+    return pg_test_roles[0]
+
+
+@pytest.fixture(scope="session")
+def pg_admin_database_url(pg_test_roles):
+    """URL da role admin (membro de ia_rls_admin, sem BYPASSRLS). Separada da runtime."""
+    return pg_test_roles[1]
 
 
 @pytest.fixture(scope="session")
@@ -250,14 +267,19 @@ def _truncate_pg_test_tables(owner_run_url):
 
 
 @pytest.fixture(scope="function")
-def pg_request_db(_hermetic_request_db, monkeypatch, pg_migrated_database_url, pg_app_database_url):
+def pg_request_db(
+    _hermetic_request_db, monkeypatch, pg_migrated_database_url, pg_app_database_url, pg_admin_database_url
+):
     """Aponta get_db, middleware de auditoria e /ready para o PG de teste; devolve a factory de sessão.
+
+    - get_db/SessionLocal usam a role runtime (RLS aplicado); get_admin_db e
+      AdminSessionLocal usam a role admin, com engine própria.
 
     - Roda depois da autouse SQLite e sobrepõe seu override/monkeypatch; restaura ao final.
     - Setup direto usa a factory devolvida e faz commit real (visível às requests).
-    - Engine própria por teste: conexões com app.tenant_id (set_config de sessão)
-      são descartadas no teardown e não vazam para o teste seguinte. Não há reset
-      por checkin, para não mascarar vazamento de contexto dentro do próprio teste.
+    - Engine própria por teste: app.tenant_id é transaction-local e reaplicado
+      pela Session quando uma nova transação começa. As conexões são descartadas
+      no teardown e não vazam contexto de tenant para o teste seguinte.
     """
     _truncate_pg_test_tables(pg_migrated_database_url)
 
@@ -265,11 +287,20 @@ def pg_request_db(_hermetic_request_db, monkeypatch, pg_migrated_database_url, p
     _pg_sessionmaker = sessionmaker(
         autocommit=False, autoflush=False, bind=request_engine, expire_on_commit=False
     )
+    admin_engine = create_engine(pg_admin_database_url, pool_pre_ping=True, hide_parameters=True)
+    _pg_admin_sessionmaker = sessionmaker(
+        autocommit=False, autoflush=False, bind=admin_engine, expire_on_commit=False
+    )
     opened_sessions = _weakref.WeakSet()
 
     def PgSessionLocal():
         # Uma Session nova por chamada (por request/thread); rastreada para o teardown.
         session = _pg_sessionmaker()
+        opened_sessions.add(session)
+        return session
+
+    def PgAdminSessionLocal():
+        session = _pg_admin_sessionmaker()
         opened_sessions.add(session)
         return session
 
@@ -280,17 +311,36 @@ def pg_request_db(_hermetic_request_db, monkeypatch, pg_migrated_database_url, p
         finally:
             db.close()
 
+    def _override_get_admin_db():
+        db = PgAdminSessionLocal()
+        try:
+            yield db
+        finally:
+            db.close()
+
     previous = fastapi_app.dependency_overrides.get(get_db, _NO_OVERRIDE)
+    previous_admin = fastapi_app.dependency_overrides.get(get_admin_db, _NO_OVERRIDE)
     fastapi_app.dependency_overrides[get_db] = _override_get_db
+    fastapi_app.dependency_overrides[get_admin_db] = _override_get_admin_db
     monkeypatch.setattr(_app_main_module, "SessionLocal", PgSessionLocal)
     monkeypatch.setattr(_app_middleware_module, "SessionLocal", PgSessionLocal)
     monkeypatch.setattr(_app_db_session_module, "SessionLocal", PgSessionLocal)
+    monkeypatch.setattr(_app_db_session_module, "AdminSessionLocal", PgAdminSessionLocal)
+    PgSessionLocal.admin = PgAdminSessionLocal
     try:
         yield PgSessionLocal
     finally:
-        _restore_get_db_override(previous)
+        _restore_override(get_admin_db, previous_admin)
+        _restore_override(get_db, previous)
         # Sessão deixada aberta por falha no meio do teste seguraria locks e travaria o TRUNCATE.
         for session in list(opened_sessions):
             session.close()
         request_engine.dispose()
+        admin_engine.dispose()
         _truncate_pg_test_tables(pg_migrated_database_url)
+
+
+@pytest.fixture(scope="function")
+def pg_admin_request_db(pg_request_db):
+    """Factory de sessão da role admin (ia_rls_admin) no mesmo ciclo de pg_request_db."""
+    return pg_request_db.admin
