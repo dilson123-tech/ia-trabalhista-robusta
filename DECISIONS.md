@@ -278,6 +278,31 @@ sessão de implantação de governança, ou a um princípio já presente em
   **não** será corrigido na frente 1A → 2 → 1B; `remaining.cases` /
   `cases_per_month` ficam congelados até decisão humana própria futura.
 
+
+- **OPS-006** — Resolve `P-006`. Fica aprovada a autonomia operacional
+  supervisionada dos agentes de IA. Após DICO autorizar explicitamente uma
+  missão com escopo e critérios definidos, os agentes podem, sem nova
+  aprovação humana passo a passo, investigar o código, editar somente dentro
+  do escopo autorizado, executar testes locais permitidos, analisar falhas,
+  aplicar correções diretamente relacionadas, repetir testes e realizar
+  revisão adversarial até concluir, bloquear ou atingir o limite da missão.
+  A autonomia não autoriza expansão de escopo, resolução autônoma de decisão
+  humana pendente, mudança arquitetural não prevista, enfraquecimento de
+  testes, regras jurídicas ou segurança, leitura de segredos ou descarte de
+  alterações inesperadas. Dúvida material, conflito de governança ou
+  necessidade de ampliar o escopo exige parada e escalonamento. `SEC-001` e
+  `SEC-002` permanecem integralmente válidas; portanto `git add`, `commit`,
+  `push`, `merge`, `tag`, `release`, `deploy`, acesso a Production, migrations
+  e integrações externas continuam exigindo autorização humana explícita e
+  específica para cada ato. O executor não aprova sua própria entrega. A
+  missão deve terminar com evidências de testes, regressão pertinente, QA
+  adversarial, estado Git, riscos, itens não validados e resultado
+  `CONCLUÍDA`, `PARCIAL` ou `BLOQUEADA`. A frase operacional
+  `AUTORIZADO — EXECUTEM` inicia essa autonomia somente quando vinculada a
+  uma missão previamente definida e aprovada; isoladamente não concede
+  autorização genérica sobre o repositório. Decisão humana (DICO/ChatGPT),
+  2026-09-30.
+
 ## E. Decisões jurídicas/processuais aprovadas
 
 - **LEG-001** — Revisão e decisão profissional do advogado responsável são
@@ -328,7 +353,7 @@ aberto até decisão humana explícita.
   qualquer outra proteção permanente já aprovada. Qualquer alteração futura
   das regras de segurança atualmente aprovadas exige decisão humana
   explícita, novo registro de decisão e aplicação da regra de
-  supersessão/histórico (Seção G). **Status: pendente.**
+  supersessão/histórico (Seção G). **Status: resolvido em `OPS-006`.**
 - **P-007 — Destino/fechamento da frente local
   `fix/editor-civil-professional-risk-specialization-v1`**, originalmente
   existente com alterações em `case_operational_assistant.py` e
