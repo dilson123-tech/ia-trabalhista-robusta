@@ -96,42 +96,30 @@ antecipa.
   dossiê interno) — nenhuma priorizada.
 - ⚠️⏳ **Refatoração de `case_operational_assistant.py`**: identificada como
   risco arquitetural na auditoria, mas **não é tarefa automática deste
-  roadmap** (regra explícita) — depende de decisão humana ainda pendente.
-- ⏳ **Prioridade do próximo ciclo (`P-002`, resolvida em `OPS-004` apenas
-  como prioridade)**: restaurar uma baseline confiável de testes e
-  isolamento multi-tenant **antes de novas features**. As duas decisões
-  humanas de `OPS-004` foram tomadas em 2026-09-25 (**não implementadas**):
-  - **A = A1 (`ARCH-001`)** — RLS PostgreSQL real e versionado, mantendo o
-    isolamento em aplicação (`scoped_query`) como camada adicional;
-  - **B = B2 (`ARCH-002`)** — `limits_for(plan_type)` é a fonte oficial de
-    limites e enforcement; `Subscription.case_limit` é legado/informativo
-    (coluna mantida). O teste de uso administrativo deve ser reconciliado
-    com B2, sem `50` hardcoded e sem depender do `.env` local.
-  - Defeito registrado (**sem solução decidida**): `remaining.cases` é
-    calculado contra o contador mensal `cases_created`, embora
-    `cases_per_month` seja alias de `active_cases_limit` (mistura casos
-    ATIVOS com casos CRIADOS NO MÊS). **Congelado** na frente 1A → 2 → 1B
-    (`OPS-005`); exige decisão humana própria futura.
-- ⏳ Sequência planejada — modelo de execução decidido em 2026-09-25
-  (`OPS-005`; detalhado em `NEXT_STEP.md`; planejamento, **não
-  autorização**; adendo A1/B2 já integrado via PR #309):
-  **BLOCO 1A** (hermeticidade/configuração de testes com PostgreSQL 16
-  efêmero, migrations no banco de teste, sem `.env` real/PG de
-  desenvolvimento; teste admin reconciliado com B2; infraestrutura de
-  `test_rls_isolation` adaptada com assert preservado; sem
-  `skip`/`xfail`/assert enfraquecido; **sem** job de suíte completa
-  vermelho no CI) → **BLOCO 2** (A1: RLS real/versionado, role não
-  superusuária sem `BYPASSRLS`, `FORCE ROW LEVEL SECURITY`;
-  `test_rls_isolation` verde) → **BLOCO 1B** (suíte completa do backend
-  no CI, obrigatória e verde; baseline final registrada). Nenhum BLOCO 1
-  é declarado concluído antes do 1B. PostgreSQL 16 alinha-se ao
-  `docker-compose.yml` e não afirma a versão de Production. Cada bloco
-  exige nova autorização específica. Nenhuma branch técnica foi criada ou autorizada; o nome
-  `fix/ci-plan-limit-test-and-rls-role-isolation-v1` está **superado** e a
-  branch nunca foi criada. Este roadmap não autoriza nenhum início
-  (`AGENTS.md`, Seção 5).
-- 🚫 **Nenhuma feature nova antes dos bloqueios básicos** (baseline de testes
-  e isolamento multi-tenant) — consequência da prioridade de `P-002`.
+  roadmap** — depende de decisão humana ainda pendente.
+- ✅ **Prioridade técnica de `P-002` / sequência `OPS-005`: concluída.**
+  As decisões A1 (`ARCH-001`) e B2 (`ARCH-002`) foram executadas dentro da
+  sequência obrigatória BLOCO 1A → BLOCO 2 → BLOCO 1B:
+  - **BLOCO 1A:** concluído no PR #311
+    (`c75d2e6c9a503bb1db7b76a690097b355bab7fa2`) — infraestrutura de testes
+    backend hermética e PostgreSQL de teste isolado;
+  - **BLOCO 2:** concluído no PR #312
+    (`29f7bd45b729766417781a80d7dfff56ddb3aa49`) — RLS PostgreSQL tenant real
+    e versionado, com migration e testes associados;
+  - **BLOCO 1B:** concluído no PR #313
+    (`1e7a686c602621ab5eaa86fdc9aaf3edd99e7833`) — suíte backend completa no
+    CI, `backend-full-suite` obrigatório e baseline final registrada em
+    `316 passed, 0 failed`, `112 warnings`.
+- ⏳ **Defeito de contrato fora do fechamento de `OPS-005`:**
+  `remaining.cases` é calculado contra `cases_created`, enquanto
+  `cases_per_month` é alias legado de `active_cases_limit`. Sua semântica
+  permanece **congelada** e exige decisão humana própria futura.
+- ⏳ As frentes posteriores já existentes no planejamento — segurança/LGPD,
+  billing/Asaas, frontend faltante e gate de release — permanecem sujeitas
+  à sua própria evidência, auditoria/proposta e autorização humana. A
+  conclusão de `OPS-005` **não autoriza automaticamente** nenhuma delas.
+- 🚫 Production permanece **NÃO VERIFICADA** neste checkpoint; PostgreSQL 16
+  usado nos testes não afirma a versão de Production.
 
 ## F. Segurança/LGPD
 
@@ -249,12 +237,14 @@ condiciona neste roadmap; não resolve nenhuma delas.
 - **Nomenclatura oficial do produto — `P-001`** — condiciona comunicação
   externa e comercial consistente (Seção B).
 - **Prioridade do próximo ciclo de desenvolvimento — `P-002`** — resolvida
-  em `OPS-004` **apenas como prioridade**: baseline confiável de testes e
-  isolamento multi-tenant antes de novas features. As decisões humanas
-  **A** (modelo de isolamento) e **B** (semântica do limite admin) foram
-  tomadas em 2026-09-25: **A1** (`ARCH-001`) e **B2** (`ARCH-002`), não
-  implementadas; modelo de execução 1A → 2 → 1B decidido em `OPS-005`,
-  não iniciado. Nenhuma branch técnica criada ou autorizada (Seção E).
+  em `OPS-004` como prioridade: estabelecer baseline confiável de testes e
+  isolamento multi-tenant antes de novas features. As decisões humanas A1
+  (`ARCH-001`) e B2 (`ARCH-002`) foram tomadas em 2026-09-25, e o modelo de
+  execução obrigatório 1A → 2 → 1B foi definido em `OPS-005`. Essa sequência
+  foi posteriormente concluída e integrada a `main` pelos PRs #311, #312 e
+  #313, respectivamente. O defeito de contrato de `remaining.cases` /
+  `cases_per_month` permaneceu fora desse fechamento, com semântica congelada
+  até decisão humana própria futura (Seção E).
 - **Refatoração de `case_operational_assistant.py` — `P-003`** — condiciona
   a evolução segura da Seção H; não deve ser tratada como tarefa automática
   deste roadmap.
@@ -301,12 +291,14 @@ encontrada na auditoria — não é métrica automatizada nem projeção tempora
 IA Trabalhista Robusta / [nomenclatura oficial pendente]
 │
 ├── 🔄 Infra base (auth, tenant app-level, health, CI, plans/limits)
-│     itens [x] nas seções 1–3 da matriz; porém RLS não versionado/não
-│     comprovado no Git, suíte completa fora do CI, testes não herméticos,
-│     sem /ready e sem rate limiting (auditoria-mestra 2026-09-24).
-│     Modelo de isolamento decidido: A1 (ARCH-001) — não implementado.
-│     Estimativas da auditoria (NÃO métricas): Banco/RLS ~40%,
-│     Testes/CI ~50%, Segurança ~55% — ver PAINEL MESTRE em PROJECT_STATE.md
+│     OPS-005 concluída: infraestrutura de testes backend hermética no
+│     PR #311; RLS PostgreSQL tenant real/versionado no PR #312; suíte
+│     backend completa no CI e `backend-full-suite` obrigatório no PR #313.
+│     Baseline final registrada: 316 passed, 0 failed, 112 warnings.
+│     Os percentuais antigos de Banco/RLS, Testes/CI e Segurança eram
+│     estimativas da auditoria de 2026-09-24 e não foram recalculados.
+│     /ready, rate limiting e demais itens fora de OPS-005 não são
+│     declarados resolvidos por esta reconciliação.
 │
 ├── ✅ Fluxo executivo (análise → resumo → relatório → PDF)
 │     estimativa: ~85% — quase todos os itens [x] na seção 6 da matriz
@@ -327,9 +319,9 @@ IA Trabalhista Robusta / [nomenclatura oficial pendente]
 │     concluída e posteriormente integrada a main via PR #305.
 │     Este número mede apenas o progresso da implantação documental da
 │     governança — não percentual de conclusão técnica do produto.
-│     P-007 resolvida (OPS-003); P-002 resolvida só como prioridade
-│     (OPS-004); A1 (ARCH-001) / B2 (ARCH-002) decididas, não
-│     implementadas; execução 1A → 2 → 1B decidida (OPS-005).
+│     P-007 resolvida (OPS-003); P-002 definiu a prioridade em OPS-004;
+│     A1 (ARCH-001) / B2 (ARCH-002) foram executadas dentro da sequência
+│     1A → 2 → 1B de OPS-005, concluída pelos PRs #311, #312 e #313.
 │
 ├── ⏳ LGPD formal (retenção/descarte/exportação/exclusão)
 │     auto-declarado parcial pelo próprio docs/LGPD_MINIMA.md
