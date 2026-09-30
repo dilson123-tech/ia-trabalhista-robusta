@@ -10,130 +10,84 @@ autorização humana explícita quando exigida.
 
 ## B. Tarefa operacional corrente
 
-**Sequência obrigatória, nesta ordem:**
+**Tarefa corrente:** concluir a reconciliação documental do fechamento de
+`OPS-005`, preservando a distinção entre histórico, estado comprovado e
+trabalho futuro. Esta edição documental não autoriza nova implementação,
+Git de escrita, Production ou integração externa.
 
-1. **Revisar e fechar este registro documental de `OPS-005`** (modelo de
-   execução 1A → 2 → 1B em `DECISIONS.md`, `PROJECT_STATE.md`,
-   `NEXT_STEP.md` e `ROADMAP.md`), mediante revisão humana
-   (DICO/ChatGPT). Staging, commit, push e PR deste registro exigem
-   autorização humana específica para cada ato.
-2. **Somente depois**, e mediante nova autorização humana específica para
-   cada ato, executar os blocos **na ordem de `OPS-005`**:
-   **BLOCO 1A → BLOCO 2 → BLOCO 1B** (detalhes abaixo). Concluir um bloco
-   não autoriza iniciar o seguinte por inferência.
+A sequência técnica obrigatória definida por `OPS-005` foi executada e
+concluída, nesta ordem:
 
-O adendo documental A1/B2 foi integrado a `main` via PR #309. A
-preparação do BLOCO 1 (relatório somente leitura) foi entregue e, com
-base nela, o responsável humano decidiu o modelo de execução registrado
-como `OPS-005`.
+- **BLOCO 1A:** PR #311,
+  `c75d2e6c9a503bb1db7b76a690097b355bab7fa2` — infraestrutura de testes
+  backend tornada hermética, com PostgreSQL de teste isolado, configuração
+  de pytest e suporte específico aos testes PostgreSQL;
+- **BLOCO 2:** PR #312,
+  `29f7bd45b729766417781a80d7dfff56ddb3aa49` — RLS PostgreSQL tenant real
+  e versionado, com migration, integração de tenant/session, segurança e
+  testes associados;
+- **BLOCO 1B:** PR #313,
+  `1e7a686c602621ab5eaa86fdc9aaf3edd99e7833` — suíte backend completa
+  incorporada ao CI, com `backend-full-suite` como status check obrigatório.
+  Baseline final registrada: `316 passed, 0 failed`, `112 warnings`.
 
-As decisões humanas **A** e **B** de `OPS-004` foram tomadas em
-2026-09-25 (DICO/ChatGPT) e registradas em `DECISIONS.md`:
+As decisões humanas **A = A1 (`ARCH-001`)** e **B = B2 (`ARCH-002`)**
+permanecem registradas em `DECISIONS.md`. O fechamento técnico acima não
+reescreve nem substitui essas decisões.
 
-- **A = A1 (`ARCH-001`)** — implementar RLS PostgreSQL real e versionado,
-  mantendo o isolamento multi-tenant em nível de aplicação
-  (`scoped_query`) como camada adicional. Requisitos da implementação
-  futura: policies versionadas por migration; role de aplicação
-  compatível com `ARCH-001` — não superusuária, sem `BYPASSRLS`, com
-  ownership/`FORCE ROW LEVEL SECURITY` tratado explicitamente; isolamento
-  testado em PostgreSQL real; cobertura em CI. **RLS não implementado.**
-- **B = B2 (`ARCH-002`)** — `limits_for(plan_type)` é a fonte oficial da
-  verdade para limites de plano e enforcement. `Subscription.case_limit`
-  é campo legado/informativo (não é enforcement, não é override
-  contratual, não é fonte oficial do limite admin); a coluna **não** é
-  removida (remoção/deprecação futura exige análise separada).
-  `test_admin_tenant_usage_full_returns_consolidated_view` deverá ser
-  reconciliado com B2, sem `50` hardcoded e sem depender do `.env` local.
-  **Nada foi alterado em código ou testes.**
+O problema de contrato registrado em `ARCH-002` continua fora desse
+fechamento: `cases_per_month` é alias legado de `active_cases_limit`, enquanto
+`remaining.cases` é calculado contra `cases_created`. A semântica de
+`remaining.cases` / `cases_per_month` permanece **congelada** e exige decisão
+humana própria futura antes de qualquer alteração.
 
-Problema técnico registrado (achado em `ARCH-002`, **sem solução
-decidida**): `cases_per_month` é alias legado de `active_cases_limit`, mas
-`remaining.cases` é calculado contra o contador mensal `cases_created`,
-misturando limite de casos **ATIVOS** com casos **CRIADOS NO MÊS**. Por
-`OPS-005`, `remaining.cases` / `cases_per_month` ficam **congelados** na
-frente 1A → 2 → 1B e exigem decisão humana própria futura antes de
-qualquer mudança de contrato.
+`P-007` permanece resolvida (`OPS-003`). `P-002` foi resolvida em `OPS-004`
+como prioridade e sua sequência técnica subsequente `OPS-005` foi concluída
+pelos PRs #311, #312 e #313.
 
-`P-007` foi resolvida (`OPS-003`): código/produto integrado a `main` via
-PR #306; fechamento documental integrado a `main` via PR #307.
-`P-002` foi resolvida em `OPS-004` **apenas como prioridade**: restaurar
-uma baseline confiável de testes e isolamento multi-tenant antes de novas
-features; a reconciliação documental correspondente foi integrada a `main`
-via PR #308. A solução técnica das duas falhas conhecidas
-(`test_admin_tenant_usage_full_returns_consolidated_view` e
-`test_rls_isolation`) agora tem direção decidida (B2 e A1,
-respectivamente), mas **não foi implementada**.
+### Sequência de blocos aprovada — estado reconciliado
 
-### Sequência de blocos aprovada (planejamento, não autorização)
+- **BLOCO 0** — governança/documentação anterior integrada.
+- **BLOCO 1A** (`OPS-005`) — **CONCLUÍDO**, PR #311.
+- **BLOCO 2** (`OPS-005`/`ARCH-001`) — **CONCLUÍDO**, PR #312.
+- **BLOCO 1B** (`OPS-005`) — **CONCLUÍDO**, PR #313.
+- **BLOCO 3** — segurança/LGPD — planejamento existente; **não autorizado
+  automaticamente** por este documento.
+- **BLOCO 4** — billing/Asaas — planejamento existente; **não autorizado
+  automaticamente** por este documento.
+- **BLOCO 5** — frontend faltante — planejamento existente; **não autorizado
+  automaticamente** por este documento.
+- **BLOCO 6** — gate de release — planejamento existente; **não autorizado
+  automaticamente** por este documento.
 
-- **BLOCO 0** — governança/documentação coerente (integrado via PR #308;
-  A1/B2 integrados via PR #309; este registro documenta `OPS-005`).
-- **BLOCO 1A** (`OPS-005`) — hermeticidade/configuração de testes:
-  PostgreSQL **16** efêmero; migrations no banco de teste; eliminar
-  dependência do `.env` real e do PostgreSQL de desenvolvimento;
-  reconciliar `test_admin_tenant_usage_full_returns_consolidated_view`
-  com B2; adaptar a infraestrutura de `test_rls_isolation` ao PostgreSQL
-  efêmero **preservando seu assert** (ele continuará dependendo do
-  BLOCO 2 para ficar verde); nenhum `skip`/`xfail`/assert enfraquecido;
-  `remaining.cases` inalterado. **Sem** job de suíte completa no CI
-  neste bloco (nem mesmo não-required e propositalmente vermelho).
-  Tentar primeiro bootstrap precoce pelo `conftest.py`; `settings.py`
-  só recebe hook mínimo de teste se objetivamente necessário, sem alterar
-  defaults/comportamento de produção.
-- **BLOCO 2** (`OPS-005`/`ARCH-001`) — RLS real e versionado; role de
-  aplicação não superusuária, sem `BYPASSRLS`; ownership/`FORCE ROW LEVEL
-  SECURITY` tratado; isolamento em PostgreSQL real; `test_rls_isolation`
-  verde.
-- **BLOCO 1B** (`OPS-005`) — somente após o BLOCO 2: suíte completa do
-  backend no CI, obrigatória e verde; baseline final executada e
-  registrada. **Nenhum BLOCO 1 é declarado concluído antes do 1B.**
-- **BLOCO 3** — segurança/LGPD.
-- **BLOCO 4** — billing/Asaas.
-- **BLOCO 5** — frontend faltante.
-- **BLOCO 6** — gate de release.
+A versão 16 do PostgreSQL usada nos testes não afirma a versão de Production.
+Production permanece **NÃO VERIFICADA** neste checkpoint.
 
-A versão 16 do PostgreSQL de testes segue o `docker-compose.yml`
-versionado e **não** afirma a versão de Production (não verificada).
-
-**Nenhum bloco técnico (1A, 2, 1B, 3 a 6) está autorizado para
-implementação por esta edição.** O foco atual é a revisão humana deste
-registro de `OPS-005`.
-Nenhuma branch técnica foi criada ou autorizada. O nome
-`fix/ci-plan-limit-test-and-rls-role-isolation-v1`, proposto
-anteriormente, foi superado pela auditoria-mestra, nunca foi criado e não
-constitui frente autorizada.
+**PRÓXIMO PASSO:** concluir esta reconciliação documental. Depois disso,
+qualquer nova frente técnica exige auditoria/proposta e autorização humana
+específica; a conclusão de `OPS-005` não autoriza automaticamente BLOCO 3
+nem qualquer outro bloco.
 
 Nenhuma ação de Git de escrita, Production ou integração externa é
 autorizada automaticamente por este estado.
 
-**PRÓXIMO PASSO: REVISAR/FECHAR O REGISTRO DOCUMENTAL DE `OPS-005` →
-SOMENTE COM NOVA AUTORIZAÇÃO ESPECÍFICA, INICIAR O BLOCO 1A (DEPOIS
-BLOCO 2, DEPOIS BLOCO 1B).**
-
 ## C. Estado atual do repositório
 
-- Repositório principal: `/home/dilsondev/projetos/ia_trabalhista_robusta`,
-  branch `main`, observada em 2026-09-25 em
-  `ba169bcaadb9836dd9763f96ba818a7544d37ea8` (commit
-  `docs(governance): record A1 and B2 decisions (#309)`), igual a
-  `origin/main` local, working tree limpo antes desta edição — valor
-  observado, a reverificar via Git em cada sessão (ver `PROJECT_STATE.md`,
-  Seção B).
-- Os 7 arquivos de governança estão commitados e integrados em `main`
-  (PR #305); o fechamento de `P-007` (PR #306, produto) e seu registro
-  documental (PR #307, `DECISIONS.md`) também estão integrados em `main`;
-  a reconciliação de `P-002` com a auditoria-mestra foi integrada em
-  `main` via PR #308; o registro das decisões A1/B2 (`ARCH-001`/
-  `ARCH-002`) foi integrado em `main` via PR #309.
-- O worktree de governança temporário e a branch
-  `docs/close-p007-decision-v1` foram removidos após comprovação de
-  equivalência material de conteúdo.
-- Nenhuma branch técnica para `P-002`/BLOCO 1A/BLOCO 2/BLOCO 1B foi
-  criada.
-- Esta atualização documental (registro de `OPS-005`) está sendo feita
-  diretamente no working tree de `main`, com alterações locais não
-  commitadas em `DECISIONS.md`, `PROJECT_STATE.md`, `NEXT_STEP.md` e
-  `ROADMAP.md`; sem staging, commit ou push.
+- Repositório principal: `/home/dilsondev/projetos/ia_trabalhista_robusta`.
+- Em 2026-09-29, antes da criação desta branch documental, `main` local e
+  `origin/main` foram comprovados sincronizados em
+  `1e7a686c602621ab5eaa86fdc9aaf3edd99e7833` (PR #313).
+- A reconciliação documental corrente ocorre na branch
+  `docs/reconcile-ops005-completion-v1`.
+- A sequência técnica `OPS-005` está integrada a `main`: BLOCO 1A via
+  PR #311 (`c75d2e6c9a503bb1db7b76a690097b355bab7fa2`), BLOCO 2 via
+  PR #312 (`29f7bd45b729766417781a80d7dfff56ddb3aa49`) e BLOCO 1B via
+  PR #313 (`1e7a686c602621ab5eaa86fdc9aaf3edd99e7833`).
+- Nesta reconciliação estão autorizadas somente alterações documentais em
+  `PROJECT_STATE.md`, `NEXT_STEP.md` e `ROADMAP.md`. `DECISIONS.md`
+  permanece inalterado.
+- Até este checkpoint documental, não há autorização automática para
+  staging, commit, push, PR, merge, deploy ou qualquer ação em Production.
 
 ## D. Escopo permitido no estado de espera
 
@@ -201,25 +155,26 @@ e o worktree temporário de governança foi removido.
 O princípio continua válido: conclusão documental nunca autoriza, por si só,
 uma nova tarefa técnica.
 
-No estado atual, a sequência vigente é a definida na Seção B:
+No estado atual, a sequência `OPS-005` — BLOCO 1A → BLOCO 2 → BLOCO 1B —
+já foi concluída e integrada pelos PRs #311, #312 e #313. A tarefa vigente é
+concluir a reconciliação documental desse fechamento. Qualquer nova frente
+técnica posterior depende de auditoria/proposta e autorização humana
+específica; nenhuma é iniciada automaticamente.
 
-1. revisar/fechar o registro documental de `OPS-005`;
-2. somente depois, mediante nova autorização específica para cada ato,
-   executar BLOCO 1A → BLOCO 2 → BLOCO 1B, nessa ordem.
+## H. Pendências humanas após o fechamento técnico de OPS-005
 
-## H. Pendências humanas relacionadas ao início da implementação
+`P-007` permanece resolvida (`OPS-003`). `P-002` foi decidida como prioridade
+em `OPS-004`; A1 (`ARCH-001`) e B2 (`ARCH-002`) foram decididas por humano em
+2026-09-25. A sequência técnica subsequente 1A → 2 → 1B, registrada em
+`OPS-005`, foi concluída pelos PRs #311, #312 e #313.
 
-`P-007` (destino da frente local anterior) foi decidida (`OPS-003`).
-`P-002` foi decidida apenas como prioridade (`OPS-004`). As decisões
-técnicas **A** (modelo de isolamento) e **B** (semântica do limite admin)
-foram decididas por humano em 2026-09-25: **A1** (`ARCH-001`) e **B2**
-(`ARCH-002`). O modelo de execução 1A → 2 → 1B foi decidido por humano
-em 2026-09-25 e registrado como `OPS-005`. Essas decisões **não**
-autorizam, por si só, a implementação de nenhum bloco. O defeito de
-`remaining.cases` registrado em `ARCH-002` não tem solução decidida e
-fica congelado nesta frente (`OPS-005`). As demais pendências seguem abertas e não são
-resolvidas nem antecipadas por este documento: `P-001`, `P-003` a `P-006`,
-`P-008` a `P-010`.
+Essa conclusão não resolve automaticamente as demais decisões pendentes.
+O defeito de `remaining.cases` registrado em `ARCH-002` continua sem solução
+decidida e sua semântica permanece congelada. Também permanecem abertas
+`P-001`, `P-003` a `P-006` e `P-008` a `P-010`, conforme `DECISIONS.md`.
+
+Nenhuma dessas pendências constitui autorização automática para iniciar uma
+nova implementação.
 
 ## I. Evidência necessária para qualquer futura declaração de conclusão
 
@@ -235,18 +190,18 @@ resolvidas nem antecipadas por este documento: `P-001`, `P-003` a `P-006`,
 
 ## J. Status operacional
 
-- Tarefa em foco: **revisar/fechar a atualização documental que registra
-  `OPS-005` (modelo 1A → 2 → 1B).**
-- `P-007` resolvida e integrada em `main`; `P-002` resolvida apenas como
-  prioridade (`OPS-004`); A decidida como A1 (`ARCH-001`) e B decidida
-  como B2 (`ARCH-002`), integradas via PR #309 — nenhuma das duas
-  implementada; modelo de execução decidido (`OPS-005`) — não iniciado.
-- Último resultado conhecido da suíte global do backend: `304 passed,
-  2 failed` em 306 testes (registrado em `OPS-003`; não reexecutado).
-  Production: **NÃO VERIFICADA**.
-- **BLOCOS 1A, 2 E 1B NÃO IMPLEMENTADOS E NÃO AUTORIZADOS PARA
-  IMPLEMENTAÇÃO — AGUARDANDO REVISÃO DESTA ATUALIZAÇÃO DOCUMENTAL E NOVA
-  AUTORIZAÇÃO HUMANA ESPECÍFICA** para criar branch técnica, alterar
-  testes/código/banco/CI, criar migration ou executar testes.
-- Este documento, por si só, não autoriza nenhuma ação de Git de escrita,
-  Production ou integração externa.
+- Tarefa em foco: **concluir a reconciliação documental do fechamento de
+  `OPS-005`**.
+- A sequência **BLOCO 1A → BLOCO 2 → BLOCO 1B** foi concluída e integrada:
+  PR #311 → PR #312 → PR #313.
+- Baseline final registrada do backend: **`316 passed, 0 failed`,
+  `112 warnings`**.
+- `backend-full-suite` está incorporado ao CI e foi configurado como status
+  check obrigatório.
+- `remaining.cases` / `cases_per_month` permanecem fora do fechamento de
+  `OPS-005`, congelados e dependentes de decisão humana futura.
+- Production permanece **NÃO VERIFICADA** neste checkpoint.
+- Nenhum BLOCO 3–6 nem qualquer outra nova frente técnica é autorizado
+  automaticamente pela conclusão de `OPS-005` ou por este documento.
+- Este documento, por si só, não autoriza staging, commit, push, PR, merge,
+  deploy, ação em Production ou integração externa.

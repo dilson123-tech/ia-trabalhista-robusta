@@ -53,66 +53,42 @@ Painel-resumo permanente deste checkpoint. Os valores abaixo são
 autorizado; não substituem a verificação direta do Git (Seção B) nem
 `DECISIONS.md`/`NEXT_STEP.md`.
 
-- **Último checkpoint Git observado (2026-09-25):** `main` local igual a
-  `origin/main` local em `ba169bcaadb9836dd9763f96ba818a7544d37ea8`
-  (PR #309 — registro das decisões A1/B2, adendo integrado), working tree
-  limpo antes desta edição, após `fetch` e `pull --ff-only` que confirmaram
-  `main` local igual a `origin/main`;
-  esta atualização documental (registro de `OPS-005`) foi feita no
-  working tree de `main`, com alterações locais não commitadas nos 4
-  documentos (`DECISIONS.md`, `PROJECT_STATE.md`, `NEXT_STEP.md`,
-  `ROADMAP.md`).
-- **Estado geral estimado — ESTIMATIVAS qualitativas da auditoria-mestra,
-  NÃO métricas formais:**
-
-  | Área | Estimativa |
-  |---|---|
-  | Geral | ~65% |
-  | Governança | ~80% |
-  | Backend | ~80% |
-  | Frontend | ~60% |
-  | Banco/RLS | ~40% |
-  | Segurança | ~55% |
-  | IA jurídica | ~65% |
-  | Billing | ~60% |
-  | LGPD | ~35% |
-  | Testes/CI | ~50% |
-  | Release | ~40% |
-  | Production | **NÃO VERIFICADA** |
-
-- **Pronto (implementado no código, conforme auditoria de leitura):**
-  backend FastAPI `/api/v1` com JWT, RBAC, isolamento multi-tenant em nível
-  de aplicação (`scoped_query`) e auditoria; motores jurídicos, editor e
-  fluxo executivo com testes associados; billing com checkout/webhook
-  Asaas no código; frontend React com os principais fluxos; governança
-  persistente (7 arquivos) em `main`.
-- **Faltando:** RLS PostgreSQL versionado (decidido em `ARCH-001` — A1 —,
-  **não implementado**: policies por migration, role de aplicação não
-  superusuária e sem `BYPASSRLS`, tratamento explícito de ownership/
-  `FORCE ROW LEVEL SECURITY`, teste em PostgreSQL real e CI); reconciliação do teste de
-  uso administrativo com B2 (`ARCH-002`); correção da semântica de
-  `remaining.cases` (defeito registrado, sem solução decidida, congelado
-  na frente 1A → 2 → 1B por `OPS-005`); suíte hermética (BLOCO 1A) e
-  suíte completa em CI (BLOCO 1B, somente após o RLS do BLOCO 2); rate
-  limiting; políticas LGPD formais (retenção/descarte); painéis de frontend
-  ainda só visuais (Recursos e Sucessão); gate de release formal.
-- **Bloqueios:** nenhuma decisão humana A/B pendente (A1 em `ARCH-001`,
-  B2 em `ARCH-002`; modelo de execução 1A → 2 → 1B em `OPS-005`); cada
-  bloco (1A, 2, 1B) depende de nova autorização humana específica para
-  implementação; as 2 falhas conhecidas da suíte global
-  têm direção decidida (A1/B2), mas **não estão corrigidas**; o defeito de
-  `remaining.cases` não tem solução decidida.
-- **Último resultado de testes conhecido:** suíte global `304 passed,
-  2 failed` em 306 testes; regressão direcionada `108 passed, 0 failed`
-  (ambos registrados em `OPS-003`/Seção D; **não reexecutados** na
-  auditoria-mestra).
-- **Próximo passo:** revisão humana deste registro documental de
-  `OPS-005` → somente com nova autorização específica, BLOCO 1A → BLOCO 2
-  → BLOCO 1B, nessa ordem (ver `NEXT_STEP.md`). Nenhum BLOCO 1 é
-  declarado concluído antes do 1B.
+- **Último checkpoint Git observado (2026-09-29):** antes da criação desta
+  branch documental, `main` local e `origin/main` estavam sincronizados em
+  `1e7a686c602621ab5eaa86fdc9aaf3edd99e7833` (PR #313). A reconciliação
+  documental corrente ocorre na branch
+  `docs/reconcile-ops005-completion-v1`.
+- **OPS-005 — sequência obrigatória concluída com evidência no Git:**
+  - **BLOCO 1A:** PR #311,
+    `c75d2e6c9a503bb1db7b76a690097b355bab7fa2` — infraestrutura de testes
+    backend tornada hermética, incluindo PostgreSQL de teste, configuração
+    de pytest e suporte específico aos testes PostgreSQL;
+  - **BLOCO 2:** PR #312,
+    `29f7bd45b729766417781a80d7dfff56ddb3aa49` — RLS PostgreSQL tenant
+    implementado/versionado, com migration, integração de tenant/session,
+    segurança e testes associados;
+  - **BLOCO 1B:** PR #313,
+    `1e7a686c602621ab5eaa86fdc9aaf3edd99e7833` — suíte backend completa
+    incorporada ao CI; `backend-full-suite` tornou-se status check
+    obrigatório.
+- **Baseline final registrado do BLOCO 1B:** `316 passed, 0 failed`,
+  `112 warnings`.
+- **Estado atual comprovado nesta frente:** infraestrutura hermética de
+  testes, RLS PostgreSQL tenant e suíte backend completa no CI estão
+  concluídos. As estimativas percentuais da auditoria-mestra anterior são
+  históricas e **não são recalculadas automaticamente por este checkpoint**.
+- **Continuam fora do fechamento de OPS-005:** semântica de
+  `remaining.cases`/`cases_per_month` (congelada, dependente de decisão
+  humana futura), rate limiting, políticas LGPD formais, pendências de
+  frontend, gate formal de release e demais decisões abertas.
+- **Production:** **NÃO VERIFICADA** neste checkpoint e não foi tocada pela
+  reconciliação documental.
+- **Próximo passo:** concluir esta reconciliação documental. Qualquer nova
+  frente técnica depende de auditoria/proposta e autorização humana
+  específica; a conclusão de OPS-005 não autoriza automaticamente o próximo
+  bloco.
 - **Decisões humanas abertas:** `P-001`, `P-003`, `P-004`, `P-005`,
-  `P-006`, `P-008`, `P-009`, `P-010`. (A e B de `OPS-004` decididas em
-  2026-09-25: `ARCH-001`/`ARCH-002`.)
+  `P-006`, `P-008`, `P-009`, `P-010`.
 
 ## B. Git / baseline histórico do checkpoint inicial
 
@@ -190,6 +166,20 @@ resolução estão registrados em `DECISIONS.md`, `OPS-003`. `main` local e
   raiz do repositório; `test_rls_isolation` usa o PostgreSQL local real e
   grava dados); o CI possui 4 jobs e **não executa a suíte completa do
   backend**.
+- **Atualização (checkpoint 2026-09-29 — BLOCO 1A):** a infraestrutura de
+  testes backend foi tornada hermética no PR #311,
+  `c75d2e6c9a503bb1db7b76a690097b355bab7fa2`, incluindo configuração de
+  pytest, PostgreSQL de teste isolado, `conftest.py`, suporte específico a
+  PostgreSQL e reconciliação dos testes envolvidos. Este checkpoint
+  substitui, para o estado atual, a limitação de não hermeticidade observada
+  em 2026-09-24; o registro histórico acima permanece preservado.
+- **Atualização (checkpoint 2026-09-29 — BLOCO 2):** RLS PostgreSQL tenant
+  real e versionado foi implementado no PR #312,
+  `29f7bd45b729766417781a80d7dfff56ddb3aa49`, incluindo migration,
+  integração de tenant/session, segurança e testes associados. Este
+  checkpoint substitui, para o estado atual do código, a ausência de RLS
+  versionado observada em 2026-09-24. Nenhuma afirmação sobre o estado ao
+  vivo de Production decorre deste registro.
 - **Atualização (checkpoint 2026-09-29 — BLOCO 1B):** a baseline completa do
   backend foi reexecutada em ambiente de teste isolado com PostgreSQL 16
   efêmero, resultando em `316 passed, 0 failed` (`112 warnings`). O PR #313,
@@ -217,6 +207,12 @@ efetivamente lido:
   existe em `backend/app/core/tenant.py`, mas nada versionado o consome.
   RLS consta como prometido/documentado, **não comprovado no Git**; o estado
   do banco local e de Production não foi verificado.
+  **Atualização de 2026-09-29:** essa conclusão permanece como registro
+  histórico da auditoria de 2026-09-24, mas foi superada para o estado
+  corrente do código pelo BLOCO 2 de `OPS-005`: o PR #312
+  (`29f7bd45b729766417781a80d7dfff56ddb3aa49`) implementou/versionou RLS
+  PostgreSQL tenant com migration e testes associados. Esta atualização
+  não comprova nem afirma o estado ao vivo de Production.
 - Frontend React 19 + Vite 8.
 - Módulo de copiloto de edição assistida concentrado em
   `backend/app/services/case_operational_assistant.py` (arquivo extenso,
@@ -273,6 +269,11 @@ auditoria:
 - **Achados da auditoria-mestra (2026-09-24), somente leitura:**
   - RLS prometido/documentado, mas não versionado (ver Seção E).
   - Suíte completa do backend fora do CI; testes não herméticos (Seção D).
+  - **Atualização de 2026-09-29:** os dois achados anteriores sobre RLS e
+    infraestrutura de testes/CI permanecem como histórico da auditoria de
+    2026-09-24, mas foram superados pelos BLOCOs 1A, 2 e 1B de `OPS-005`
+    (PRs #311, #312 e #313). Os demais achados desta lista não são
+    declarados resolvidos por essa sequência.
   - Nenhum rate limiting encontrado no HEAD auditado.
   - Dump local de banco (`ia_trabalhista_before_case_cleanup_2026-04-14.dump`)
     e arquivos em `backend/storage` presentes localmente — exigem decisão
@@ -320,8 +321,9 @@ checkpoint, `P-001`, `P-003` a `P-006` e `P-008` a `P-010` permanecem
 pendentes; `P-007` foi resolvida (`OPS-003`) e `P-002` foi resolvida
 **apenas como prioridade** (`OPS-004`); as decisões técnicas A e B de
 `OPS-004` foram tomadas por humano em 2026-09-25 (A1 em `ARCH-001`, B2 em
-`ARCH-002`), sem implementação. `PROJECT_STATE.md` não resolve, renumera nem substitui
-essas decisões; para o estado normativo corrente e completo, consultar
+`ARCH-002`). A sequência técnica subsequente `OPS-005`
+(BLOCO 1A → BLOCO 2 → BLOCO 1B) foi concluída pelos PRs #311, #312 e #313.
+`PROJECT_STATE.md` não resolve, renumera nem substitui essas decisões; para o estado normativo corrente e completo, consultar
 diretamente `DECISIONS.md`.
 
 Síntese temática (apenas resumo — `DECISIONS.md` é a fonte normativa):
@@ -331,8 +333,10 @@ Síntese temática (apenas resumo — `DECISIONS.md` é a fonte normativa):
   `OPS-004` apenas como prioridade: baseline confiável de testes e
   isolamento multi-tenant antes de novas features; decisões A — modelo de
   isolamento — e B — semântica do limite admin — tomadas em 2026-09-25:
-  A1 (`ARCH-001`) e B2 (`ARCH-002`); nenhuma branch técnica criada ou
-  autorizada; nada implementado)
+  A1 (`ARCH-001`) e B2 (`ARCH-002`); sequência técnica `OPS-005`
+  posteriormente concluída nos PRs #311, #312 e #313; a semântica de
+  `remaining.cases`/`cases_per_month` permanece fora desse fechamento e
+  dependente de decisão humana futura)
 - Eventual refatoração de `case_operational_assistant.py`. (`P-003`,
   pendente)
 - Fechamento formal do gate de release. (`P-004`, pendente)
