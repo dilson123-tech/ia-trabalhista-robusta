@@ -5457,13 +5457,29 @@ def create_editable_document_version(
                 .first()
             )
 
+        latest_version = None
+        if latest_version_number is not None:
+            latest_version = (
+                db.query(EditableDocumentVersion)
+                .filter(
+                    EditableDocumentVersion.editable_document_id == document.id,
+                    EditableDocumentVersion.tenant_id == current_user["tenant_id"],
+                    EditableDocumentVersion.version_number == latest_version_number,
+                )
+                .first()
+            )
+
         payload_has_assisted_origin = any(
             _section_has_assisted_origin(section) for section in payload_sections
         )
 
         if (
             not _is_audiencia_estrategica_document_type(document.document_type)
-            and (payload_has_assisted_origin or _version_has_assisted_origin(base_version))
+            and (
+                payload_has_assisted_origin
+                or _version_has_assisted_origin(base_version)
+                or _version_has_assisted_origin(latest_version)
+            )
         ):
             raise HTTPException(
                 status_code=409,
