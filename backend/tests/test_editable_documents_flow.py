@@ -818,3 +818,259 @@ def test_normal_assisted_draft_does_not_call_case_analysis(monkeypatch):
         "case_operational_assistant_editor_all_blocks_ready"
     ]
     assert latest_version["approved"] is False
+
+
+def _create_document_with_assisted_draft(headers):
+    r_case = client.post(
+        "/api/v1/cases",
+        json={
+            "case_number": f"F1-{uuid.uuid4().hex[:8]}",
+            "title": "Cobrança contratual — reprodução F1",
+            "description": "Caso sintético para reprodução do gate de aprovação assistida.",
+            "legal_area": "civel",
+            "action_type": "Petição Inicial",
+            "status": "draft",
+        },
+        headers=headers,
+    )
+    assert r_case.status_code == 200
+
+    r_document = client.post(
+        "/api/v1/editable-documents",
+        json={
+            "case_id": r_case.json()["id"],
+            "area": "civel",
+            "document_type": "peticao_inicial",
+            "title": "Petição Inicial — reprodução F1",
+            "metadata": {},
+            "sections": [
+                {
+                    "key": "resumo_fatico",
+                    "title": "Resumo Fático",
+                    "content": "",
+                    "source": "manual",
+                    "status": "draft",
+                    "metadata": {},
+                }
+            ],
+        },
+        headers=headers,
+    )
+    assert r_document.status_code == 200
+    document_id = r_document.json()["id"]
+
+    r_generate = client.post(
+        f"/api/v1/editable-documents/{document_id}/generate-assisted-draft",
+        headers=headers,
+    )
+    assert r_generate.status_code == 200
+
+    assisted_version = max(
+        r_generate.json()["versions"],
+        key=lambda item: item["version_number"],
+    )
+    assert assisted_version["approved"] is False
+    assert assisted_version["version_metadata"]["source"] == "assisted_draft_from_analysis"
+    return document_id, assisted_version
+
+
+def _strip_assisted_markers(sections):
+    return [
+        {
+            "key": section["key"],
+            "title": section["title"],
+            "content": section.get("content") or "",
+            "source": "manual",
+            "status": "draft",
+            "metadata": {},
+        }
+        for section in sections
+    ]
+
+
+F1_GATE_DETAIL = (
+    "Assisted draft versions cannot be approved directly. "
+    "Create a reviewed draft version and approve only after manual coherence validation."
+)
+
+
+def test_f1_assisted_draft_with_markers_cannot_be_approved_directly(monkeypatch):
+    headers = _auth_headers(monkeypatch)
+    document_id, assisted_version = _create_document_with_assisted_draft(headers)
+
+    r_approve = client.post(
+        f"/api/v1/editable-documents/{document_id}/versions",
+        json={
+            "sections": assisted_version["sections"],
+            "metadata": {"based_on_version_number": assisted_version["version_number"]},
+            "approved": True,
+        },
+        headers=headers,
+    )
+
+    assert r_approve.status_code == 409
+    assert r_approve.json()["detail"] == F1_GATE_DETAIL
+
+
+def test_f1_assisted_content_without_markers_or_base_reference_cannot_be_approved(monkeypatch):
+    headers = _auth_headers(monkeypatch)
+    document_id, assisted_version = _create_document_with_assisted_draft(headers)
+
+    r_approve = client.post(
+        f"/api/v1/editable-documents/{document_id}/versions",
+        json={
+            "sections": _strip_assisted_markers(assisted_version["sections"]),
+            "metadata": {},
+            "approved": True,
+        },
+        headers=headers,
+    )
+
+    assert r_approve.status_code == 409, r_approve.json()
+    assert r_approve.json()["detail"] == F1_GATE_DETAIL
+
+
+def test_f1_assisted_content_with_manipulated_base_reference_cannot_be_approved(monkeypatch):
+    headers = _auth_headers(monkeypatch)
+    document_id, assisted_version = _create_document_with_assisted_draft(headers)
+
+    r_approve = client.post(
+        f"/api/v1/editable-documents/{document_id}/versions",
+        json={
+            "sections": _strip_assisted_markers(assisted_version["sections"]),
+            "metadata": {"based_on_version_number": 1},
+            "approved": True,
+        },
+        headers=headers,
+    )
+
+    assert r_approve.status_code == 409, r_approve.json()
+    assert r_approve.json()["detail"] == F1_GATE_DETAIL
+
+
+def test_f1_reviewed_draft_after_assisted_draft_can_be_approved(monkeypatch):
+    headers = _auth_headers(monkeypatch)
+    document_id, assisted_version = _create_document_with_assisted_draft(headers)
+    reviewed_sections = _strip_assisted_markers(assisted_version["sections"])
+
+    r_reviewed = client.post(
+        f"/api/v1/editable-documents/{document_id}/versions",
+        json={
+            "sections": reviewed_sections,
+            "notes": "Versão revisada manualmente após rascunho assistido.",
+            "metadata": {},
+            "approved": False,
+        },
+        headers=headers,
+    )
+
+    assert r_reviewed.status_code == 200, r_reviewed.json()
+    reviewed_version = r_reviewed.json()
+    assert reviewed_version["approved"] is False
+    assert reviewed_version["version_number"] == assisted_version["version_number"] + 1
+
+    r_approve = client.post(
+        f"/api/v1/editable-documents/{document_id}/versions",
+        json={
+            "sections": reviewed_sections,
+            "notes": "Aprovação da versão revisada.",
+            "metadata": {"based_on_version_number": reviewed_version["version_number"]},
+            "approved": True,
+        },
+        headers=headers,
+    )
+
+    assert r_approve.status_code == 200, r_approve.json()
+    assert r_approve.json()["approved"] is True
+
+
+def test_f1_assisted_draft_after_approved_manual_version_cannot_be_approved_directly(monkeypatch):
+    headers = _auth_headers(monkeypatch)
+    document_id, first_assisted_version = _create_document_with_assisted_draft(headers)
+    manual_sections = _strip_assisted_markers(first_assisted_version["sections"])
+
+    r_manual_draft = client.post(
+        f"/api/v1/editable-documents/{document_id}/versions",
+        json={"sections": manual_sections, "metadata": {}, "approved": False},
+        headers=headers,
+    )
+    assert r_manual_draft.status_code == 200, r_manual_draft.json()
+
+    r_manual_approved = client.post(
+        f"/api/v1/editable-documents/{document_id}/versions",
+        json={
+            "sections": manual_sections,
+            "metadata": {"based_on_version_number": r_manual_draft.json()["version_number"]},
+            "approved": True,
+        },
+        headers=headers,
+    )
+    assert r_manual_approved.status_code == 200, r_manual_approved.json()
+    approved_version_number = r_manual_approved.json()["version_number"]
+
+    r_generate = client.post(
+        f"/api/v1/editable-documents/{document_id}/generate-assisted-draft",
+        headers=headers,
+    )
+    assert r_generate.status_code == 200
+    new_assisted_version = max(
+        r_generate.json()["versions"],
+        key=lambda item: item["version_number"],
+    )
+    assert new_assisted_version["version_number"] > approved_version_number
+    assert new_assisted_version["approved"] is False
+
+    r_approve = client.post(
+        f"/api/v1/editable-documents/{document_id}/versions",
+        json={
+            "sections": _strip_assisted_markers(new_assisted_version["sections"]),
+            "metadata": {
+                "based_on_version_number": approved_version_number,
+                "source": "manual",
+                "generation_mode": "manual",
+            },
+            "approved": True,
+        },
+        headers=headers,
+    )
+
+    assert r_approve.status_code == 409, r_approve.json()
+    assert r_approve.json()["detail"] == F1_GATE_DETAIL
+
+
+def test_f1_assisted_content_with_nonexistent_base_reference_cannot_be_approved(monkeypatch):
+    headers = _auth_headers(monkeypatch)
+    document_id, assisted_version = _create_document_with_assisted_draft(headers)
+
+    r_approve = client.post(
+        f"/api/v1/editable-documents/{document_id}/versions",
+        json={
+            "sections": _strip_assisted_markers(assisted_version["sections"]),
+            "metadata": {"based_on_version_number": assisted_version["version_number"] + 999},
+            "approved": True,
+        },
+        headers=headers,
+    )
+
+    assert r_approve.status_code == 409, r_approve.json()
+    assert r_approve.json()["detail"] == F1_GATE_DETAIL
+
+
+def test_f1_assisted_content_with_non_numeric_base_reference_cannot_be_approved(monkeypatch):
+    # `metadata` is a free dict in the schema, so a non-numeric value reaches the
+    # route; it is coerced to None there and the gate still applies.
+    headers = _auth_headers(monkeypatch)
+    document_id, assisted_version = _create_document_with_assisted_draft(headers)
+
+    r_approve = client.post(
+        f"/api/v1/editable-documents/{document_id}/versions",
+        json={
+            "sections": _strip_assisted_markers(assisted_version["sections"]),
+            "metadata": {"based_on_version_number": "not-a-number"},
+            "approved": True,
+        },
+        headers=headers,
+    )
+
+    assert r_approve.status_code == 409, r_approve.json()
+    assert r_approve.json()["detail"] == F1_GATE_DETAIL
