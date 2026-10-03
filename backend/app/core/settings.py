@@ -74,6 +74,9 @@ def validate_production_settings() -> None:
     if not is_production_env():
         return
 
+    if not settings.AUTH_ENABLED:
+        raise RuntimeError("AUTH_ENABLED must be true in production-like env")
+
     if settings.DATABASE_URL == "postgresql+psycopg2://ia_app:ia_app_pass@127.0.0.1:55432/ia_trabalhista":
         raise RuntimeError("DATABASE_URL default local is not allowed when APP_ENV is production-like")
 
