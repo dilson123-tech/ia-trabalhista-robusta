@@ -977,7 +977,10 @@ def generate_case_report(
     return {"report_html": html}
 
 
-@router.get("/{case_id}/executive-summary")
+@router.get(
+    "/{case_id}/executive-summary",
+    dependencies=[Depends(require_role("admin", "advogado"))],
+)
 def get_executive_summary(
     case_id: int,
     db: Session = Depends(get_db),
@@ -1039,7 +1042,10 @@ def get_executive_summary(
         "analysis_foundations": foundations,
     }
 
-@router.get("/{case_id}/executive-report")
+@router.get(
+    "/{case_id}/executive-report",
+    dependencies=[Depends(require_role("admin", "advogado"))],
+)
 def get_executive_report(
     case_id: int,
     db: Session = Depends(get_db),

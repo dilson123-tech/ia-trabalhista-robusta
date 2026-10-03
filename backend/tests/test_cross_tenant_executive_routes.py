@@ -1,6 +1,8 @@
 import uuid
 from datetime import datetime, timezone
 
+import pytest
+
 from app.core.security import pwd_context
 from app.models.subscription import Subscription
 from app.models.tenant import Tenant
@@ -16,11 +18,11 @@ def create_tenant(db, name):
     return tenant
 
 
-def create_user(db, username, password):
+def create_user(db, username, password, role="admin"):
     user = User(
         username=username,
         password_hash=pwd_context.hash(password),
-        role="admin",
+        role=role,
         is_active=True,
     )
     db.add(user)
@@ -29,8 +31,8 @@ def create_user(db, username, password):
     return user
 
 
-def link_user_to_tenant(db, user_id, tenant_id):
-    db.add(TenantMember(user_id=user_id, tenant_id=tenant_id, role="admin"))
+def link_user_to_tenant(db, user_id, tenant_id, role="admin"):
+    db.add(TenantMember(user_id=user_id, tenant_id=tenant_id, role=role))
 
 
 def create_subscription(db, tenant_id):
@@ -103,3 +105,81 @@ def test_cross_tenant_access_blocked_on_executive_and_report_routes(client, db_s
     for route in routes:
         response = client.get(route, headers=headers_b)
         assert response.status_code == 404, f"{route} should be isolated across tenants"
+
+
+EXECUTIVE_ROUTES = ("executive-summary", "executive-report")
+
+
+def _setup_same_tenant_case_with_role_user(client, db_session, role):
+    tenant = create_tenant(db_session, f"TenantRole_{uuid.uuid4()}")
+    create_subscription(db_session, tenant.id)
+    db_session.commit()
+
+    password = "123456"
+    owner = create_user(db_session, f"owner_{uuid.uuid4()}@example.com", password)
+    member = create_user(
+        db_session, f"{role}_{uuid.uuid4()}@example.com", password, role=role
+    )
+    link_user_to_tenant(db_session, owner.id, tenant.id)
+    link_user_to_tenant(db_session, member.id, tenant.id, role=role)
+    db_session.commit()
+
+    headers_owner = {"Authorization": f"Bearer {login(client, owner.username, password)}"}
+    headers_member = {"Authorization": f"Bearer {login(client, member.username, password)}"}
+
+    create_case = client.post(
+        "/api/v1/cases",
+        json={
+            "case_number": f"R-{uuid.uuid4()}",
+            "title": "Caso mesmo tenant",
+            "description": "Desc",
+            "status": "draft",
+        },
+        headers=headers_owner,
+    )
+    assert create_case.status_code == 200
+    case_id = create_case.json()["id"]
+
+    analyze = client.get(f"/api/v1/cases/{case_id}/analysis", headers=headers_owner)
+    assert analyze.status_code == 200
+
+    return case_id, headers_member
+
+
+@pytest.mark.parametrize("role", ["leitura", "estagiario"])
+def test_same_tenant_non_professional_role_forbidden_on_executive_routes(
+    client, db_session, role
+):
+    case_id, headers = _setup_same_tenant_case_with_role_user(client, db_session, role)
+
+    for route in EXECUTIVE_ROUTES:
+        response = client.get(f"/api/v1/cases/{case_id}/{route}", headers=headers)
+        assert response.status_code == 403, f"{route} must reject role {role}"
+        assert response.json() == {"detail": "forbidden"}
+
+
+@pytest.mark.parametrize("role", ["admin", "advogado"])
+def test_same_tenant_professional_role_allowed_on_executive_routes(
+    client, db_session, role
+):
+    case_id, headers = _setup_same_tenant_case_with_role_user(client, db_session, role)
+
+    summary = client.get(f"/api/v1/cases/{case_id}/executive-summary", headers=headers)
+    assert summary.status_code == 200, f"executive-summary must allow role {role}"
+    assert summary.json()["case"]["id"] == case_id
+
+    report = client.get(f"/api/v1/cases/{case_id}/executive-report", headers=headers)
+    assert report.status_code == 200, f"executive-report must allow role {role}"
+    assert report.json()["case_id"] == case_id
+
+
+@pytest.mark.parametrize("role", ["leitura", "estagiario"])
+def test_non_professional_role_forbidden_on_missing_case_executive_routes(
+    client, db_session, role
+):
+    _, headers = _setup_same_tenant_case_with_role_user(client, db_session, role)
+
+    for route in EXECUTIVE_ROUTES:
+        response = client.get(f"/api/v1/cases/999999/{route}", headers=headers)
+        assert response.status_code == 403
+        assert response.json() == {"detail": "forbidden"}
