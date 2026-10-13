@@ -290,6 +290,11 @@ jobs:
           source ../.venv/bin/activate
           pip install -r requirements.txt
 
+      - name: Install ffmpeg (ffprobe for media attachment validation)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
       - name: Run full backend test suite
         run: |
           .venv/bin/python -m pytest backend/tests -q

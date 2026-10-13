@@ -13,10 +13,15 @@ from sqlalchemy.orm import Session
 
 from app.core.security import require_auth, require_role
 from app.core.settings import settings
-from app.core.tenant import scoped_query
+from app.core.tenant import scoped_query, set_tenant_on_session
 from app.db.session import get_db
 from app.models import Case, CaseAttachment
 from app.schemas.case_attachment import CaseAttachmentOut, CaseAttachmentUpdate
+from app.services.attachment_content_validation import (
+    AttachmentValidatorUnavailable,
+    UnsupportedAttachmentContent,
+    validate_attachment_content,
+)
 
 
 router = APIRouter(
@@ -36,6 +41,36 @@ _ALLOWED_CATEGORIES = {
     "testemunha",
     "outro",
 }
+
+
+MAX_DOCUMENT_IMAGE_UPLOAD_BYTES = 25 * 1024 * 1024
+MAX_MEDIA_UPLOAD_BYTES = 100 * 1024 * 1024
+
+_UPLOAD_CHUNK_BYTES = 1024 * 1024
+_UNDECLARED_CONTENT_TYPES = {"", "application/octet-stream"}
+_DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+
+# extensão final → (mime canônico persistido, content_types declarados aceitos, limite em bytes)
+_UPLOAD_FORMATS = {
+    ".pdf": ("application/pdf", {"application/pdf"}, MAX_DOCUMENT_IMAGE_UPLOAD_BYTES),
+    ".doc": ("application/msword", {"application/msword"}, MAX_DOCUMENT_IMAGE_UPLOAD_BYTES),
+    ".docx": (_DOCX_MIME, {_DOCX_MIME}, MAX_DOCUMENT_IMAGE_UPLOAD_BYTES),
+    ".txt": ("text/plain", {"text/plain"}, MAX_DOCUMENT_IMAGE_UPLOAD_BYTES),
+    ".jpg": ("image/jpeg", {"image/jpeg", "image/pjpeg"}, MAX_DOCUMENT_IMAGE_UPLOAD_BYTES),
+    ".jpeg": ("image/jpeg", {"image/jpeg", "image/pjpeg"}, MAX_DOCUMENT_IMAGE_UPLOAD_BYTES),
+    ".png": ("image/png", {"image/png"}, MAX_DOCUMENT_IMAGE_UPLOAD_BYTES),
+    ".webp": ("image/webp", {"image/webp"}, MAX_DOCUMENT_IMAGE_UPLOAD_BYTES),
+    ".mp3": ("audio/mpeg", {"audio/mpeg", "audio/mp3"}, MAX_MEDIA_UPLOAD_BYTES),
+    ".wav": ("audio/wav", {"audio/wav", "audio/x-wav", "audio/wave", "audio/vnd.wave"}, MAX_MEDIA_UPLOAD_BYTES),
+    ".m4a": ("audio/mp4", {"audio/mp4", "audio/x-m4a", "audio/m4a"}, MAX_MEDIA_UPLOAD_BYTES),
+    ".mp4": ("video/mp4", {"video/mp4", "application/mp4"}, MAX_MEDIA_UPLOAD_BYTES),
+    ".mov": ("video/quicktime", {"video/quicktime"}, MAX_MEDIA_UPLOAD_BYTES),
+    ".webm": ("video/webm", {"video/webm", "audio/webm"}, MAX_MEDIA_UPLOAD_BYTES),
+}
+
+
+def _unsupported_media(detail: str = "Unsupported attachment format") -> HTTPException:
+    return HTTPException(status_code=415, detail=detail)
 
 
 def _get_case_or_404(db: Session, current_user, case_id: int) -> Case:
@@ -94,6 +129,23 @@ def upload_case_attachment(
     db: Session = Depends(get_db),
     current_user=Depends(require_auth),
 ):
+    try:
+        return _store_case_attachment(
+            case_id, file, category, description, event_date, db, current_user
+        )
+    finally:
+        file.file.close()
+
+
+def _store_case_attachment(
+    case_id: int,
+    file: UploadFile,
+    category: str,
+    description: str | None,
+    event_date: date | None,
+    db: Session,
+    current_user,
+) -> CaseAttachment:
     case = _get_case_or_404(db, current_user, case_id)
 
     normalized_category = (category or "outro").strip().lower()
@@ -102,6 +154,18 @@ def upload_case_attachment(
 
     original_filename = _safe_filename(file.filename or "arquivo")
     suffix = Path(original_filename).suffix.lower()
+    upload_format = _UPLOAD_FORMATS.get(suffix)
+    if upload_format is None:
+        raise _unsupported_media()
+    canonical_mime, accepted_content_types, max_bytes = upload_format
+
+    declared_content_type = (file.content_type or "").split(";", 1)[0].strip().lower()
+    if (
+        declared_content_type not in _UNDECLARED_CONTENT_TYPES
+        and declared_content_type not in accepted_content_types
+    ):
+        raise _unsupported_media("Attachment content type does not match extension")
+
     stored_filename = f"{uuid.uuid4().hex}{suffix}"
 
     upload_dir = _case_upload_dir(current_user["tenant_id"], case.id)
@@ -113,32 +177,88 @@ def upload_case_attachment(
     try:
         with target_path.open("wb") as out:
             while True:
-                chunk = file.file.read(1024 * 1024)
+                chunk = file.file.read(_UPLOAD_CHUNK_BYTES)
                 if not chunk:
                     break
                 size += len(chunk)
+                if size > max_bytes:
+                    raise HTTPException(status_code=413, detail="Attachment exceeds size limit")
                 out.write(chunk)
-    finally:
-        file.file.close()
 
-    record = CaseAttachment(
-        tenant_id=current_user["tenant_id"],
-        case_id=case.id,
-        original_filename=original_filename,
-        stored_filename=stored_filename,
-        storage_path=str(target_path),
-        mime_type=file.content_type,
-        file_size_bytes=size,
-        category=normalized_category,
-        description=description,
-        event_date=event_date,
-    )
+        if size == 0:
+            raise HTTPException(status_code=422, detail="Empty attachment")
 
-    db.add(record)
-    db.commit()
-    db.refresh(record)
+        try:
+            validate_attachment_content(target_path, suffix)
+        except UnsupportedAttachmentContent as exc:
+            raise _unsupported_media(str(exc)) from exc
+        except AttachmentValidatorUnavailable as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+        record = CaseAttachment(
+            tenant_id=current_user["tenant_id"],
+            case_id=case.id,
+            original_filename=original_filename,
+            stored_filename=stored_filename,
+            storage_path=str(target_path),
+            mime_type=canonical_mime,
+            file_size_bytes=size,
+            category=normalized_category,
+            description=description,
+            event_date=event_date,
+        )
+
+        # flush/refresh antes do commit: nenhuma operação de banco após o commit
+        # (expire_on_commit=False), então qualquer falha até aqui limpa arquivo e transação.
+        db.add(record)
+        db.flush()
+        db.refresh(record)
+    except Exception:
+        target_path.unlink(missing_ok=True)
+        db.rollback()
+        raise
+
+    try:
+        db.commit()
+    except Exception:
+        # commit ambíguo: a exceção não prova que nada foi persistido (ex.: conexão
+        # perdida após o COMMIT chegar ao banco). Só remove o arquivo se uma nova
+        # sessão confirmar que o registro não existe; na dúvida, preserva o arquivo.
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        if _attachment_record_absent(db, current_user["tenant_id"], target_path):
+            target_path.unlink(missing_ok=True)
+        raise
 
     return record
+
+
+def _attachment_record_absent(db: Session, tenant_id: int, target_path: Path) -> bool:
+    """True somente se uma sessão nova confirmar a ausência do registro do arquivo."""
+    try:
+        reconcile = Session(bind=db.get_bind(), autoflush=False, expire_on_commit=False)
+    except Exception:
+        return False
+    try:
+        set_tenant_on_session(reconcile, tenant_id)
+        existing_id = (
+            reconcile.query(CaseAttachment.id)
+            .filter(
+                CaseAttachment.tenant_id == tenant_id,
+                CaseAttachment.storage_path == str(target_path),
+            )
+            .first()
+        )
+        return existing_id is None
+    except Exception:
+        return False
+    finally:
+        try:
+            reconcile.close()
+        except Exception:
+            pass
 
 
 @router.patch(

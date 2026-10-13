@@ -1,5 +1,8 @@
+import io
 import uuid
 from pathlib import Path
+
+from pypdf import PdfWriter
 
 from app.core.settings import settings
 
@@ -57,7 +60,11 @@ def test_case_attachments_authenticated_flow(client, monkeypatch, tmp_path):
     assert r_case.status_code == 200
     case_id = r_case.json()["id"]
 
-    pdf_bytes = b"%PDF-1.4\n% prova trabalhista fake\n%%EOF\n"
+    writer = PdfWriter()
+    writer.add_blank_page(width=72, height=72)
+    pdf_buffer = io.BytesIO()
+    writer.write(pdf_buffer)
+    pdf_bytes = pdf_buffer.getvalue()
 
     r_upload = client.post(
         f"/api/v1/cases/{case_id}/attachments",

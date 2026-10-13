@@ -1,7 +1,19 @@
+import io
 import uuid
+
+from pypdf import PdfWriter
 
 from app.core.settings import settings
 from app.api.v1.routes import cases as cases_routes
+
+
+def _real_pdf_bytes() -> bytes:
+    # PDF estruturalmente válido: o upload valida o conteúdo com pypdf (strict).
+    writer = PdfWriter()
+    writer.add_blank_page(width=72, height=72)
+    buffer = io.BytesIO()
+    writer.write(buffer)
+    return buffer.getvalue()
 
 
 def _auth_headers(client, monkeypatch):
@@ -100,7 +112,7 @@ def test_case_evidence_checklist_authenticated_flow(client, monkeypatch, tmp_pat
             "description": "Comprovante de residência recebido.",
             "event_date": "2026-06-02",
         },
-        files={"file": ("comprovante.pdf", b"%PDF-1.4\n%%EOF\n", "application/pdf")},
+        files={"file": ("comprovante.pdf", _real_pdf_bytes(), "application/pdf")},
     )
     assert r_upload.status_code == 200
     attachment_id = r_upload.json()["id"]
