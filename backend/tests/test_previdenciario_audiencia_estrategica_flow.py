@@ -1,8 +1,21 @@
+import io
 from fastapi.testclient import TestClient
 import uuid
 
+from pypdf import PdfWriter
+
 from app.main import app
 from app.core.settings import settings
+
+
+def _real_pdf_bytes() -> bytes:
+    # PDF estruturalmente válido: o upload valida o conteúdo com pypdf (strict).
+    writer = PdfWriter()
+    writer.add_blank_page(width=72, height=72)
+    buffer = io.BytesIO()
+    writer.write(buffer)
+    return buffer.getvalue()
+
 
 client = TestClient(app)
 
@@ -149,7 +162,7 @@ def test_previdenciario_bpc_loas_audiencia_estrategica_generates_approves_and_ex
         files={
             "file": (
                 "laudo_medico_cadunico_renda_bpc_loas.pdf",
-                b"%PDF-1.4\n% previdenciario fake\n%%EOF\n",
+                _real_pdf_bytes(),
                 "application/pdf",
             )
         },
