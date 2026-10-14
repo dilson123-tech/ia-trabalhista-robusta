@@ -1,0 +1,34 @@
+{
+  "$schema": "https://schema.railpack.com",
+  "steps": {
+    "build": {
+      "inputs": [
+        {
+          "step": "install"
+        },
+        {
+          "local": true,
+          "include": [
+            "."
+          ],
+          "exclude": [
+            ".venv",
+            ".env",
+            ".env.*",
+            "storage/case_attachments",
+            "__pycache__",
+            ".pytest_cache",
+            "*.pyc"
+          ]
+        }
+      ]
+    }
+  },
+  "deploy": {
+    "startCommand": "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8080}",
+    "aptPackages": [
+      "...",
+      "ffmpeg"
+    ]
+  }
+}
