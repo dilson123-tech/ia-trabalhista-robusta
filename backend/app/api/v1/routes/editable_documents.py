@@ -775,6 +775,11 @@ def _build_civil_ambiental_audiencia_person_specific_questions(context_text: str
         ]),
     ])
 
+def _normalize_audiencia_fallback_text(text: str | None) -> str:
+    decomposed = unicodedata.normalize("NFKD", (text or "").lower())
+    return "".join(ch for ch in decomposed if not unicodedata.combining(ch))
+
+
 def _build_audiencia_person_specific_questions(
     context_text: str,
     area: str | None = None,
@@ -797,70 +802,97 @@ def _build_audiencia_person_specific_questions(
     if _is_criminal_audiencia_area(area):
         return _build_criminal_audiencia_person_specific_questions(context_text)
 
-    normalized = (context_text or "").lower()
+    normalized = _normalize_audiencia_fallback_text(context_text)
 
-    has_pratic = "pratic sider" in normalized or "pratic" in normalized
-    has_edson = "edson" in normalized
-    has_rosangela = "rosangela" in normalized or "rosângela" in normalized
-    has_dilson = "dilson" in normalized
+    def _has(pattern: str) -> bool:
+        return bool(re.search(pattern, normalized))
+
+    # Palavras inteiras apenas: "pratic" não pode casar com "praticamente"/"praticar".
+    has_pratic = _has(r"(?<!\w)pratic sider(?!\w)")
+
+    # Identidade completa só com o nome completo no contexto. Nome parcial gera bloco
+    # neutro (sem sobrenome, papel ou fatos presumidos) e pede confirmação de identidade.
+    named_people = [
+        ("edson", r"(?<!\w)edson\s+estevao(?!\w)", "Edson Estevão"),
+        ("rosangela", r"(?<!\w)rosangela\s+de\s+lourdes\s+siqueira(?!\w)", "Rosangela de Lourdes Siqueira"),
+        ("dilson", r"(?<!\w)dilson\s+pereira(?!\w)", "Dilson Pereira"),
+    ]
+
+    # Fatos só entram quando o caso atual os sustenta individualmente.
+    has_carreta = _has(r"(?<!\w)carretas?(?!\w)")
+    has_locacao = has_carreta and _has(r"(?<!\w)(locacao|locacoes|locar|locada|locado|alugu\w*)(?!\w)")
+    has_seguro = has_carreta and _has(r"(?<!\w)(seguro|seguros|apolice|apolices|seguradora)(?!\w)")
+    has_posse = has_carreta and _has(r"(?<!\w)(posse|conducao|condutor|conduzia|conduzida|conduzido|motorista)(?!\w)")
+    has_valor = _has(r"(?<!\w)(cobranca|cobrado|cobrada|prejuizo|prejuizos|r\$)")
+
+    # Papéis (autora/ré) só quando o contexto os afirma junto ao nome.
+    pratic_is_autora = has_pratic and _has(
+        r"pratic sider\s+(contra|x|vs\.?|versus)\b|(autora|requerente)[^.\n]{0,60}pratic sider|pratic sider[^.\n]{0,40}(autora|requerente)"
+    )
+    dilson_is_reu = _has(
+        r"(contra|x|vs\.?|versus)\s+dilson pereira|(reu|requerido|demandado)[^.\n]{0,60}dilson pereira|dilson pereira[^.\n]{0,40}(reu|requerido|demandado)"
+    )
+
+    gap_note = (
+        "Lacuna: o contexto do caso não detalha os fatos; confirmar com o cliente/advogado "
+        "antes da audiência e ajustar as perguntas aos fatos efetivamente narrados."
+    )
 
     blocks: list[str] = []
 
     if has_pratic:
-        blocks.append(_paragraphs([
-            "Representante da PRATIC SIDER / parte autora:",
-            "1. Quem procurou a empresa inicialmente para viabilizar a locação da carreta?",
-            "2. Edson Estevão participou das tratativas antes ou durante a contratação?",
-            "3. A empresa tinha conhecimento de que Edson seria usuário, condutor ou interessado prático na carreta?",
-            "4. A empresa confirma se, nos autos, afirmou que Dilson teria apenas emprestado o CNPJ para Edson locar a carreta?",
-            "5. A empresa sabe dizer quem estava com a posse direta ou condução da carreta no momento do desaparecimento?",
-            "6. Há prova direta de que Dilson estava dirigindo ou com a posse física da carreta no momento do desaparecimento?",
-            "7. A empresa foi comunicada sobre o desaparecimento/furto da carreta? Quando e por qual meio?",
-            "8. Foi registrado boletim de ocorrência? Quem registrou e com quais informações?",
-            "9. Havia seguro para furto/roubo da carreta? A apólice e eventual negativa foram juntadas aos autos?",
-            "10. Como a empresa calculou o valor cobrado e quais documentos demonstram esse prejuízo?",
-        ]))
+        label = "Representante da PRATIC SIDER / parte autora:" if pratic_is_autora else "Representante da PRATIC SIDER:"
+        questions = [
+            label,
+            "1. Qual é a sua função e como tomou conhecimento dos fatos discutidos no processo?",
+            "2. Quais documentos a empresa possui sobre a relação discutida e foram juntados aos autos?",
+            "3. Houve comunicação formal dos fatos? Quando e por qual meio?",
+        ]
+        if has_valor:
+            questions.append("4. Como a empresa calculou o valor mencionado no caso e quais documentos o demonstram?")
+        if has_locacao:
+            questions.append("5. Quem procurou a empresa inicialmente para viabilizar a locação da carreta mencionada no caso?")
+        if has_posse:
+            questions.append("6. A empresa sabe dizer quem estava com a posse direta ou condução da carreta no momento do fato discutido?")
+        if has_seguro:
+            questions.append("7. Havia seguro da carreta? A apólice e eventual negativa foram juntadas aos autos?")
+        if not (has_valor or has_locacao or has_posse or has_seguro):
+            questions.append(gap_note)
+        blocks.append(_paragraphs(questions))
 
-    if has_edson:
-        blocks.append(_paragraphs([
-            "Edson Estevão:",
-            "1. Foi o senhor quem pediu a Dilson que fizesse a locação da carreta?",
-            "2. A carreta seria usada pelo senhor ou em atividade de seu interesse?",
-            "3. A locação foi formalizada em nome de Dilson para atender a um pedido seu?",
-            "4. Depois da locação, quem passou a usar ou conduzir a carreta no dia a dia?",
-            "5. No momento do desaparecimento, quem estava com a posse direta ou condução da carreta?",
-            "6. Dilson estava presente, dirigindo ou controlando a carreta quando ela desapareceu?",
-            "7. Onde a carreta estava quando desapareceu?",
-            "8. O local tinha controle de entrada, saída, vigilância, estacionamento ou responsável?",
-            "9. O senhor comunicou Dilson sobre o desaparecimento? Quando e por qual meio?",
-            "10. A empresa locadora foi comunicada? Quem comunicou e em qual momento aproximado?",
-        ]))
+    for token, full_pattern, full_name in named_people:
+        if _has(full_pattern):
+            if token == "dilson" and dilson_is_reu:
+                label = f"{full_name} / parte ré:"
+            else:
+                label = f"{full_name}:"
+            identity_confirmed = True
+        elif _has(rf"(?<!\w){token}(?!\w)"):
+            label = f"{token.capitalize()} (nome parcial no contexto; identidade a confirmar):"
+            identity_confirmed = False
+        else:
+            continue
 
-    if has_rosangela:
-        blocks.append(_paragraphs([
-            "Rosangela de Lourdes Siqueira:",
-            "1. A senhora conhece Dilson Pereira e Edson Estevão?",
-            "2. A senhora sabe como surgiu a locação da carreta discutida no processo?",
-            "3. Pelo que a senhora presenciou diretamente, Edson pediu ajuda de Dilson para locar a carreta?",
-            "4. A carreta era para uso de Dilson ou para uso/interesse de Edson?",
-            "5. Depois da locação, quem efetivamente passou a usar ou conduzir a carreta?",
-            "6. A senhora soube quem estava com a carreta quando ela desapareceu?",
-            "7. A senhora sabe se Dilson foi comunicado logo após o desaparecimento?",
-            "8. A senhora presenciou alguma tentativa de esconder o fato ou, ao contrário, de comunicar e resolver a situação?",
-        ]))
-
-    if has_dilson:
-        blocks.append(_paragraphs([
-            "Dilson Pereira / parte ré:",
-            "1. Qual foi a participação de Dilson na formalização da locação?",
-            "2. A locação foi feita para uso próprio de Dilson ou para atender pedido/interesse de Edson?",
-            "3. Dilson tinha posse direta, condução ou controle diário da carreta?",
-            "4. Dilson estava com a carreta quando ela desapareceu?",
-            "5. Quando Dilson tomou conhecimento do desaparecimento?",
-            "6. Quais providências foram adotadas após essa comunicação?",
-            "7. Há mensagens, testemunhas ou documentos que confirmem a participação de Edson?",
-            "8. Há prova de que Dilson agiu de má-fé ou se beneficiou do desaparecimento?",
-        ]))
+        questions = [
+            label,
+            "1. Qual é o seu envolvimento nos fatos discutidos no processo?",
+            "2. O que presenciou diretamente e o que soube por terceiros?",
+            "3. Comunicou alguém sobre os fatos? Quando e por qual meio?",
+        ]
+        if not identity_confirmed:
+            questions.append(
+                "Lacuna: apenas parte do nome consta do contexto; confirmar nome completo e papel "
+                "da pessoa antes de usar este bloco."
+            )
+        elif has_carreta:
+            questions.append("4. Qual é a sua relação com a carreta mencionada no caso?")
+            if has_posse:
+                questions.append("5. No momento do fato discutido, quem estava com a posse direta ou condução da carreta?")
+            if has_locacao:
+                questions.append("6. A locação mencionada no caso foi feita para uso próprio ou a pedido de terceiro?")
+        else:
+            questions.append(gap_note)
+        blocks.append(_paragraphs(questions))
 
     if not blocks:
         return _paragraphs([
