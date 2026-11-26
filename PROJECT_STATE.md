@@ -370,3 +370,56 @@ Síntese temática (apenas resumo — `DECISIONS.md` é a fonte normativa):
   conforme `AGENTS.md` e `DECISIONS.md`.
 - Não expõe, e nunca expôs nesta sessão, conteúdo de `.env`, `.env.bak*` ou
   qualquer segredo.
+
+## K. Checkpoint 2026-11-26 — Fechamento F1/F2
+
+Este checkpoint prevalece sobre os registros anteriores quanto
+ao estado da frente F1/F2, sem invalidar seu valor historico.
+
+### Entrega comprovada
+
+- PR #321: MERGED.
+- Commit integrado: fe8b96cb37ffab4260ef911560ddc8ef1896ab1a.
+- Merge: 2026-11-26T02:03:10Z.
+- F1: corrigida contaminacao factual nas perguntas de audiencia.
+- F2: corrigida contaminacao factual no assistente operacional.
+- Preservacao das especializacoes juridicas existentes.
+- Tratamento conservador de evidencias insuficientes ou ambiguas.
+
+### Evidencias de validacao
+
+- Regressao direcionada: 171 passed, 18 warnings.
+- Regressao complementar: 50 passed, 18 warnings.
+- Os conjuntos possuem sobreposicao e nao devem ser somados.
+- 41 regressoes especificas de isolamento F1/F2.
+- Revisao estatica independente Codex: APROVADO.
+- Aprovacao humana concedida.
+- CI final do PR #321: 5/5 checks aprovados.
+- Contagem final da suite completa nao registrada neste checkpoint.
+
+### Integracao e limites
+
+- Integracao realizada mediante recuperacao manual supervisionada.
+- Duas tentativas automatizadas anteriores foram bloqueadas.
+- O resultado nao comprova validacao operacional completa do DICO AI OPS.
+- Nenhum deploy manual realizado.
+- Auto deploy do backend Railway observado como desabilitado.
+- Production permanece NAO VERIFICADA.
+
+### Pendencias preservadas
+
+- H4: risco de resposta assincrona obsoleta no frontend.
+- H5: comportamento fail-open potencial no filtro de contexto.
+- H1/H2: coerencia juridica e lacunas probatorias.
+- H3/H6: verificacoes adicionais pendentes.
+- F3: achado latente, sem caminho produtivo confirmado.
+- F4: correcao historica identificada no PR #131.
+
+Nenhuma dessas pendencias esta automaticamente autorizada.
+
+### Continuidade estrategica
+
+Frente F1/F2 concluida e integrada na main.
+Prioridade seguinte: concluir a capacidade operacional dos
+agentes no projeto DICO AI OPS, preservando a arquitetura C.
+Nenhuma nova implementacao neste produto sem autorizacao humana.
