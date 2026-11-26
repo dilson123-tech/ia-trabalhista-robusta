@@ -168,61 +168,538 @@ def _requested_guidance_modules(lowered: str) -> list[str]:
     return ordered
 
 
+def _has_whole_term(text: str, terms: tuple[str, ...]) -> bool:
+    """Match whole words/phrases only (no substring hits like 'moto' in 'motorista')."""
+    for term in terms:
+        if re.search(r"(?<!\w)" + re.escape(term) + r"(?!\w)", text, flags=re.IGNORECASE):
+            return True
+    return False
+
+
+_DEALER_VEHICLE_TERMS = ("veículo", "veiculo", "carro", "automóvel", "automovel", "moto", "motocicleta")
+_DEALER_PURCHASE_TERMS = (
+    "comprou",
+    "compra",
+    "comprei",
+    "adquiriu",
+    "adquiri",
+    "aquisição",
+    "aquisicao",
+    "financiou",
+    "financiamento",
+)
+_DEALER_TERMS = (
+    "revendedora",
+    "garagem",
+    "comércio de automóveis",
+    "comercio de automoveis",
+    "automóveis ltda",
+    "automoveis ltda",
+)
+_DEALER_PAYMENT_TERMS = ("pix", "parcela", "parcelas", "parcelamento", "nota promissória", "nota promissoria")
+_DEALER_RETENTION_TERMS = (
+    "bloqueio",
+    "tomou",
+    "recolheu",
+    "retomou",
+    "retomada",
+    "recolhimento",
+    "busca e apreensão",
+    "busca e apreensao",
+)
+
+
+def _terms_alternation(terms: tuple[str, ...]) -> str:
+    return "(?:" + "|".join(re.escape(term) for term in terms) + ")"
+
+
+def _split_sentences(text: str) -> list[str]:
+    # "." seguido de dígito (ex.: R$ 10.800,00) não encerra a frase.
+    return [part.strip() for part in re.split(r"[.;!?]+(?=\s|$)|\n+", text) if part.strip()]
+
+
+def _vehicle_purchase_from_dealer_spans(sentence: str) -> list[tuple[int, int]]:
+    """Trechos de compra/aquisição do próprio veículo, com a revendedora ligada a essa mesma compra.
+
+    Não basta os termos coexistirem na frase: o objeto da compra deve ser o veículo
+    (até 3 palavras de distância) e a revendedora deve aparecer logo após, sem quebra
+    de oração (vírgula/"e"), indicando que é a contraparte dessa compra.
+    """
+    vehicle = _terms_alternation(_DEALER_VEHICLE_TERMS)
+    purchase = _terms_alternation(_DEALER_PURCHASE_TERMS)
+    dealer = re.compile(r"(?<!\w)" + _terms_alternation(_DEALER_TERMS) + r"(?!\w)")
+    patterns = (
+        # "comprou o veículo", "aquisição de veículo", "adquiriu veículo"
+        r"(?<!\w)" + purchase + r"(?!\w)(?:[^\w,;]+\w+){0,3}?[^\w,;]+" + vehicle + r"(?!\w)",
+        # "veículo adquirido/comprado/financiado"
+        r"(?<!\w)" + vehicle + r"(?:[^\w,;]+\w+){0,2}?[^\w,;]+(?:adquirid[oa]|comprad[oa]|financiad[oa])(?!\w)",
+    )
+    spans: list[tuple[int, int]] = []
+    for pattern in patterns:
+        for match in re.finditer(pattern, sentence):
+            tail = sentence[match.end() : match.end() + 40]
+            # contraparte da compra: revendedora logo em seguida, na mesma oração
+            dealer_match = dealer.search(tail)
+            if dealer_match and not re.search(r",|(?<!\w)e(?!\w)", tail[: dealer_match.start()]):
+                spans.append((match.start(), match.end() + dealer_match.end()))
+    return spans
+
+
+# Qualificadores que mantêm a identidade do veículo/revendedora da compra do cliente.
+_DEALER_VEHICLE_OWN_QUALIFIERS = frozenset(
+    {
+        "cliente",
+        "comprador",
+        "compradora",
+        "autor",
+        "autora",
+        "consumidor",
+        "consumidora",
+        "requerente",
+        "revendedora",
+        "garagem",
+    }
+)
+_DEALER_OWN_QUALIFIERS = frozenset(
+    {
+        "veículos",
+        "veiculos",
+        "automóveis",
+        "automoveis",
+        "carros",
+        "motos",
+        "motocicletas",
+        "seminovos",
+        "usados",
+    }
+)
+_DEALER_OTHER_RELATION = re.compile(
+    r"(?<!\w)outr[oa]s?\s+(?:contratos?|neg[oó]cios?|negociaç(?:ão|ões)|negociac(?:ao|oes)|compras?|"
+    r"financiamentos?|d[ií]vidas?|d[eé]bitos?|empr[eé]stimos?|acordos?|parcelamentos?|"
+    + "|".join(re.escape(term) for term in _DEALER_VEHICLE_TERMS + _DEALER_TERMS)
+    + r")(?!\w)"
+)
+_DEALER_INDEFINITE_BEFORE = re.compile(r"(?<!\w)(?:um|uma|algum|alguma|qualquer|novo|nova|outr[oa]s?)\s+$")
+_DEALER_OTHER_BEFORE = re.compile(r"(?<!\w)outr[oa]s?\s+$")
+
+
+def _dealer_reference_kinds(sentence: str, anchor_spans: list[tuple[int, int]]) -> tuple[bool, bool]:
+    """(há referência definida ao veículo/revendedora, há referência a outro veículo/revendedora/relação).
+
+    Considera apenas menções fora do trecho de compra (âncora). Menção qualificada por
+    outro titular ("o veículo do irmão"), indefinida ("um carro") ou "outro(a)" não
+    identifica o veículo/negociação do cliente.
+    """
+    definite = False
+    foreign = bool(_DEALER_OTHER_RELATION.search(sentence))
+    groups = ((_DEALER_VEHICLE_TERMS, _DEALER_VEHICLE_OWN_QUALIFIERS), (_DEALER_TERMS, _DEALER_OWN_QUALIFIERS))
+    for terms, own_qualifiers in groups:
+        for match in re.finditer(r"(?<!\w)" + _terms_alternation(terms) + r"(?!\w)", sentence):
+            if any(start <= match.start() and match.end() <= end for start, end in anchor_spans):
+                continue
+            before = sentence[max(0, match.start() - 20) : match.start()]
+            after = sentence[match.end() : match.end() + 40]
+            qualifier = re.match(r"\s+(?:d[oa]s?|de)\s+(\w+)", after)
+            if (
+                _DEALER_OTHER_BEFORE.search(before)
+                or re.match(r"\s+(?:dele|dela|deles|delas)(?!\w)", after)
+                or (qualifier and qualifier.group(1) not in own_qualifiers)
+            ):
+                foreign = True
+                continue
+            if not _DEALER_INDEFINITE_BEFORE.search(before):
+                definite = True
+    return definite, foreign
+
+
+# Pagador/titular diverso do cliente (parente, terceiro, posse alheia "dele/dela").
+_THIRD_PARTY_PAYER = re.compile(
+    r"(?<!\w)(?:irmã[os]?|irmão|irmaos?|irmas?|pai|pais|mãe|mae|filh[oa]s?|espos[oa]|marido|cunhad[oa]|"
+    r"sogr[oa]|genro|nora|ti[oa]|prim[oa]|sobrinh[oa]|av[ôó]|avo|net[oa]|amig[oa]s?|namorad[oa]|"
+    r"companheir[oa]|parentes?|terceir[oa]s?|vizinh[oa]|colega|sóci[oa]|soci[oa]|patrão|patrao|"
+    r"dele|dela|deles|delas)(?!\w)"
+)
+
+
+_PAYMENT_SENTENCE_TERMS = _DEALER_PAYMENT_TERMS + ("pagou", "pagamento", "pagamentos")
+# Após uma menção "nua" à revendedora só cabem pontuação, fim de frase ou conectivo.
+_DEALER_BARE_FOLLOWER = re.compile(
+    r"\s*(?:$|[.,;:!?)]|(?:e|ou|mas|que|porém|porem|quando|enquanto|após|apos)(?!\w))"
+)
+
+
+def _dealer_mention_spans(sentence: str) -> list[tuple[int, int]]:
+    """Menções à revendedora na frase (minúsculas). Termos contíguos de uma mesma
+    denominação ("revendedora x comércio de automóveis ltda") formam uma única menção:
+    no máximo 2 palavras entre eles, sem pontuação nem conectivos."""
+    spans: list[tuple[int, int]] = []
+    for match in re.finditer(r"(?<!\w)" + _terms_alternation(_DEALER_TERMS) + r"(?!\w)", sentence):
+        if spans:
+            gap = sentence[spans[-1][1] : match.start()]
+            if len(gap.split()) <= 2 and not re.search(
+                r"[.,;:!?]|(?<!\w)(?:e|ou|a|à|o|ao|da|do|na|no|para|pela|pelo|com|de)(?!\w)", gap
+            ):
+                spans[-1] = (spans[-1][0], match.end())
+                continue
+        spans.append((match.start(), match.end()))
+    return spans
+
+
+def _has_qualified_dealer_in_payment(sentence: str, anchor_spans: list[tuple[int, int]]) -> bool:
+    """Frase de pagamento que menciona revendedora qualificada fora da compra-âncora.
+
+    Retomar a mesma negociação usa menção nua ("pagou à revendedora", "a revendedora
+    recolheu"). Menção seguida de qualificador ("à revendedora beta", "à revendedora auto
+    beta", "à revendedora de motos") pode indicar destinatário distinto: vínculo ambíguo.
+    Não depende de maiúsculas nem de nomes comerciais.
+    """
+    if not _has_whole_term(sentence, _PAYMENT_SENTENCE_TERMS):
+        return False
+    for start, end in _dealer_mention_spans(sentence):
+        if any(a_start <= start < a_end for a_start, a_end in anchor_spans):
+            continue
+        if not _DEALER_BARE_FOLLOWER.match(sentence[end:]):
+            return True
+    return False
+
+
+def _dealer_linked_sentences(blob: str) -> list[str]:
+    """Frases (em minúsculas) que sustentam a compra do veículo na revendedora e o
+    pagamento/retomada vinculados a essa mesma compra. Lista vazia => fluxo genérico.
+
+    Pagamento/retomada só é vinculado quando está na própria frase da compra, ou em
+    frase que retoma de forma definida o veículo ou a revendedora; qualquer menção a
+    outro veículo, outra revendedora ou outra relação torna a frase ambígua e ela é
+    descartada (na dúvida, não associar).
+
+    Ambiguidade que atinge a própria frase da compra, pagamento por terceiro na frase da
+    compra ou pagamento a revendedora qualificada (possível destinatário distinto), em
+    qualquer frase => fluxo genérico (lista vazia).
+    Pagamento mencionado junto a terceiro (irmão, "dele"...) nunca é vinculado.
+    """
+    sentences = _split_sentences(blob.lower())
+    anchor_spans = [_vehicle_purchase_from_dealer_spans(sentence) for sentence in sentences]
+    anchors = [index for index, spans in enumerate(anchor_spans) if spans]
+    if not anchors:
+        return []
+    if any(_has_qualified_dealer_in_payment(sentence, anchor_spans[index]) for index, sentence in enumerate(sentences)):
+        return []
+    linked_terms = _DEALER_PAYMENT_TERMS + _DEALER_RETENTION_TERMS
+    linked: list[int] = []
+    for index, sentence in enumerate(sentences):
+        if not _has_whole_term(sentence, linked_terms):
+            continue
+        definite, foreign = _dealer_reference_kinds(sentence, anchor_spans[index])
+        if _has_whole_term(sentence, _PAYMENT_SENTENCE_TERMS) and (
+            _THIRD_PARTY_PAYER.search(sentence)
+        ):
+            foreign = True
+        if foreign:
+            if anchor_spans[index]:
+                # a própria frase da compra é ambígua: não usar o fluxo especializado
+                return []
+            continue
+        if anchor_spans[index] or definite:
+            linked.append(index)
+    if not linked:
+        return []
+    return [sentences[index] for index in sorted(set(anchors) | set(linked))]
+
+
+def _dealer_linked_text(blob: str) -> str:
+    return ". ".join(_dealer_linked_sentences(blob))
+
+
 def _is_vehicle_dealer_pix_context(blob: str) -> bool:
+    """Fluxo especializado só quando veículo, compra, revendedora e pagamento/retomada
+    pertencem inequivocamente à mesma relação factual. Ambiguidade => fluxo genérico."""
+    return bool(_dealer_linked_sentences(blob))
+
+
+# Limites de oração: pontuação e conjunções adversativas/concessivas.
+_CLAUSE_BOUNDARY = re.compile(
+    r"[.;:!?,\n]|(?<!\w)(?:mas|porém|porem|contudo|entretanto|todavia|embora|enquanto)(?!\w)"
+)
+# Incisos temporais que não rompem a oração ("sem apresentar, até o momento, ordem judicial").
+_TEMPORAL_PARENTHETICAL = re.compile(
+    r",\s*(?:até o momento|ate o momento|até agora|ate agora|até então|ate entao|ainda|"
+    r"em nenhum momento|em momento algum)\s*,"
+)
+_NEGATION = r"(?:não|nao|nunca|jamais|nem)"
+_CONDITIONAL_CUE = re.compile(
+    r"(?<!\w)(?:se|caso|(?:verificar|confirmar|checar|conferir|perguntar|saber|apurar|investigar|"
+    r"esclarecer|consultar|avaliar)\w*)(?!\w)"
+)
+
+
+def _clause_prefix(text: str, position: int) -> str:
+    """Trecho da mesma oração que antecede ``position``."""
+    prefix = text[:position]
+    boundaries = list(_CLAUSE_BOUNDARY.finditer(prefix))
+    return prefix[boundaries[-1].end() :] if boundaries else prefix
+
+
+def _clause_suffix(text: str, position: int) -> str:
+    """Trecho da mesma oração que sucede ``position``."""
+    suffix = text[position:]
+    boundary = _CLAUSE_BOUNDARY.search(suffix)
+    return suffix[: boundary.start()] if boundary else suffix
+
+
+_PROOF_NOUN = re.compile(r"(?<!\w)(comprovantes?|recibos?|prints?)(?!\w)")
+_PAYMENT_PROOF_WORDS = r"(?:pix|pagamentos?|parcelas?|transferências?|transferencias?)"
+_LICENSE_PROOF_WORDS = r"(?:licenciamentos?|ipva|taxas?\s+do\s+ve[ií]culo|documento\s+anual)"
+_PROOF_OWN_QUALIFIERS = frozenset({"cliente", "comprador", "compradora", "pix"})
+_PROOF_POSSESSION_CUE = re.compile(
+    r"(?<!\w)(?:possui|possuo|possuem|tem|têm|tenho|guardou|guarda|guardam|dispõe de|dispoe de|"
+    r"está com|esta com|estão com|estao com|enviou|enviaram|juntou|anexou|apresentou|entregou)(?!\w)"
+)
+_PROOF_REQUEST_CUE = re.compile(
+    r"(?<!\w)(?:solicitar|solicitad[oa]s?|solicite|solicitou|pedir|pedid[oa]s?|peça|peca|requerer|requisitar|"
+    r"obter|providenciar|cobrar|levantar|reunir|buscar)(?!\w)"
+)
+_PROOF_PENDING_CUE = re.compile(
+    r"(?<!\w)(?:sem|faltam?|aguardando|aguarda|pendentes?\s+(?:de\s+)?)(?:\s+(?:os|as|o|a|seus|suas))?\s*$"
+)
+_PROOF_AFTER_NEGATED = re.compile(
+    r"(?<!\w)" + _NEGATION + r"\s+(?:foram\s+|estão\s+|estao\s+|estavam\s+|foi\s+|está\s+|esta\s+)?"
+    r"(?:enviad|anexad|juntad|apresentad|entregu|dispon)\w*"
+)
+_PROOF_AFTER_PENDING = re.compile(
+    r"(?<!\w)(?:pendentes?|faltantes?|a solicitar|a obter|ainda não|ainda nao)(?!\w)"
+)
+_PROOF_AFTER_AVAILABLE = re.compile(
+    r"(?<!\w)(?:enviad[oa]s|anexad[oa]s|juntad[oa]s|disponíveis|disponiveis|em mãos|em maos|em posse|"
+    r"em seu poder|guardad[oa]s)(?!\w)"
+)
+
+
+def _proof_mention_kind(text: str, match: re.Match) -> str:
+    """Natureza do comprovante mencionado: "pagamento", "licenciamento", "outro" ou "generico".
+
+    "generico" = substantivo sem qualificador ("tem os comprovantes"). Comprovantes de
+    naturezas distintas (ex.: "recibos da entrada") nunca são agregados aos de pagamento.
+    """
+    after = text[match.end() : match.end() + 80]
+    if re.match(r"\s+(?:de\s+pagamento\s+)?(?:d[oa]s?\s+|de\s+|com\s+)?" + _LICENSE_PROOF_WORDS + r"(?!\w)", after):
+        return "licenciamento"
+    payment = re.match(
+        r"\s+(?:de\s+pagamento\s+)?(?:d[oa]s?\s+|de\s+|por\s+|via\s+|em\s+)?" + _PAYMENT_PROOF_WORDS + r"(?!\w)",
+        after,
+    )
+    if payment:
+        # qualificador posterior ("dos pagamentos", "das últimas parcelas") deve manter a natureza
+        qualifier = re.match(r"\s+(?:d[oa]s?|de)\s+((?:\w+\s+){0,2}\w+)", after[payment.end() :])
+        if qualifier and not any(
+            re.fullmatch(_PAYMENT_PROOF_WORDS, word) or word in _PROOF_OWN_QUALIFIERS
+            for word in qualifier.group(1).split()
+        ):
+            return "outro"
+        return "pagamento"
+    if re.match(r"\s+(?:d[oa]s?|de)\s+\w+", after) or re.match(r"\s+(?:banc[aá]ri|fisca|m[eé]dic)\w*", after):
+        return "outro"
+    if match.group(1).startswith("comprovante"):
+        return "generico"
+    return "outro"
+
+
+def _proof_mention_status(text: str, match: re.Match) -> str:
+    """Disponibilidade afirmada para UMA menção, segundo sua própria oração."""
+    prefix = _clause_prefix(text, match.start())
+    suffix = _clause_suffix(text, match.end())
+    if _CONDITIONAL_CUE.search(prefix):
+        return "desconhecido"
+    if _PROOF_PENDING_CUE.search(prefix):
+        return "pendente"
+    cues = [("posse", m) for m in _PROOF_POSSESSION_CUE.finditer(prefix)]
+    cues += [("pedido", m) for m in _PROOF_REQUEST_CUE.finditer(prefix)]
+    if cues:
+        kind, cue = max(cues, key=lambda item: item[1].start())
+        if kind == "pedido":
+            return "solicitado"
+        # negação imediatamente antes do verbo de posse (até 2 palavras: "ainda não tem")
+        if re.search(r"(?<!\w)" + _NEGATION + r"(?:\s+\w+){0,1}\s+$", prefix[: cue.start()]):
+            return "pendente"
+        return "disponivel"
+    if _PROOF_AFTER_NEGATED.search(suffix) or _PROOF_AFTER_PENDING.search(suffix):
+        return "pendente"
+    if _PROOF_AFTER_AVAILABLE.search(suffix):
+        return "disponivel"
+    return "desconhecido"
+
+
+def _document_availability(lowered: str, nature: str) -> str:
+    """Disponibilidade específica de comprovantes de uma natureza ("pagamento" ou "licenciamento").
+
+    Retorna "disponivel", "pendente", "solicitado" ou "desconhecido". Cada menção é
+    avaliada na própria oração; menções condicionais ("verificar se possui") são
+    desconhecidas; afirmações conflitantes resultam em "desconhecido" (solicitar
+    confirmação). Mera menção do documento nunca o torna disponível.
+    """
+    statuses: set[str] = set()
+    for sentence in _split_sentences(_TEMPORAL_PARENTHETICAL.sub(" ", lowered)):
+        payment_sentence = _has_whole_term(sentence, ("pix", "parcela", "parcelas", "pagamento", "pagamentos", "pagou"))
+        for match in _PROOF_NOUN.finditer(sentence):
+            kind = _proof_mention_kind(sentence, match)
+            if kind == "generico":
+                # "tem os comprovantes" só se refere aos pagamentos quando a própria frase os menciona
+                kind = "pagamento" if payment_sentence else "outro"
+            if kind != nature:
+                continue
+            statuses.add(_proof_mention_status(sentence, match))
+    if not statuses:
+        return "desconhecido"
+    if "disponivel" in statuses:
+        return "disponivel" if statuses == {"disponivel"} else "desconhecido"
+    if "desconhecido" in statuses:
+        return "desconhecido"
+    if "pendente" in statuses:
+        return "pendente"
+    return "solicitado"
+
+
+def _proof_documents_status(lowered: str) -> str:
+    """Disponibilidade dos comprovantes dos pagamentos (Pix/parcelas) segundo o contexto."""
+    return _document_availability(lowered, "pagamento")
+
+
+_FORMAL_DOCUMENT = (
+    r"(?:ordem judicial|ordens judiciais|mandado|mandados|documentos? forma(?:l|is)|notificaç(?:ão|ões)|"
+    r"notificac(?:ao|oes)|busca e apreens(?:ão|ao)|justificativa formal|"
+    r"document(?:o|os|ação|acao)\s+(?:d[oa]\s+|sobre\s+o\s+|que\s+(?:comprove|justifique|sustente)\s+o\s+)bloqueio)"
+)
+_FORMAL_DOCUMENT_VERB = (
+    r"(?:receb\w*|apresent\w*|entreg\w*|mostr\w*|exib\w*|possui|tem|houve|há|ha|existe|existir|existia|enviou|enviad\w*)"
+)
+# Entre verbo e documento só determinantes/advérbios: impede atravessar outro objeto.
+_FORMAL_DOCUMENT_FILLER = (
+    r"(?:\s+(?:o|a|os|as|um|uma|nenhum|nenhuma|qualquer|quaisquer|sequer|nem|ainda|também|tambem|já|ja|jamais|nunca))"
+)
+_FORMAL_DOCUMENT_ABSENCE = re.compile(
+    r"(?<!\w)(?:não|nao|nunca|jamais|sem)"
+    r"(?:\s+(?:lhe|lhes|me|se|foi|foram|ter|tido|tinha|ainda|sequer|chegou|chegaram|a|o|ao|à))*"
+    r"\s+" + _FORMAL_DOCUMENT_VERB + _FORMAL_DOCUMENT_FILLER + r"{0,3}\s+" + _FORMAL_DOCUMENT + r"(?!\w)"
+)
+_FORMAL_DOCUMENT_AFFIRMATION = re.compile(
+    r"(?<!\w)" + _FORMAL_DOCUMENT_VERB + _FORMAL_DOCUMENT_FILLER + r"{0,3}\s+" + _FORMAL_DOCUMENT + r"(?!\w)"
+)
+
+
+def _formal_block_document_status(lowered: str) -> str:
+    """"ausente" | "mencionado" | "desconhecido" para documento formal (ordem judicial, mandado...).
+
+    "ausente" só quando a ausência é afirmada na própria oração (negação + verbo + documento,
+    sem atravessar vírgula, adversativa ou outro objeto) e nenhuma outra oração afirma
+    recebimento/existência de documento formal. Afirmação de recebimento/existência
+    (ou contradição) => "mencionado". Condicional ("verificar se recebeu") não conta.
+    """
+    text = _TEMPORAL_PARENTHETICAL.sub(" ", lowered)
+    absent = False
+    affirmed = False
+    for match in _FORMAL_DOCUMENT_ABSENCE.finditer(text):
+        if not _CONDITIONAL_CUE.search(_clause_prefix(text, match.start())):
+            absent = True
+    for match in _FORMAL_DOCUMENT_AFFIRMATION.finditer(text):
+        prefix = _clause_prefix(text, match.start())
+        if re.search(
+            r"(?<!\w)(?:não|nao|nunca|jamais|sem)(?:\s+\w+){0,3}\s*$", prefix
+        ) or _CONDITIONAL_CUE.search(prefix):
+            continue
+        affirmed = True
+    if affirmed:
+        return "mencionado"
+    if absent:
+        return "ausente"
+    return "desconhecido"
+
+
+def _dealer_case_flags(blob: str) -> dict[str, Any]:
+    """Per-claim evidence flags derived only from the current case text.
+
+    Pix, parcelas, retomada e bloqueio só contam quando aparecem em frases vinculadas
+    inequivocamente à compra do veículo na revendedora (``_dealer_linked_text``).
+    """
     lowered = blob.lower()
-    has_vehicle = any(
-        marker in lowered
-        for marker in (
-            "veículo",
-            "veiculo",
-            "carro",
-            "automóvel",
-            "automovel",
-            "moto",
-            "placa",
-            "renavam",
-            "chassi",
-        )
+    linked = _dealer_linked_text(lowered)
+    retention = _has_whole_term(
+        linked,
+        ("tomou", "recolheu", "retomou", "retomada", "recolhimento", "busca e apreensão", "busca e apreensao"),
     )
-    has_dealer = any(
-        marker in lowered
-        for marker in (
-            "revendedora",
-            "garagem",
-            "automóveis",
-            "automoveis",
-            "quintino",
-            "comércio de automóveis",
-            "comercio de automoveis",
-        )
+    formal_docs_status = _formal_block_document_status(lowered)
+    return {
+        "linked_text": linked,
+        "pix": _has_whole_term(linked, ("pix",)),
+        "installments": _has_whole_term(
+            linked, ("parcela", "parcelas", "parcelamento", "nota promissória", "nota promissoria")
+        ),
+        "contract_request": _has_whole_term(lowered, ("contrato",)),
+        "retention": retention,
+        "block": _has_whole_term(linked, ("bloqueio", "bloqueado", "bloqueada")),
+        # ausência de documento formal só quando o contexto a informa explicitamente, sem contradição
+        "no_formal_docs": formal_docs_status == "ausente",
+        # "ausente" | "mencionado" | "desconhecido"
+        "formal_docs_status": formal_docs_status,
+        # "disponivel" | "pendente" | "solicitado" | "desconhecido" — apenas comprovantes dos pagamentos
+        "proofs_status": _proof_documents_status(lowered),
+        # disponibilidade própria dos comprovantes de licenciamento/IPVA (natureza distinta)
+        "license_proofs_status": _document_availability(lowered, "licenciamento"),
+        "license": _has_whole_term(
+            lowered,
+            ("licenciamento", "licenciamentos", "ipva", "documento anual", "taxa do veículo", "taxa do veiculo"),
+        ),
+    }
+
+
+# Bens entregues e via do contrato não são afirmados a partir de coincidências textuais:
+# viram perguntas neutras ao cliente.
+_GOODS_QUESTION = "Houve entrega de algum bem como parte do pagamento desta negociação?"
+_CONTRACT_COPY_QUESTION = "O cliente possui uma via do contrato referente a esta negociação?"
+
+
+_MONEY_PATTERN = r"R\$\s*(\d{1,3}(?:\.\d{3})*,\d{2}|\d+,\d{2})"
+
+
+def _extract_installment_facts(blob: str) -> dict[str, str]:
+    """Extract installment figures only when the current case text states them."""
+    facts: dict[str, str] = {}
+    match = re.search(
+        r"(\d{1,3})\s+parcelas?(?:\s+mensais)?\s+de\s+" + _MONEY_PATTERN,
+        blob,
+        flags=re.IGNORECASE,
     )
-    has_payment = any(
-        marker in lowered
-        for marker in (
-            "pix",
-            "parcela",
-            "parcelas",
-            "parcelamento",
-            "nota promissória",
-            "nota promissoria",
-            "entrada",
-            "r$",
-        )
+    if match:
+        facts["count"] = match.group(1)
+        facts["value"] = f"R$ {match.group(2)}"
+        facts["phrase"] = f"{match.group(1)} parcelas de R$ {match.group(2)}"
+    total = re.search(
+        r"total(?:izando|\s+pago|\s+preliminar)?[^R\d]{0,30}" + _MONEY_PATTERN,
+        blob,
+        flags=re.IGNORECASE,
     )
-    has_retention = any(
-        marker in lowered
-        for marker in (
-            "bloqueio",
-            "tomou",
-            "recolheu",
-            "retomou",
-            "retomada",
-            "recolhimento",
-            "busca e apreensão",
-            "busca e apreensao",
-        )
-    )
-    return has_vehicle and has_dealer and (has_payment or has_retention)
+    if total:
+        facts["total"] = f"R$ {total.group(1)}"
+    return facts
+
+
+def _installment_phrase(facts: dict[str, str]) -> str:
+    return facts.get("phrase") or "as parcelas pagas (quantidade e valor a confirmar nos comprovantes)"
+
+
+def _installment_total_phrase(facts: dict[str, str]) -> str:
+    if facts.get("total"):
+        return f"o total informado de {facts['total']}"
+    return "o total pago (a apurar a partir dos comprovantes)"
+
+
+def _proof_status_sentence(status: str, label: str) -> str:
+    """Frase que distingue documento disponível, solicitado, pendente ou de disponibilidade desconhecida."""
+    if status == "disponivel":
+        return f"Disponível: cliente informa possuir {label}; "
+    if status == "pendente":
+        return f"Pendente: o contexto indica que {label} ainda não estão em posse ou não foram apresentados; "
+    if status == "solicitado":
+        return f"Solicitado: {label} foram solicitados, mas o contexto não confirma que já estejam disponíveis; "
+    return f"Disponibilidade desconhecida: o contexto não informa se o cliente possui {label}; confirmar e solicitar ao cliente. "
 
 
 def _timeline_guide_text(case: Case, context: dict[str, Any], message: str = "") -> str:
@@ -230,59 +707,61 @@ def _timeline_guide_text(case: Case, context: dict[str, Any], message: str = "")
     blob = f"{_case_context_text(case, context)} {message}".lower()
 
     if _is_vehicle_dealer_pix_context(blob):
+        flags = _dealer_case_flags(blob)
+        # valores de parcelas só das frases vinculadas à compra do veículo na revendedora
+        installment_facts = _extract_installment_facts(flags["linked_text"])
         facts = [
             (
                 "A confirmar",
                 "Compra do veículo junto à revendedora",
-                "Cliente relata que adquiriu veículo junto à revendedora, mediante negociação parcelada, com entrega de bens como entrada e pagamentos posteriores via Pix.",
+                "Cliente relata que adquiriu veículo junto à revendedora"
+                + (", mediante negociação parcelada" if flags["installments"] else "")
+                + (", e pagamentos via Pix" if flags["pix"] else "")
+                + ". Demais condições da negociação não constam do contexto e devem ser esclarecidas.",
                 "contrato, nota promissória, mensagens com a revendedora, comprovantes de negociação e documentos do veículo adquirido",
                 "cliente comprador; pessoa que acompanhou a negociação; representante da revendedora",
-                "confirmar data da compra, dados do veículo adquirido, placa, Renavam, chassi, valor total contratado e condições da negociação",
+                "confirmar data da compra, dados do veículo adquirido, placa, Renavam, chassi, valor total contratado e condições da negociação; perguntar ao cliente: "
+                + _GOODS_QUESTION
+                + " "
+                + _CONTRACT_COPY_QUESTION,
             ),
             (
                 "A confirmar",
-                "Entrega do veículo Scenic 2004 como parte da entrada",
-                "Cliente informa que entregou um veículo Scenic 2004 avaliado em R$ 4.000,00 como parte da entrada na negociação.",
-                "documentos do Scenic 2004, recibo, mensagens, comprovante de transferência, avaliação ou declaração de recebimento",
-                "cliente comprador; pessoa que presenciou a entrega; representante da revendedora que recebeu o bem",
-                "confirmar se houve recibo, transferência, avaliação formal e identificação de quem recebeu o veículo",
-            ),
-            (
-                "A confirmar",
-                "Entrega da moto Honda CBX 300 como parte da entrada",
-                "Cliente informa que entregou uma moto Honda CBX 300 avaliada em R$ 11.000,00 como parte da entrada na negociação.",
-                "documentos da Honda CBX 300, recibo, mensagens, comprovante de transferência, avaliação ou declaração de recebimento",
-                "cliente comprador; pessoa que presenciou a entrega; representante da revendedora que recebeu o bem",
-                "confirmar se houve recibo, transferência, avaliação formal e identificação de quem recebeu a moto",
-            ),
-            (
-                "A confirmar",
-                "Pagamento de 34 parcelas via Pix",
-                "Cliente informa que pagou 34 parcelas de R$ 1.180,00 via Pix, totalizando R$ 40.120,00 em parcelas pagas à revendedora ou a destinatário vinculado à negociação.",
+                ("Pagamento das parcelas" if not installment_facts.get("count") else f"Pagamento de {installment_facts['count']} parcelas")
+                + (" via Pix" if flags["pix"] else ""),
+                f"Conforme o contexto do caso, {_installment_phrase(installment_facts)}"
+                + (" via Pix" if flags["pix"] else "")
+                + f"; conferir {_installment_total_phrase(installment_facts)}, e o destinatário (revendedora ou pessoa vinculada à negociação, a confirmar).",
                 "comprovantes Pix, extratos bancários, identificação do destinatário dos Pix, mensagens de cobrança ou confirmação de pagamento",
                 "cliente comprador; pessoa que auxiliou nos pagamentos; responsável da revendedora que recebia ou confirmava os pagamentos",
                 "conferir datas, destinatários, chaves Pix, valores, soma total e eventual saldo alegado pela revendedora",
             ),
             (
                 "A confirmar",
-                "Perda da via física do contrato pelo comprador",
-                "Cliente informa que perdeu sua via física do contrato, permanecendo pendente a obtenção de cópia junto à revendedora.",
-                "relato do cliente, mensagens solicitando cópia do contrato, eventual negativa ou ausência de resposta",
-                "cliente comprador; representante da revendedora responsável pelo contrato",
-                "solicitar cópia integral do contrato, notas promissórias, recibos e prestação de contas",
-            ),
-            (
-                "A confirmar",
                 "Retomada ou recolhimento do veículo pela revendedora",
-                "Cliente relata que a revendedora tomou ou recolheu o veículo sob alegação de suposto bloqueio, sem documentação completa apresentada até o momento.",
+                "O contexto indica retomada/recolhimento do veículo"
+                + (", com alegação de bloqueio" if flags["block"] else "")
+                + "; quem agiu, quando e com qual justificativa devem ser confirmados com o cliente e os documentos.",
                 "mensagens, fotos, vídeos, comprovante de guincho, localização do veículo, comunicação da revendedora ou testemunhas",
                 "cliente comprador; pessoa que presenciou o recolhimento; representante da revendedora; eventual guincheiro ou terceiro",
                 "confirmar data, local, quem realizou o recolhimento, onde está o veículo e qual justificativa formal foi apresentada",
             ),
             (
                 "A confirmar",
-                "Ausência de documentação clara sobre o suposto bloqueio",
-                "Até o momento, o cliente informa não ter recebido ordem judicial, busca e apreensão, contrato, prestação de contas, documento formal da dívida ou comprovação do suposto bloqueio.",
+                (
+                    "Ausência de documentação clara sobre o suposto bloqueio"
+                    if flags["no_formal_docs"]
+                    else "Documentação do bloqueio alegado a confirmar"
+                ),
+                (
+                    "O cliente informa não ter recebido documento formal que sustente o bloqueio alegado."
+                    if flags["no_formal_docs"]
+                    else (
+                        "O contexto menciona documento formal (ordem judicial, mandado, notificação ou similar), mas não permite confirmar seu conteúdo nem seu vínculo com o bloqueio alegado; verificar o documento com o cliente."
+                        if flags["formal_docs_status"] == "mencionado"
+                        else "O contexto menciona bloqueio, mas não informa se existe ou não documento formal que o sustente; confirmar com o cliente se recebeu ordem judicial, busca e apreensão, notificação ou outro documento."
+                    )
+                ),
                 "mensagens de solicitação, resposta ou silêncio da revendedora, consulta Detran, consulta processual, documentos recebidos ou ausência deles",
                 "cliente comprador; advogado responsável pela conferência; representante da revendedora",
                 "validar documentalmente se existe bloqueio administrativo, ordem judicial, busca e apreensão ou apenas alegação comercial",
@@ -290,20 +769,39 @@ def _timeline_guide_text(case: Case, context: dict[str, Any], message: str = "")
             (
                 "A confirmar",
                 "Avaliação jurídica das medidas cabíveis",
-                "Diante da compra, entradas com bens, pagamentos via Pix e retomada/recolhimento do veículo, o caso depende de avaliação do advogado sobre exibição de contrato/documentos, restituição do veículo ou valores, danos materiais/morais e eventual tutela de urgência.",
-                "conjunto documental do caso, comprovantes Pix, documentos dos bens de entrada, mensagens e consultas oficiais",
+                "Diante dos fatos efetivamente sustentados pelo contexto (compra do veículo"
+                + (", pagamentos via Pix" if flags["pix"] else "")
+                + (", retomada/recolhimento do veículo" if flags["retention"] else "")
+                + (", alegação de bloqueio" if flags["block"] else "")
+                + "), o caso depende de avaliação do advogado sobre as medidas cabíveis, conforme a documentação a ser reunida.",
+                "conjunto documental do caso, comprovantes de pagamento, mensagens e consultas oficiais",
                 "cliente comprador; advogado responsável; eventuais testemunhas dos fatos principais",
                 "não afirmar crime, culpa ou ilegalidade definitiva sem prova; manter linguagem prudente e pendente de validação documental",
             ),
         ]
-    elif "pátio" in blob or "patio" in blob or "carreta" in blob:
+        # Itens que afirmam fatos específicos só entram se o caso atual os sustentar.
+        def _supported(title: str) -> bool:
+            if title.startswith("Retomada ou recolhimento"):
+                return flags["retention"]
+            if title.startswith(("Ausência de documentação clara", "Documentação do bloqueio alegado")):
+                return flags["block"]
+            if title.startswith("Pagamento"):
+                return flags["pix"] or flags["installments"]
+            return True
+
+        facts = [fact for fact in facts if _supported(fact[1])]
+    elif _has_whole_term(blob, ("pátio", "patio", "carreta")):
         facts = [
             ("A confirmar", "Entrada ou permanência da carreta no pátio", "Registrar quando, onde, por quem e por qual motivo a carreta ficou sob guarda do pátio.", "contrato, recibo, mensagens, comprovante de entrada ou documentos do pátio", "quem entregou, recebeu, autorizou ou acompanhou a guarda", "confirmar data exata, responsável pela guarda e documento de entrada"),
             ("A confirmar", "Desaparecimento, furto ou não localização da carreta", "Registrar quando foi percebido que a carreta não estava mais disponível, quem comunicou o fato e qual foi a resposta do pátio.", "BO, mensagens, ligações, fotos, comunicações e registros do pátio", "pessoa que constatou ou comunicou o desaparecimento", "confirmar data, horário, local e versão do pátio"),
             ("A confirmar", "Boletim de ocorrência e comunicações do fato", "Registrar a data do BO e demais comunicações feitas ao pátio, seguradora, locador, locatário ou responsáveis.", "boletim de ocorrência, protocolos, mensagens e e-mails", "quem registrou o BO ou participou da comunicação", "anexar BO e identificar todos os protocolos"),
-            ("28/05 ou data a confirmar", "Audiência/acordo anterior envolvendo a carreta", "Registrar que houve audiência ou acordo anterior relacionado ao pagamento da carreta, sem confundir esse acordo com a responsabilidade do pátio.", "ata de audiência, termo de acordo, processo anterior", "partes presentes na audiência", "confirmar número do processo, termos do acordo e valores"),
             ("A confirmar", "Avaliação de responsabilidade do pátio", "Registrar as providências para apurar se o pátio tinha dever de guarda e se houve falha na custódia do bem.", "contrato, recibos, regulamento do pátio, mensagens, BO e documentos do veículo", "responsável do pátio, cliente, condutor ou testemunhas", "confirmar fundamento da guarda e documentos faltantes"),
         ]
+        if _has_whole_term(blob, ("acordo", "acordos")):
+            facts.insert(
+                3,
+                ("A confirmar", "Acordo anterior mencionado no caso", "O contexto menciona acordo; registrar data, processo e partes conforme os documentos, sem confundir esse acordo com a responsabilidade do pátio.", "ata de audiência, termo de acordo, processo anterior", "partes presentes", "confirmar data, número do processo, termos do acordo e valores"),
+            )
     else:
         facts = [
             ("A confirmar", "Início da relação ou situação jurídica", "Registrar quando e como começou a relação entre as partes, serviço, contrato, trabalho, benefício, atendimento, guarda, compra ou conflito.", "contrato, mensagens, recibos, cadastro, protocolo ou documento inicial", "quem participou ou presenciou o início dos fatos", "confirmar data inicial e partes envolvidas"),
@@ -331,6 +829,11 @@ def _checklist_guide_text(case: Case, context: dict[str, Any], message: str = ""
     blob = f"{_case_context_text(case, context)} {message}".lower()
 
     if _is_vehicle_dealer_pix_context(blob):
+        flags = _dealer_case_flags(blob)
+        # valores de parcelas só das frases vinculadas à compra do veículo na revendedora
+        installment_facts = _extract_installment_facts(flags["linked_text"])
+        installments = _installment_phrase(installment_facts)
+        installments_total = _installment_total_phrase(installment_facts)
         pending_items = [
             (
                 "Conferir e anexar comprovantes Pix das parcelas pagas",
@@ -338,7 +841,8 @@ def _checklist_guide_text(case: Case, context: dict[str, Any], message: str = ""
                 "alta",
                 "cliente",
                 "a definir",
-                "Cliente informa possuir comprovantes Pix de 34 parcelas de R$ 1.180,00, totalizando R$ 40.120,00. Conferir todos os comprovantes, datas, valores, destinatário, chave Pix, banco de origem e vínculo com a negociação do veículo. Depois de conferidos, anexar os arquivos em Anexos/provas e registrar se há parcela faltante ou divergente.",
+                _proof_status_sentence(flags["proofs_status"], f"comprovantes de {installments}")
+                + f"{installments_total}. Conferir todos os comprovantes, datas, valores, destinatário, chave Pix, banco de origem e vínculo com a negociação do veículo. Depois de conferidos, anexar os arquivos em Anexos/provas e registrar se há parcela faltante ou divergente.",
             ),
             (
                 "Montar resumo cronológico dos pagamentos realizados",
@@ -346,7 +850,7 @@ def _checklist_guide_text(case: Case, context: dict[str, Any], message: str = ""
                 "alta",
                 "cliente/advogado",
                 "a definir",
-                "Organizar os pagamentos em ordem cronológica, com data, valor, destinatário, chave Pix, banco, comprovante correspondente e observação. Confirmar se o total pago em parcelas é R$ 40.120,00 e se todos os Pix foram enviados à revendedora, representante ou pessoa vinculada à negociação.",
+                f"Organizar os pagamentos em ordem cronológica, com data, valor, destinatário, chave Pix, banco, comprovante correspondente e observação. Confirmar {installments_total} e se todos os Pix foram enviados à revendedora, representante ou pessoa vinculada à negociação.",
             ),
             (
                 "Solicitar contrato, notas promissórias e prestação de contas da revendedora",
@@ -354,15 +858,20 @@ def _checklist_guide_text(case: Case, context: dict[str, Any], message: str = ""
                 "alta",
                 "revendedora/cliente/advogado",
                 "a definir",
-                "Cliente informa que perdeu sua via física do contrato. Solicitar cópia integral do contrato, notas promissórias, recibos, demonstrativo de parcelas, saldo alegado, prestação de contas e qualquer documento usado pela revendedora para justificar a retomada ou recolhimento do veículo.",
+                "Perguntar ao cliente: "
+                + _CONTRACT_COPY_QUESTION
+                + " Solicitar cópia integral do contrato, notas promissórias, recibos, demonstrativo de parcelas, saldo alegado, prestação de contas"
+                + (" e qualquer documento usado pela revendedora para justificar a retomada ou recolhimento do veículo." if flags["retention"] else " e demais documentos da negociação."),
             ),
             (
-                "Comprovar bens entregues como entrada",
-                "prova",
-                "alta",
+                "Esclarecer eventual bem dado na negociação",
+                "informação",
+                "normal",
                 "cliente",
                 "a definir",
-                "Levantar documentos, recibos, prints, mensagens ou comprovantes da entrega do Scenic 2004 avaliado em R$ 4.000,00 e da moto Honda CBX 300 avaliada em R$ 11.000,00. Confirmar quem recebeu os bens, data da entrega, avaliação usada e se houve transferência ou recibo.",
+                "Perguntar ao cliente: "
+                + _GOODS_QUESTION
+                + " O contexto não permite afirmar. Somente se o cliente confirmar, identificar o bem, valor atribuído, data, quem recebeu e documentos correspondentes.",
             ),
             (
                 "Comprovar retomada ou recolhimento do veículo",
@@ -394,9 +903,22 @@ def _checklist_guide_text(case: Case, context: dict[str, Any], message: str = ""
                 "normal",
                 "advogado",
                 "a definir",
-                "Após reunir Pix, documentos da entrada, contrato/prestação de contas e prova do recolhimento, avaliar pedidos possíveis: exibição de documentos, restituição do veículo ou valores, danos materiais/morais e tutela de urgência. Não afirmar culpa ou ilegalidade definitiva sem prova documental.",
+                "Após reunir a documentação disponível do caso, avaliar pedidos possíveis: exibição de documentos, restituição do veículo ou valores, danos materiais/morais e tutela de urgência, conforme os fatos que vierem a ser comprovados. Não afirmar culpa ou ilegalidade definitiva sem prova documental.",
             ),
         ]
+
+        def _checklist_supported(title: str) -> bool:
+            if title.startswith(("Conferir e anexar comprovantes Pix", "Montar resumo cronológico")):
+                return flags["pix"] or flags["installments"]
+            if title.startswith("Comprovar retomada"):
+                return flags["retention"]
+            if title.startswith("Verificar existência do suposto bloqueio"):
+                return flags["block"]
+            if title.startswith("Consultar Detran"):
+                return flags["block"] or flags["retention"]
+            return True
+
+        pending_items = [item for item in pending_items if _checklist_supported(item[0])]
     else:
         pending_items = [
             (
@@ -443,17 +965,15 @@ def _attachments_guide_text(case: Case, context: dict[str, Any], message: str = 
     blob = f"{_case_context_text(case, context)} {message}".lower()
 
     if _is_vehicle_dealer_pix_context(blob):
-        has_license = any(
-            marker in blob
-            for marker in (
-                "licenciamento",
-                "licenciamentos",
-                "ipva",
-                "documento anual",
-                "taxa do veículo",
-                "taxa do veiculo",
-            )
-        )
+        flags = _dealer_case_flags(blob)
+        has_license = flags["license"]
+        # valores de parcelas só das frases vinculadas à compra do veículo na revendedora
+        installments = _installment_phrase(_extract_installment_facts(flags["linked_text"]))
+
+        # "Disponível" = o contexto indica que o cliente possui o documento; caso contrário
+        # o documento é apenas solicitado/pendente.
+        proofs_status = flags["proofs_status"]
+        pix_proofs_available = (flags["pix"] or flags["installments"]) and proofs_status == "disponivel"
 
         available = [
             (
@@ -461,11 +981,16 @@ def _attachments_guide_text(case: Case, context: dict[str, Any], message: str = 
                 "comprovante de pagamento",
                 "Comprovante Pix de parcela do veículo adquirido junto à revendedora. Usar para conferência de data, valor, destinatário, chave Pix, banco de origem e vínculo com a negociação.",
                 "Ajuda a demonstrar pagamento de parcelas, histórico de adimplemento informado pelo cliente e valor econômico já desembolsado.",
-                "Conferir se todos os comprovantes correspondem à negociação, se o destinatário é a revendedora/representante e se o total bate com as 34 parcelas de R$ 1.180,00.",
+                "Conferir se todos os comprovantes correspondem à negociação, se o destinatário é a revendedora/representante e se o total bate com " + installments + ".",
             ),
         ]
 
-        if has_license:
+        if not pix_proofs_available:
+            available = []
+
+        # licenciamento é natureza distinta: disponibilidade própria, nunca herdada dos comprovantes Pix
+        license_status = flags["license_proofs_status"]
+        if has_license and license_status == "disponivel":
             available.append(
                 (
                     "Comprovantes de pagamento dos licenciamentos",
@@ -476,22 +1001,54 @@ def _attachments_guide_text(case: Case, context: dict[str, Any], message: str = 
                 )
             )
 
-        pending = [
+        pending = []
+        if not pix_proofs_available and (flags["pix"] or flags["installments"]):
+            pending.append(
+                "Comprovantes dos pagamentos mencionados (Pix/parcelas): "
+                + _proof_status_sentence(proofs_status, "os comprovantes").strip()
+            )
+        if has_license and license_status != "disponivel":
+            pending.append(
+                "Comprovantes de pagamento dos licenciamentos/IPVA mencionados: "
+                + _proof_status_sentence(license_status, "esses comprovantes").strip()
+            )
+        pending += [
             "Contrato de compra e venda ou financiamento/parcelamento firmado com a revendedora.",
             "Notas promissórias, recibos, carnês, demonstrativo de parcelas ou confissão de dívida.",
-            "Recibos ou documentos da entrada com Scenic 2004 e Honda CBX 300.",
-            "Prestação de contas da revendedora com valores pagos, saldo alegado e motivo da retomada/recolhimento.",
-            "Documento formal do suposto bloqueio, ordem judicial, busca e apreensão, restrição Detran ou justificativa administrativa.",
-            "Prova da retomada/recolhimento: mensagens, fotos, vídeos, guincho, local onde o veículo está ou testemunhas.",
-            "Consultas Detran e eventuais consultas processuais vinculadas ao veículo ou às partes.",
         ]
+        pending.append(
+            "Perguntar ao cliente: " + _GOODS_QUESTION + " Somente se confirmado, solicitar recibos ou documentos do bem."
+        )
+        pending.append(
+            "Prestação de contas da revendedora com valores pagos e saldo alegado"
+            + (", e motivo da retomada/recolhimento." if flags["retention"] else ".")
+        )
+        if flags["block"]:
+            pending.append("Documento formal do bloqueio alegado, ordem judicial, busca e apreensão, restrição Detran ou justificativa administrativa.")
+        if flags["retention"]:
+            pending.append("Prova da retomada/recolhimento: mensagens, fotos, vídeos, guincho, local onde o veículo está ou testemunhas.")
+        if flags["block"] or flags["retention"]:
+            pending.append("Consultas Detran e eventuais consultas processuais vinculadas ao veículo ou às partes.")
 
         risks = [
             "Sem contrato, fica pendente confirmar valor total, cláusulas, vencimentos, multa, saldo e autorização contratual alegada.",
-            "Sem documento do suposto bloqueio, não se deve afirmar irregularidade definitiva; é necessário validar se houve ordem judicial, restrição administrativa ou mera alegação comercial.",
             "Sem prestação de contas, o cálculo de saldo, devolução, restituição ou indenização fica pendente de conferência.",
-            "Sem prova da retomada/recolhimento, é importante buscar mensagens, testemunhas ou documento que confirme data, local, responsável e destino do veículo.",
         ]
+        if flags["block"]:
+            risks.append(
+                (
+                    "O cliente informa não ter recebido documento formal do bloqueio alegado"
+                    if flags["no_formal_docs"]
+                    else (
+                        "O contexto não permite confirmar se o documento formal mencionado se refere ao bloqueio alegado"
+                        if flags["formal_docs_status"] == "mencionado"
+                        else "O contexto não informa se existe documento formal do bloqueio alegado"
+                    )
+                )
+                + "; não se deve afirmar irregularidade definitiva, sendo necessário validar se houve ordem judicial, restrição administrativa ou mera alegação comercial."
+            )
+        if flags["retention"]:
+            risks.append("Sem prova da retomada/recolhimento, é importante buscar mensagens, testemunhas ou documento que confirme data, local, responsável e destino do veículo.")
 
         blocks = [
             f"Para o caso: {case_title}",
@@ -510,7 +1067,10 @@ def _attachments_guide_text(case: Case, context: dict[str, Any], message: str = 
                 f"Cuidado/conferência: {caution}"
             )
 
-        blocks.append("\nProvas/documentos ainda pendentes:")
+        if not available:
+            blocks.append("(O contexto não confirma documentos já em posse do cliente; trate todos como solicitados/pendentes.)")
+
+        blocks.append("\nProvas/documentos solicitados ou ainda pendentes:")
         for index, item in enumerate(pending, start=1):
             blocks.append(f"{index}. {item}")
 
@@ -520,9 +1080,9 @@ def _attachments_guide_text(case: Case, context: dict[str, Any], message: str = 
 
         blocks.append(
             "\nPróximas providências:\n"
-            "1. Anexar primeiro os comprovantes Pix e, se existirem, os comprovantes de licenciamentos.\n"
+            "1. Anexar primeiro os documentos que o cliente de fato possuir e confirmar com ele o que ainda precisa ser solicitado.\n"
             "2. Descrever cada arquivo de forma objetiva, sem aumentar o conteúdo do documento.\n"
-            "3. Criar pendências no Checklist para contrato, prestação de contas, entrada com bens, suposto bloqueio e prova do recolhimento.\n"
+            "3. Criar pendências no Checklist para os documentos solicitados acima.\n"
             "4. Depois de anexar as provas reais, atualizar o Dossiê interno para consolidar o que já existe e o que ainda falta."
         )
 

@@ -76,7 +76,7 @@ def test_criminal_audiencia_questions_remain_criminal_after_labor_addition():
 
 def test_civil_pratic_sider_flow_remains_civil_after_labor_addition():
     content = _build_audiencia_person_specific_questions(
-        "Processo PRATIC SIDER contra Dilson Pereira envolvendo Edson Estevão e Rosangela.",
+        "Processo PRATIC SIDER contra Dilson Pereira envolvendo Edson Estevão e Rosangela de Lourdes Siqueira.",
         area="civel",
     ).lower()
 
