@@ -1,5 +1,35 @@
 # NEXT_STEP.md — Tarefa operacional corrente
 
+## CHECKPOINT VIGENTE — 2026-11-26
+
+Esta secao prevalece sobre as orientacoes operacionais anteriores,
+que permanecem abaixo como registro historico.
+
+- OPS-005: concluido e integrado.
+- F1/F2: concluido, aprovado e integrado pelo PR #321.
+- Commit: fe8b96cb37ffab4260ef911560ddc8ef1896ab1a.
+- CI final: 5/5 checks aprovados.
+- Production: NAO VERIFICADA.
+- Nenhum deploy manual realizado.
+
+### Proxima tarefa operacional
+
+Concluir o fechamento documental F1/F2.
+
+Apos esse fechamento, manter este produto em espera supervisionada.
+A prioridade estrategica passa ao DICO AI OPS: resolver os impedimentos
+operacionais da arquitetura C e validar a cooperacao automatizada
+entre executor Claude e revisor Codex.
+
+As pendencias H1-H6 e F3 permanecem registradas em PROJECT_STATE.md.
+Nenhuma nova implementacao esta autorizada neste produto.
+
+Preservar as regras de AGENTS.md e DECISIONS.md.
+Nenhum commit, push, merge, deploy ou acesso a Production
+esta automaticamente autorizado.
+
+---
+
 ## A. Finalidade
 
 Este documento define a **única tarefa operacional corrente em foco**, no
